@@ -1,65 +1,139 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
-const { JWT_SECRET } = require('../middleware/auth');
+const { requireAuth, JWT_SECRET } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Kayıt: hesap tipi 'individual' (bireysel ev sahibi) veya 'company' (yönetim şirketi)
-// -> şablonun 7.1 bölümündeki "birleşik panel" mantığı burada uygulanıyor.
-router.post('/register', (req, res) => {
-  const { email, password, name, accountType, companyName } = req.body;
+const OTP_TTL_MINUTES = 5;
 
-  if (!email || !password || !name || !accountType) {
-    return res.status(400).json({ error: 'email, password, name ve accountType zorunlu.' });
+function normalizePhone(raw) {
+  // Boşluk/tire gibi karakterleri temizler, rakam ve baştaki '+' kalır.
+  return (raw || '').replace(/[^\d+]/g, '');
+}
+
+function generateCode() {
+  return String(Math.floor(100000 + Math.random() * 900000)); // 6 haneli
+}
+
+// --- 1. Adım: telefon numarasına kod gönder ---
+// Ablan Temizler/Glovo tarzı akış: kullanıcı adı/e-posta yok, sadece telefon.
+router.post('/request-otp', (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  if (!phone || phone.length < 8) {
+    return res.status(400).json({ error: 'Geçerli bir telefon numarası gir.' });
+  }
+
+  const code = generateCode();
+  const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000).toISOString();
+
+  db.prepare(
+    `INSERT INTO otp_requests (phone, code, expires_at, attempts)
+     VALUES (?, ?, ?, 0)
+     ON CONFLICT(phone) DO UPDATE SET code = excluded.code, expires_at = excluded.expires_at, attempts = 0`
+  ).run(phone, code, expiresAt);
+
+  // --- GERÇEK SMS ENTEGRASYONU BURAYA GELECEK ---
+  // Prod'da burada Twilio/yerel SMS sağlayıcı çağrılır, kod client'a asla dönülmez.
+  // Şu an gerçek bir SMS sağlayıcımız olmadığı için demo amaçlı konsola yazıyor
+  // ve response'ta devCode olarak dönüyoruz.
+  console.log(`[SMS SİMÜLASYONU] ${phone} numarasına gönderilen kod: ${code}`);
+
+  res.json({
+    message: 'Doğrulama kodu telefonuna gönderildi.',
+    devCode: code, // TODO: prod'a çıkarken bu satırı sil, gerçek SMS gönderimiyle değiştir.
+  });
+});
+
+// --- 2. Adım: kodu doğrula, kullanıcı yoksa oluştur ---
+router.post('/verify-otp', (req, res) => {
+  const phone = normalizePhone(req.body.phone);
+  const { code } = req.body;
+
+  const otp = db.prepare('SELECT * FROM otp_requests WHERE phone = ?').get(phone);
+  if (!otp) {
+    return res.status(400).json({ error: 'Önce bir doğrulama kodu iste.' });
+  }
+  if (new Date(otp.expires_at).getTime() < Date.now()) {
+    return res.status(400).json({ error: 'Kodun süresi doldu, yeni kod iste.' });
+  }
+  if (otp.attempts >= 5) {
+    return res.status(429).json({ error: 'Çok fazla yanlış deneme. Yeni kod iste.' });
+  }
+  if (otp.code !== code) {
+    db.prepare('UPDATE otp_requests SET attempts = attempts + 1 WHERE phone = ?').run(phone);
+    return res.status(400).json({ error: 'Kod hatalı.' });
+  }
+
+  db.prepare('DELETE FROM otp_requests WHERE phone = ?').run(phone);
+
+  let user = db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
+  let isNewUser = false;
+  if (!user) {
+    const id = uuid();
+    db.prepare(
+      `INSERT INTO users (id, phone, account_type, profile_completed)
+       VALUES (?, ?, 'individual', 0)`
+    ).run(id, phone);
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    isNewUser = true;
+  }
+
+  const token = jwt.sign(
+    { id: user.id, phone: user.phone, accountType: user.account_type },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+
+  res.json({
+    token,
+    isNewUser: isNewUser || !user.profile_completed,
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      accountType: user.account_type,
+      companyName: user.company_name,
+      profileCompleted: !!user.profile_completed,
+    },
+  });
+});
+
+// --- 3. Adım (yalnızca yeni kullanıcılar için): ad ve hesap tipini tamamla ---
+router.post('/complete-profile', requireAuth, (req, res) => {
+  const { name, accountType, companyName } = req.body;
+  if (!name || !accountType) {
+    return res.status(400).json({ error: 'name ve accountType zorunlu.' });
   }
   if (!['individual', 'company'].includes(accountType)) {
     return res.status(400).json({ error: "accountType 'individual' veya 'company' olmalı." });
   }
   if (accountType === 'company' && !companyName) {
-    return res.status(400).json({ error: 'Yönetim şirketi hesabı için companyName zorunlu.' });
+    return res.status(400).json({ error: 'Yönetim şirketi için companyName zorunlu.' });
   }
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-  if (existing) {
-    return res.status(409).json({ error: 'Bu e-posta ile zaten bir hesap var.' });
-  }
-
-  const id = uuid();
-  const passwordHash = bcrypt.hashSync(password, 10);
   db.prepare(
-    `INSERT INTO users (id, email, password_hash, name, account_type, company_name)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, email, passwordHash, name, accountType, companyName || null);
+    `UPDATE users SET name = ?, account_type = ?, company_name = ?, profile_completed = 1
+     WHERE id = ?`
+  ).run(name, accountType, companyName || null, req.user.id);
 
-  const token = jwt.sign({ id, email, accountType }, JWT_SECRET, { expiresIn: '7d' });
-  res.status(201).json({
-    token,
-    user: { id, email, name, accountType, companyName: companyName || null },
-  });
-});
-
-router.post('/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
-    return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
-  }
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   const token = jwt.sign(
-    { id: user.id, email: user.email, accountType: user.account_type },
+    { id: user.id, phone: user.phone, accountType: user.account_type },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '30d' }
   );
+
   res.json({
     token,
     user: {
       id: user.id,
-      email: user.email,
+      phone: user.phone,
       name: user.name,
       accountType: user.account_type,
       companyName: user.company_name,
+      profileCompleted: true,
     },
   });
 });
