@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Adria Temiz — Ev Sahibi / Yönetim Paneli</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#12303F;
+    --navy-2:#1B4353;
+    --sage:#7C9C82;
+    --sage-dark:#5B7A62;
+    --ochre:#C98A3E;
+    --bg:#EEF2EF;
+    --panel:#FFFFFF;
+    --line:#DCE3DF;
+    --text:#16262B;
+    --muted:#5C7178;
+    --danger:#B5542A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .app{display:flex; min-height:100vh;}
+
+  /* --- Auth ekranı --- */
+  .auth-wrap{
+    display:flex; align-items:center; justify-content:center;
+    width:100%; min-height:100vh; padding:24px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(124,156,130,.25), transparent 45%),
+      radial-gradient(circle at 85% 80%, rgba(201,138,62,.18), transparent 45%),
+      var(--navy);
+  }
+  .auth-card{
+    width:100%; max-width:420px; background:var(--panel);
+    border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .brand{display:flex; align-items:baseline; gap:8px; margin-bottom:6px;}
+  .brand .mark{color:var(--ochre); font-size:28px;}
+  .brand h1{font-size:24px; color:var(--navy);}
+  .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
+  .tabs{display:flex; gap:4px; background:var(--bg); border-radius:8px; padding:4px; margin-bottom:20px;}
+  .tab{flex:1; text-align:center; padding:8px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--muted);}
+  .tab.active{background:var(--navy); color:#fff;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+  .field input, .field select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:14px; font-family:inherit; background:#fbfcfb;
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--sage); border-color:var(--sage);}
+  .account-type-choice{display:flex; gap:10px; margin-bottom:14px;}
+  .choice{
+    flex:1; border:1.5px solid var(--line); border-radius:10px; padding:12px; cursor:pointer;
+    text-align:center; font-size:13px; font-weight:600; color:var(--muted);
+  }
+  .choice.selected{border-color:var(--sage-dark); background:rgba(124,156,130,.12); color:var(--navy);}
+  .btn{
+    width:100%; padding:11px; border:none; border-radius:8px; background:var(--navy); color:#fff;
+    font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .btn:hover{background:var(--navy-2);}
+  .btn.ochre{background:var(--ochre);}
+  .btn.ochre:hover{background:#b5792f;}
+  .btn.ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
+  .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
+  .hint{font-size:12px; color:var(--muted); margin-top:16px; line-height:1.5;}
+
+  /* --- Panel --- */
+  .sidebar{
+    width:230px; background:var(--navy); color:#EAF0EE; padding:22px 18px; flex-shrink:0;
+    display:flex; flex-direction:column;
+  }
+  .sidebar .brand{color:#fff; margin-bottom:2px;}
+  .sidebar .brand h1{color:#fff; font-size:19px;}
+  .account-badge{
+    margin-top:6px; margin-bottom:28px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+    color:var(--sage); font-weight:700;
+  }
+  .nav-item{
+    padding:10px 12px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;
+    color:#C9D6D2; margin-bottom:4px;
+  }
+  .nav-item.active{background:rgba(255,255,255,.1); color:#fff;}
+  .sidebar .spacer{flex:1;}
+  .who{font-size:12px; color:#9FB3AE; line-height:1.5; margin-bottom:10px;}
+  .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline;}
+
+  .main{flex:1; padding:32px 40px; max-width:1100px;}
+  .page-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px;}
+  .page-head h2{font-size:26px; color:var(--navy);}
+  .page-head p{color:var(--muted); font-size:13px; margin-top:4px;}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:28px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px;}
+  .card h3{font-size:15px; color:var(--navy); margin-bottom:4px;}
+  .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
+  .card .price{font-family:'Fraunces',serif; font-size:20px; color:var(--ochre); margin-bottom:12px;}
+  .row-actions{display:flex; gap:8px;}
+  .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:6px;}
+
+  table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:12px 14px; background:#F5F8F6; border-bottom:1px solid var(--line);}
+  td{padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  .badge{padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.02em;}
+  .badge.pending{background:#F1E6D3; color:#8A5A19;}
+  .badge.assigned{background:#DCE7F5; color:#2C5C8A;}
+  .badge.in_progress{background:#E4E0F5; color:#5B3F9E;}
+  .badge.done{background:#DEEFE0; color:#2E7D46;}
+  .badge.confirmed{background:#CFEAD4; color:#1F6B34;}
+  .badge.cancelled{background:#F2DADA; color:#A13A3A;}
+  .pay-badge{font-size:11px; font-weight:700;}
+  .pay-badge.unpaid{color:var(--muted);}
+  .pay-badge.held{color:var(--ochre);}
+  .pay-badge.released{color:var(--sage-dark);}
+  .empty-state{
+    border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px; text-align:center; color:var(--muted);
+  }
+  .toolbar{display:flex; gap:10px; margin-bottom:20px;}
+  .toolbar .btn{width:auto; padding:9px 16px;}
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex; align-items:center; justify-content:center; z-index:50;
+  }
+  .modal{background:#fff; border-radius:14px; padding:26px; width:100%; max-width:420px;}
+  .modal h3{margin-bottom:16px; color:var(--navy);}
+  .modal .actions{display:flex; gap:10px; margin-top:18px;}
+  .toast{
+    position:fixed; bottom:24px; right:24px; background:var(--navy); color:#fff; padding:12px 18px;
+    border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60;
+  }
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+
+<script>
+const API = 'http://localhost:4000/api';
+let state = {
+  token: localStorage.getItem('token') || null,
+  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  page: 'properties',
+  properties: { owned: [], delegated: [] },
+  jobs: [],
+  authMode: 'login',
+  accountTypeChoice: 'individual',
+  authError: '',
+  modal: null,
+};
+
+function render(){ document.getElementById('app').innerHTML = state.token ? renderPanel() : renderAuth(); attachHandlers(); }
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2600);
+}
+
+async function api(path, opts={}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}),
+      ...(opts.headers||{}),
+    },
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'Bir hata oluştu.');
+  return data;
+}
+
+/* ---------- AUTH ---------- */
+function renderAuth(){
+  return `
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand"><span class="mark">◆</span><h1>Adria Temiz</h1></div>
+      <div class="tagline">Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.</div>
+      <div class="tabs">
+        <div class="tab ${state.authMode==='login'?'active':''}" data-authmode="login">Giriş yap</div>
+        <div class="tab ${state.authMode==='register'?'active':''}" data-authmode="register">Hesap oluştur</div>
+      </div>
+      ${state.authMode==='register' ? `
+        <div class="account-type-choice">
+          <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">
+            Bireysel<br/>ev sahibi
+          </div>
+          <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">
+            Yönetim<br/>şirketi
+          </div>
+        </div>
+      ` : ''}
+      <form id="auth-form">
+        ${state.authMode==='register' ? `
+          <div class="field"><label>Ad soyad / yetkili adı</label><input name="name" required /></div>
+          ${state.accountTypeChoice==='company' ? `
+            <div class="field"><label>Şirket adı</label><input name="companyName" required /></div>
+          ` : ''}
+        ` : ''}
+        <div class="field"><label>E-posta</label><input name="email" type="email" required /></div>
+        <div class="field"><label>Şifre</label><input name="password" type="password" required minlength="6" /></div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">${state.authMode==='login' ? 'Giriş yap' : 'Hesap oluştur'}</button>
+      </form>
+      <div class="hint">Demo: kayıt ol, bir mülk ekle, örnek bir .ics ile takvim senkronunu tetikle ve otomatik oluşan temizlik işlerini gör.</div>
+    </div>
+  </div>`;
+}
+
+/* ---------- PANEL ---------- */
+function renderPanel(){
+  const isCompany = state.user.accountType === 'company';
+  return `
+  <div class="sidebar">
+    <div class="brand"><span class="mark" style="color:#E7B98C">◆</span><h1>Adria Temiz</h1></div>
+    <div class="account-badge">${isCompany ? 'Yönetim Şirketi' : 'Bireysel Ev Sahibi'}</div>
+    <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">Mülklerim</div>
+    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Temizlik İşleri</div>
+    <div class="spacer"></div>
+    <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.email}</div>
+    <div class="logout" id="logout">Çıkış yap</div>
+  </div>
+  <div class="main">
+    ${state.page==='properties' ? renderProperties() : renderJobs()}
+  </div>
+  ${state.modal ? renderModal() : ''}
+  `;
+}
+
+function renderProperties(){
+  const props = [...state.properties.owned, ...state.properties.delegated];
+  return `
+  <div class="page-head">
+    <div>
+      <h2>Mülklerim</h2>
+      <p>Airbnb/Booking iCal linkini ekleyip her check-out için otomatik temizlik talebi oluştur.</p>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="btn ochre" id="add-property">+ Mülk ekle</button>
+  </div>
+  ${props.length === 0 ? `
+    <div class="empty-state">Henüz mülk eklenmedi. Başlamak için "Mülk ekle" butonunu kullan.</div>
+  ` : `
+    <div class="grid">
+      ${props.map(p => `
+        <div class="card">
+          <h3>${p.name}</h3>
+          <div class="meta">${p.city || 'Şehir belirtilmedi'}${p.ical_url ? ' · iCal bağlı' : ' · iCal bağlı değil (demo verisiyle senkronla)'}</div>
+          <div class="price">${p.base_price} €<span style="font-size:12px;color:var(--muted);font-family:Inter"> / temizlik</span></div>
+          <div class="row-actions">
+            <button class="btn ghost btn-sm" data-sync="${p.id}">Takvimi senkronla (demo)</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `}
+  `;
+}
+
+const STATUS_LABELS = {
+  pending:'Bekliyor', assigned:'Atandı', in_progress:'Devam ediyor',
+  done:'Tamamlandı', confirmed:'Onaylandı', cancelled:'İptal',
+};
+const PAY_LABELS = { unpaid:'Ödenmedi', held:'Emanette', released:'Serbest bırakıldı', refunded:'İade edildi' };
+
+function renderJobs(){
+  return `
+  <div class="page-head">
+    <div>
+      <h2>Temizlik İşleri</h2>
+      <p>Takvim senkronundan otomatik oluşan ve manuel eklenen tüm temizlik talepleri.</p>
+    </div>
+  </div>
+  ${state.jobs.length === 0 ? `
+    <div class="empty-state">Henüz temizlik işi yok. Bir mülkün takvimini senkronla, check-out'lar otomatik iş oluştursun.</div>
+  ` : `
+    <table>
+      <thead><tr>
+        <th>Mülk</th><th>Check-out</th><th>Durum</th><th>Ödeme</th><th>Fiyat</th><th>Kaynak</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${state.jobs.map(j => `
+          <tr>
+            <td><strong>${j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
+            <td>${new Date(j.checkout_at).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}</td>
+            <td><span class="badge ${j.status}">${STATUS_LABELS[j.status]}</span></td>
+            <td><span class="pay-badge ${j.payment_status}">${PAY_LABELS[j.payment_status]}</span></td>
+            <td>${j.price} €</td>
+            <td style="color:var(--muted);font-size:12px">${j.source === 'ical_auto' ? 'Otomatik (iCal)' : 'Manuel'}</td>
+            <td>
+              ${j.payment_status==='unpaid' ? `<button class="btn ghost btn-sm" data-pay="${j.id}">Ödemeyi tut</button>` : ''}
+              ${j.payment_status==='held' ? `<button class="btn ochre btn-sm" data-release="${j.id}">Onayla ve öde</button>` : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
+function renderModal(){
+  if(state.modal === 'add-property'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>Yeni mülk ekle</h3>
+        <form id="property-form">
+          <div class="field"><label>Mülk adı</label><input name="name" required placeholder="örn. Kotor Eski Şehir Stüdyo" /></div>
+          <div class="field"><label>Şehir</label><input name="city" placeholder="örn. Kotor" /></div>
+          <div class="field"><label>Temizlik başı fiyat (€)</label><input name="basePrice" type="number" value="45" /></div>
+          <div class="field"><label>Airbnb/Booking iCal linki (opsiyonel)</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
+          <div class="actions">
+            <button type="button" class="btn ghost" id="modal-cancel">Vazgeç</button>
+            <button type="submit" class="btn ochre">Ekle</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+/* ---------- DATA LOADING ---------- */
+async function loadAll(){
+  const [props, jobs] = await Promise.all([ api('/properties'), api('/jobs') ]);
+  state.properties = props;
+  state.jobs = jobs;
+  render();
+}
+
+/* ---------- EVENTS ---------- */
+function attachHandlers(){
+  document.querySelectorAll('[data-authmode]').forEach(el => el.onclick = () => {
+    state.authMode = el.dataset.authmode; state.authError=''; render();
+  });
+  document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
+    state.accountTypeChoice = el.dataset.choice; render();
+  });
+
+  const authForm = document.getElementById('auth-form');
+  if(authForm) authForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(authForm));
+    try{
+      const endpoint = state.authMode === 'login' ? '/auth/login' : '/auth/register';
+      const body = state.authMode === 'login'
+        ? { email: fd.email, password: fd.password }
+        : { email: fd.email, password: fd.password, name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName };
+      const data = await api(endpoint, { method:'POST', body: JSON.stringify(body) });
+      state.token = data.token; state.user = data.user;
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      state.authError = '';
+      await loadAll();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
+    state.page = el.dataset.page; await loadAll();
+  });
+
+  const logout = document.getElementById('logout');
+  if(logout) logout.onclick = () => {
+    localStorage.removeItem('token'); localStorage.removeItem('user');
+    state.token = null; state.user = null; render();
+  };
+
+  const addPropBtn = document.getElementById('add-property');
+  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; render(); };
+
+  const modalCancel = document.getElementById('modal-cancel');
+  if(modalCancel) modalCancel.onclick = () => { state.modal = null; render(); };
+
+  const propForm = document.getElementById('property-form');
+  if(propForm) propForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(propForm));
+    await api('/properties', { method:'POST', body: JSON.stringify({
+      name: fd.name, city: fd.city, basePrice: Number(fd.basePrice)||40, icalUrl: fd.icalUrl || null,
+    })});
+    state.modal = null;
+    await loadAll();
+    showToast('Mülk eklendi.');
+  };
+
+  document.querySelectorAll('[data-sync]').forEach(el => el.onclick = async () => {
+    const SAMPLE_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Airbnb Inc//Hosting Calendar//EN
+BEGIN:VEVENT
+UID:demo-${Date.now()}-1@airbnb.com
+DTSTAMP:20260701T000000Z
+DTSTART:20260805T140000Z
+DTEND:20260810T100000Z
+SUMMARY:Reserved
+END:VEVENT
+BEGIN:VEVENT
+UID:demo-${Date.now()}-2@airbnb.com
+DTSTAMP:20260701T000000Z
+DTSTART:20260812T140000Z
+DTEND:20260815T100000Z
+SUMMARY:Reserved
+END:VEVENT
+END:VCALENDAR`;
+    const result = await api(`/properties/${el.dataset.sync}/sync`, { method:'POST', body: JSON.stringify({ icsText: SAMPLE_ICS }) });
+    showToast(`Senkron tamam: ${result.created} yeni temizlik işi oluşturuldu.`);
+    state.page = 'jobs';
+    await loadAll();
+  });
+
+  document.querySelectorAll('[data-pay]').forEach(el => el.onclick = async () => {
+    await api(`/jobs/${el.dataset.pay}/pay`, { method:'POST' });
+    showToast('Ödeme emanete alındı (escrow).');
+    await loadAll();
+  });
+  document.querySelectorAll('[data-release]').forEach(el => el.onclick = async () => {
+    await api(`/jobs/${el.dataset.release}/release`, { method:'POST' });
+    showToast('Ödeme personele serbest bırakıldı.');
+    await loadAll();
+  });
+}
+
+/* ---------- INIT ---------- */
+(async function init(){
+  render();
+  if(state.token){
+    try{ await loadAll(); } catch(err){
+      localStorage.removeItem('token'); localStorage.removeItem('user');
+      state.token = null; render();
+    }
+  }
+})();
+</script>
+</body>
+</html>
