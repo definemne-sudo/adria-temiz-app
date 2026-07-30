@@ -4,6 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Adria Temiz — Ev Sahibi / Yönetim Paneli</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#12303F" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -142,21 +146,36 @@
 </head>
 <body>
 <div id="app" class="app"></div>
+
 <script>
-const API = 'https://adria-temiz-app-production.up.railway.app/api';
+// Yerelde çalışırken backend'e localhost:4000 üzerinden bağlanır.
+// Deploy ettiğinde bu satırı gerçek backend adresinle değiştir, örn:
+// const API = 'https://api.adriatemiz.com/api';
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:4000/api'
+  : location.origin + '/api';
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+
 let state = {
   token: localStorage.getItem('token') || null,
   user: JSON.parse(localStorage.getItem('user') || 'null'),
   page: 'properties',
   properties: { owned: [], delegated: [] },
   jobs: [],
-  authMode: 'login',
+  authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
+  phone: '',
+  devCode: '',
   accountTypeChoice: 'individual',
   authError: '',
   modal: null,
 };
 
-function render(){ document.getElementById('app').innerHTML = state.token ? renderPanel() : renderAuth(); attachHandlers(); }
+function render(){ document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth(); attachHandlers(); }
 
 function showToast(msg){
   const el = document.createElement('div');
@@ -179,40 +198,73 @@ async function api(path, opts={}){
   return data;
 }
 
-/* ---------- AUTH ---------- */
+/* ---------- AUTH: telefon -> SMS kod -> (yeni kullanıcıysa) profil ---------- */
 function renderAuth(){
+  let inner = '';
+
+  if(state.authStep === 'phone'){
+    inner = `
+      <div class="tagline">Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.</div>
+      <form id="phone-form">
+        <div class="field">
+          <label>Telefon numarası</label>
+          <input name="phone" type="tel" placeholder="+382 67 123 456" required autofocus />
+        </div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">Kod gönder</button>
+      </form>
+      <div class="hint">Şifre yok, e-posta yok — telefonuna gelen 6 haneli kodla giriş yapıyorsun. Yeni numaraysan otomatik hesap açılır.</div>
+    `;
+  }
+
+  if(state.authStep === 'otp'){
+    inner = `
+      <div class="tagline">${state.phone} numarasına gönderdiğimiz 6 haneli kodu gir.</div>
+      <form id="otp-form">
+        <div class="field">
+          <label>Doğrulama kodu</label>
+          <input name="code" inputmode="numeric" maxlength="6" placeholder="••••••" required autofocus
+            style="letter-spacing:6px; font-size:20px; text-align:center;" />
+        </div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">Doğrula</button>
+      </form>
+      <div class="hint">
+        ${state.devCode ? `Demo modu — gerçek SMS servisi henüz bağlı değil, kodun: <strong>${state.devCode}</strong>` : ''}
+      </div>
+      <div style="text-align:center; margin-top:10px;">
+        <span id="change-phone" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">Numarayı değiştir</span>
+      </div>
+    `;
+  }
+
+  if(state.authStep === 'profile'){
+    inner = `
+      <div class="tagline">Son bir adım — seni tanıyalım.</div>
+      <div class="account-type-choice">
+        <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">
+          Bireysel<br/>ev sahibi
+        </div>
+        <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">
+          Yönetim<br/>şirketi
+        </div>
+      </div>
+      <form id="profile-form">
+        <div class="field"><label>Ad soyad / yetkili adı</label><input name="name" required autofocus /></div>
+        ${state.accountTypeChoice==='company' ? `
+          <div class="field"><label>Şirket adı</label><input name="companyName" required /></div>
+        ` : ''}
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">Panele gir</button>
+      </form>
+    `;
+  }
+
   return `
   <div class="auth-wrap">
     <div class="auth-card">
       <div class="brand"><span class="mark">◆</span><h1>Adria Temiz</h1></div>
-      <div class="tagline">Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.</div>
-      <div class="tabs">
-        <div class="tab ${state.authMode==='login'?'active':''}" data-authmode="login">Giriş yap</div>
-        <div class="tab ${state.authMode==='register'?'active':''}" data-authmode="register">Hesap oluştur</div>
-      </div>
-      ${state.authMode==='register' ? `
-        <div class="account-type-choice">
-          <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">
-            Bireysel<br/>ev sahibi
-          </div>
-          <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">
-            Yönetim<br/>şirketi
-          </div>
-        </div>
-      ` : ''}
-      <form id="auth-form">
-        ${state.authMode==='register' ? `
-          <div class="field"><label>Ad soyad / yetkili adı</label><input name="name" required /></div>
-          ${state.accountTypeChoice==='company' ? `
-            <div class="field"><label>Şirket adı</label><input name="companyName" required /></div>
-          ` : ''}
-        ` : ''}
-        <div class="field"><label>E-posta</label><input name="email" type="email" required /></div>
-        <div class="field"><label>Şifre</label><input name="password" type="password" required minlength="6" /></div>
-        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${state.authMode==='login' ? 'Giriş yap' : 'Hesap oluştur'}</button>
-      </form>
-      <div class="hint">Demo: kayıt ol, bir mülk ekle, örnek bir .ics ile takvim senkronunu tetikle ve otomatik oluşan temizlik işlerini gör.</div>
+      ${inner}
     </div>
   </div>`;
 }
@@ -227,7 +279,7 @@ function renderPanel(){
     <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">Mülklerim</div>
     <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Temizlik İşleri</div>
     <div class="spacer"></div>
-    <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.email}</div>
+    <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
     <div class="logout" id="logout">Çıkış yap</div>
   </div>
   <div class="main">
@@ -342,23 +394,59 @@ async function loadAll(){
 
 /* ---------- EVENTS ---------- */
 function attachHandlers(){
-  document.querySelectorAll('[data-authmode]').forEach(el => el.onclick = () => {
-    state.authMode = el.dataset.authmode; state.authError=''; render();
-  });
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
     state.accountTypeChoice = el.dataset.choice; render();
   });
 
-  const authForm = document.getElementById('auth-form');
-  if(authForm) authForm.onsubmit = async (e) => {
+  // 1) Telefon gönder -> kod iste
+  const phoneForm = document.getElementById('phone-form');
+  if(phoneForm) phoneForm.onsubmit = async (e) => {
     e.preventDefault();
-    const fd = Object.fromEntries(new FormData(authForm));
+    const fd = Object.fromEntries(new FormData(phoneForm));
     try{
-      const endpoint = state.authMode === 'login' ? '/auth/login' : '/auth/register';
-      const body = state.authMode === 'login'
-        ? { email: fd.email, password: fd.password }
-        : { email: fd.email, password: fd.password, name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName };
-      const data = await api(endpoint, { method:'POST', body: JSON.stringify(body) });
+      const data = await api('/auth/request-otp', { method:'POST', body: JSON.stringify({ phone: fd.phone }) });
+      state.phone = fd.phone;
+      state.devCode = data.devCode || '';
+      state.authStep = 'otp';
+      state.authError = '';
+      render();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  // 2) Kodu doğrula -> yeni kullanıcıysa profil adımına geç, değilse direkt panele gir
+  const otpForm = document.getElementById('otp-form');
+  if(otpForm) otpForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(otpForm));
+    try{
+      const data = await api('/auth/verify-otp', { method:'POST', body: JSON.stringify({ phone: state.phone, code: fd.code }) });
+      state.token = data.token;
+      localStorage.setItem('token', data.token);
+      if(data.isNewUser){
+        state.authStep = 'profile';
+        state.authError = '';
+        render();
+      } else {
+        state.user = data.user;
+        localStorage.setItem('user', JSON.stringify(data.user));
+        state.authError = '';
+        await loadAll();
+      }
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const changePhone = document.getElementById('change-phone');
+  if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
+
+  // 3) Profili tamamla (yalnızca yeni kullanıcı) -> panele gir
+  const profileForm = document.getElementById('profile-form');
+  if(profileForm) profileForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(profileForm));
+    try{
+      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify({
+        name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName,
+      })});
       state.token = data.token; state.user = data.user;
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
@@ -374,7 +462,7 @@ function attachHandlers(){
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
     localStorage.removeItem('token'); localStorage.removeItem('user');
-    state.token = null; state.user = null; render();
+    state.token = null; state.user = null; state.authStep = 'phone'; render();
   };
 
   const addPropBtn = document.getElementById('add-property');
@@ -434,6 +522,10 @@ END:VCALENDAR`;
 
 /* ---------- INIT ---------- */
 (async function init(){
+  if(state.token && !state.user){
+    // Profil tamamlama adımında yarım kalmış olabilir - güvenli şekilde baştan başlat.
+    localStorage.removeItem('token'); state.token = null;
+  }
   render();
   if(state.token){
     try{ await loadAll(); } catch(err){
