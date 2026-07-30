@@ -8,14 +8,29 @@ db.pragma('foreign_keys = ON');
 // --- Şema ---
 // users: hem bireysel ev sahibi hem yönetim şirketi burada, account_type ile ayrılıyor.
 // account_type: 'individual' | 'company' | 'staff' | 'admin'
+// Kimlik doğrulama artık e-posta/şifre değil, telefon + SMS kod (OTP) ile.
+// profile_completed = 0: kullanıcı telefonunu doğruladı ama henüz adını/hesap
+// tipini girmedi (Glovo/Ablan Temizler tarzı "önce gir, sonra tamamla" akışı).
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  password_hash TEXT NOT NULL,
-  name TEXT NOT NULL,
-  account_type TEXT NOT NULL CHECK (account_type IN ('individual','company','staff','admin')),
+  phone TEXT UNIQUE NOT NULL,
+  name TEXT,
+  account_type TEXT NOT NULL DEFAULT 'individual' CHECK (
+    account_type IN ('individual','company','staff','admin')
+  ),
   company_name TEXT,
+  profile_completed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Telefon numarasına gönderilen tek kullanımlık doğrulama kodları.
+-- Aynı numara tekrar kod istediğinde eski kayıt üzerine yazılır (UNIQUE phone).
+CREATE TABLE IF NOT EXISTS otp_requests (
+  phone TEXT PRIMARY KEY,
+  code TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
