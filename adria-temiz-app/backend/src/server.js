@@ -4,6 +4,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const jobRoutes = require('./routes/jobs');
+const serviceRoutes = require('./routes/services');
 
 const app = express();
 app.use(cors());
@@ -14,6 +15,7 @@ app.get('/api/health', (req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/services', serviceRoutes);
 
 // Genel hata yakalayıcı
 app.use((err, req, res, next) => {
