@@ -1,6 +1,7 @@
 const ical = require('node-ical');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
+const { calcPrice } = require('./catalog');
 
 /**
  * Şablonun 7.2 bölümündeki en değerli/en ucuz özellik:
@@ -29,12 +30,13 @@ async function syncPropertyCalendar(propertyId, { icsText } = {}) {
 
   const insertJob = db.prepare(`
     INSERT OR IGNORE INTO cleaning_jobs
-      (id, property_id, checkout_at, status, source, ical_uid, price)
-    VALUES (?, ?, ?, 'pending', 'ical_auto', ?, ?)
+      (id, property_id, service_key, checkout_at, status, source, ical_uid, price)
+    VALUES (?, ?, 'checkin_checkout', ?, 'pending', 'ical_auto', ?, ?)
   `);
 
   let created = 0;
   let skipped = 0;
+  const price = calcPrice('checkin_checkout', { sizeSqm: property.size_sqm });
 
   for (const key of Object.keys(events)) {
     const ev = events[key];
@@ -48,7 +50,7 @@ async function syncPropertyCalendar(propertyId, { icsText } = {}) {
       propertyId,
       checkoutAt,
       icalUid,
-      property.base_price
+      price
     );
     if (result.changes > 0) created += 1;
     else skipped += 1;
