@@ -100,9 +100,12 @@ router.post('/verify-otp', (req, res) => {
   });
 });
 
-// --- 3. Adım (yalnızca yeni kullanıcılar için): ad ve hesap tipini tamamla ---
+// --- 3. Adım (yalnızca yeni kullanıcılar için): ad/hesap tipini tamamla ---
+// Bireysel ev sahibi ise, Glovo tarzı akışla aynı adımda ilk mülkünü de kaydeder
+// (property alanı gönderilirse). Yönetim şirketi mülk eklemeyi panelden yapar,
+// çünkü genelde çok sayıda mülk portföy olarak eklenir, kayıt formuna sığmaz.
 router.post('/complete-profile', requireAuth, (req, res) => {
-  const { name, accountType, companyName } = req.body;
+  const { name, accountType, companyName, property } = req.body;
   if (!name || !accountType) {
     return res.status(400).json({ error: 'name ve accountType zorunlu.' });
   }
@@ -117,6 +120,24 @@ router.post('/complete-profile', requireAuth, (req, res) => {
     `UPDATE users SET name = ?, account_type = ?, company_name = ?, profile_completed = 1
      WHERE id = ?`
   ).run(name, accountType, companyName || null, req.user.id);
+
+  let createdProperty = null;
+  if (accountType === 'individual' && property && (property.city || property.sizeSqm || property.name)) {
+    const propertyId = uuid();
+    const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
+    db.prepare(
+      `INSERT INTO properties (id, owner_id, name, address, city, size_sqm)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run(
+      propertyId,
+      req.user.id,
+      property.name || 'Evim',
+      property.address || null,
+      property.city || null,
+      sizeSqm
+    );
+    createdProperty = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
   const token = jwt.sign(
@@ -135,6 +156,7 @@ router.post('/complete-profile', requireAuth, (req, res) => {
       companyName: user.company_name,
       profileCompleted: true,
     },
+    property: createdProperty,
   });
 });
 
