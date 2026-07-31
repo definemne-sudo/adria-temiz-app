@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS properties (
   name TEXT NOT NULL,
   address TEXT,
   city TEXT,
+  latitude REAL,
+  longitude REAL,
   size_sqm REAL,
   ical_url TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -61,6 +63,9 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   property_id TEXT NOT NULL REFERENCES properties(id),
   service_key TEXT NOT NULL DEFAULT 'checkin_checkout',
   quantity INTEGER,
+  addons TEXT,
+  urgency TEXT NOT NULL DEFAULT 'scheduled' CHECK (urgency IN ('now','urgent','scheduled')),
+  payment_method TEXT CHECK (payment_method IS NULL OR payment_method IN ('cash','card')),
   checkout_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (
     status IN ('pending','assigned','in_progress','done','confirmed','cancelled')
