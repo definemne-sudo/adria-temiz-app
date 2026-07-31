@@ -26,14 +26,18 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, city, icalUrl, sizeSqm } = req.body;
+  const { name, address, city, icalUrl, sizeSqm, latitude, longitude } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
   const id = uuid();
   db.prepare(
-    `INSERT INTO properties (id, owner_id, name, address, city, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, req.user.id, name, address || null, city || null, sizeSqm ? Number(sizeSqm) : null, icalUrl || null);
+    `INSERT INTO properties (id, owner_id, name, address, city, latitude, longitude, size_sqm, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    id, req.user.id, name, address || null, city || null,
+    latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
+    sizeSqm ? Number(sizeSqm) : null, icalUrl || null
+  );
 
   res.status(201).json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
 });
