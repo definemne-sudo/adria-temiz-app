@@ -183,6 +183,7 @@ let state = {
   bookingUrgency: 'scheduled', // 'now' | 'urgent' | 'scheduled'
   bookingScheduledAt: '',
   bookingAddons: {},           // { carpet: {checked:true, quantity:2}, ... }
+  bookingPaymentMethod: 'cash',
   payingJobId: null,           // Siparişlerim'de hangi satırın ödeme seçenekleri açık
   authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
   phone: '',
@@ -442,7 +443,13 @@ function renderBookingPanel(service, props, selectedProperty){
       </div>
     `).join('')}
 
-    <div class="price" style="margin:14px 0;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">toplam · ödeme hizmet tamamlanınca alınır</span></div>
+    <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">toplam</span></div>
+
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Ödeme yöntemi</div>
+    <div class="option-row">
+      <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">💵 Nakit<br/><span style="font-weight:400; font-size:11px;">personel gelince</span></div>
+      <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">💳 Kart<br/><span style="font-weight:400; font-size:11px;">şimdi öde</span></div>
+    </div>
     <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Siparişi Oluştur</button>
   </div>
   `;
@@ -527,16 +534,12 @@ function renderJobAction(j){
     return `<span class="pay-badge released">✓ Ödendi</span>`;
   }
   if(!['done','confirmed'].includes(j.status)){
-    return `<button class="btn ghost btn-sm" data-mark-done="${j.id}">Tamamlandı olarak işaretle</button>`;
-  }
-  if(state.payingJobId === j.id){
     return `
-      <div style="display:flex; gap:6px;">
-        <button class="btn ochre btn-sm" data-pay-method="cash" data-pay-job="${j.id}">💵 Nakit</button>
-        <button class="btn ochre btn-sm" data-pay-method="card" data-pay-job="${j.id}">💳 Kart</button>
-      </div>`;
+      <button class="btn ghost btn-sm" data-mark-done="${j.id}">Tamamlandı olarak işaretle</button>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? '💳 Kart · ödeme alındı, tamamlanınca serbest kalır' : '💵 Nakit · personel gelince tahsil edilir'}</div>
+    `;
   }
-  return `<button class="btn ochre btn-sm" data-open-pay="${j.id}">Öde</button>`;
+  return `<span class="pay-badge held">Ödeme sonuçlanıyor…</span>`;
 }
 
 function renderAddonsSummary(addonsJson){
@@ -700,6 +703,7 @@ function attachHandlers(){
     state.bookingUrgency = 'scheduled';
     state.bookingScheduledAt = '';
     state.bookingAddons = {};
+    state.bookingPaymentMethod = 'cash';
     if(!state.bookingPropertyId){
       const props = [...state.properties.owned, ...state.properties.delegated];
       state.bookingPropertyId = props[0]?.id || null;
@@ -734,6 +738,10 @@ function attachHandlers(){
     render();
   });
 
+  document.querySelectorAll('[data-payment-method]').forEach(el => el.onclick = () => {
+    state.bookingPaymentMethod = el.dataset.paymentMethod; render();
+  });
+
   document.querySelectorAll('[data-confirm-booking]').forEach(el => el.onclick = async () => {
     const serviceKey = el.dataset.confirmBooking;
     const props = [...state.properties.owned, ...state.properties.delegated];
@@ -751,11 +759,12 @@ function attachHandlers(){
         urgency: state.bookingUrgency,
         scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
         addons,
+        paymentMethod: state.bookingPaymentMethod,
       })});
       state.bookingService = null;
       state.page = 'jobs';
       await loadAll();
-      showToast('Siparişin oluşturuldu. Hizmet tamamlanınca ödeme adımı açılacak.');
+      showToast('Siparişin oluşturuldu.');
     }catch(err){ showToast(err.message); }
   });
 
@@ -810,18 +819,7 @@ END:VCALENDAR`;
 
   document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
     await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
-    showToast('Hizmet tamamlandı olarak işaretlendi. Şimdi ödeyebilirsin.');
-    await loadAll();
-  });
-  document.querySelectorAll('[data-open-pay]').forEach(el => el.onclick = () => {
-    state.payingJobId = el.dataset.openPay; render();
-  });
-  document.querySelectorAll('[data-pay-job]').forEach(el => el.onclick = async () => {
-    await api(`/jobs/${el.dataset.payJob}/complete-payment`, {
-      method:'POST', body: JSON.stringify({ paymentMethod: el.dataset.payMethod }),
-    });
-    state.payingJobId = null;
-    showToast('Ödeme tamamlandı.');
+    showToast('Hizmet tamamlandı, ödeme otomatik sonuçlandı.');
     await loadAll();
   });
 }
