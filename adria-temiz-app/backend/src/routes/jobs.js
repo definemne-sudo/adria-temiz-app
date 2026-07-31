@@ -1,6 +1,8 @@
 const express = require('express');
+const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { calcPrice, getService } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -17,6 +19,46 @@ function accessiblePropertyIds(userId) {
     .all(userId, userId);
   return rows.map((r) => r.id);
 }
+
+// Ana akış: kullanıcı bir mülk + hizmet türü seçip talep açar (Glovo tarzı
+// "ürün seç, fiyatı gör, onayla" akışının backend karşılığı).
+router.post('/', (req, res) => {
+  const { propertyId, serviceKey, quantity, scheduledAt, notes } = req.body;
+
+  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
+    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+  }
+
+  let service;
+  try {
+    service = getService(serviceKey);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+
+  const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm, quantity });
+
+  const id = uuid();
+  db.prepare(
+    `INSERT INTO cleaning_jobs
+       (id, property_id, service_key, quantity, checkout_at, status, source, price)
+     VALUES (?, ?, ?, ?, ?, 'pending', 'manual', ?)`
+  ).run(
+    id,
+    propertyId,
+    serviceKey,
+    service.calcType === 'per_item' ? Number(quantity) || 1 : null,
+    scheduledAt || new Date().toISOString(),
+    price
+  );
+
+  if (notes) {
+    db.prepare('UPDATE cleaning_jobs SET notes = ? WHERE id = ?').run(notes, id);
+  }
+
+  res.status(201).json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+});
 
 // Kullanıcının (bireysel ev sahibi veya yönetim şirketi) erişebildiği
 // tüm mülklerdeki temizlik işleri - portföy görünümü şablon 7.1'e uygun.
