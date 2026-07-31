@@ -164,9 +164,13 @@ if ('serviceWorker' in navigator) {
 let state = {
   token: localStorage.getItem('token') || null,
   user: JSON.parse(localStorage.getItem('user') || 'null'),
-  page: 'properties',
+  page: 'services',
   properties: { owned: [], delegated: [] },
   jobs: [],
+  services: [],
+  bookingService: null, // hizmet kartına tıklanınca açılan rezervasyon paneli
+  bookingPropertyId: null,
+  bookingQuantity: 1,
   authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
   phone: '',
   devCode: '',
@@ -253,7 +257,17 @@ function renderAuth(){
         <div class="field"><label>Ad soyad / yetkili adı</label><input name="name" required autofocus /></div>
         ${state.accountTypeChoice==='company' ? `
           <div class="field"><label>Şirket adı</label><input name="companyName" required /></div>
-        ` : ''}
+          <div class="hint" style="margin:0 0 14px;">Mülklerini panele girdikten sonra, "Mülklerim" sekmesinden tek tek ekleyebilirsin.</div>
+        ` : `
+          <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
+              Mülkün (opsiyonel, sonra da ekleyebilirsin)
+            </div>
+            <div class="field"><label>Mülk adı</label><input name="propertyName" placeholder="örn. Budva Sahil Daire" /></div>
+            <div class="field"><label>Şehir</label><input name="propertyCity" placeholder="örn. Budva, Kotor, Tivat..." /></div>
+            <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
+          </div>
+        `}
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
         <button class="btn ochre" type="submit">Panele gir</button>
       </form>
@@ -276,6 +290,7 @@ function renderPanel(){
   <div class="sidebar">
     <div class="brand"><span class="mark" style="color:#E7B98C">◆</span><h1>Adria Temiz</h1></div>
     <div class="account-badge">${isCompany ? 'Yönetim Şirketi' : 'Bireysel Ev Sahibi'}</div>
+    <div class="nav-item ${state.page==='services'?'active':''}" data-page="services">Hizmetler</div>
     <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">Mülklerim</div>
     <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Temizlik İşleri</div>
     <div class="spacer"></div>
@@ -283,9 +298,78 @@ function renderPanel(){
     <div class="logout" id="logout">Çıkış yap</div>
   </div>
   <div class="main">
-    ${state.page==='properties' ? renderProperties() : renderJobs()}
+    ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : renderJobs()}
   </div>
   ${state.modal ? renderModal() : ''}
+  `;
+}
+
+function calcPriceClient(service, { sizeSqm, quantity } = {}){
+  let price;
+  if(service.calcType === 'per_sqm') price = service.base + (Number(sizeSqm)||0) * service.rate;
+  else if(service.calcType === 'per_item') price = service.base + (Number(quantity)||1) * service.rate;
+  else price = service.base;
+  return Math.max(service.min, Math.round(price/5)*5);
+}
+
+function renderServices(){
+  const props = [...state.properties.owned, ...state.properties.delegated];
+  const selectedProperty = props.find(p => p.id === state.bookingPropertyId) || props[0];
+
+  if(props.length === 0){
+    return `
+    <div class="page-head"><div><h2>Hizmetler</h2><p>İhtiyacına göre bir hizmet seç, fiyatı anında gör.</p></div></div>
+    <div class="empty-state">
+      Hizmet talep etmeden önce bir mülk eklemen lazım.
+      <div style="margin-top:12px;"><button class="btn ochre btn-sm" id="goto-add-property">+ Mülk ekle</button></div>
+    </div>`;
+  }
+
+  return `
+  <div class="page-head">
+    <div>
+      <h2>Hizmetler</h2>
+      <p>İhtiyacına göre bir hizmet seç, fiyatı anında gör, talebi oluştur.</p>
+    </div>
+  </div>
+  <div class="grid">
+    ${state.services.map(s => {
+      const preview = calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm, quantity: state.bookingQuantity });
+      const isOpen = state.bookingService === s.key;
+      return `
+      <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
+        <h3>${s.name}</h3>
+        <div class="meta" style="margin-bottom:10px;">${s.description}</div>
+        <div class="price">${preview} €${s.calcType!=='per_item' && selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
+        <div class="row-actions">
+          <button class="btn ${isOpen?'ochre':'ghost'} btn-sm" data-toggle-service="${s.key}">${isOpen ? 'Kapat' : 'Talep oluştur'}</button>
+        </div>
+        ${isOpen ? renderBookingPanel(s, props, selectedProperty) : ''}
+      </div>
+    `}).join('')}
+  </div>
+  `;
+}
+
+function renderBookingPanel(service, props, selectedProperty){
+  return `
+  <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+    ${props.length > 1 ? `
+      <div class="field">
+        <label>Mülk</label>
+        <select id="booking-property-select">
+          ${props.map(p => `<option value="${p.id}" ${p.id===selectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
+        </select>
+      </div>
+    ` : ''}
+    ${service.calcType === 'per_item' ? `
+      <div class="field">
+        <label>Adet (${service.unitLabel || 'adet'})</label>
+        <input type="number" min="1" id="booking-quantity-input" value="${state.bookingQuantity}" />
+      </div>
+    ` : ''}
+    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Talebi onayla</button>
+  </div>
   `;
 }
 
@@ -308,9 +392,9 @@ function renderProperties(){
       ${props.map(p => `
         <div class="card">
           <h3>${p.name}</h3>
-          <div class="meta">${p.city || 'Şehir belirtilmedi'}${p.ical_url ? ' · iCal bağlı' : ' · iCal bağlı değil (demo verisiyle senkronla)'}</div>
-          <div class="price">${p.base_price} €<span style="font-size:12px;color:var(--muted);font-family:Inter"> / temizlik</span></div>
+          <div class="meta" style="margin-bottom:14px;">${p.city || 'Şehir belirtilmedi'}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · iCal bağlı' : ' · iCal bağlı değil (demo verisiyle senkronla)'}</div>
           <div class="row-actions">
+            <button class="btn ochre btn-sm" data-book="${p.id}">Hizmet talep et</button>
             <button class="btn ghost btn-sm" data-sync="${p.id}">Takvimi senkronla (demo)</button>
           </div>
         </div>
@@ -326,30 +410,35 @@ const STATUS_LABELS = {
 };
 const PAY_LABELS = { unpaid:'Ödenmedi', held:'Emanette', released:'Serbest bırakıldı', refunded:'İade edildi' };
 
+function serviceName(key){
+  const s = state.services.find(x => x.key === key);
+  return s ? s.name : key;
+}
+
 function renderJobs(){
   return `
   <div class="page-head">
     <div>
       <h2>Temizlik İşleri</h2>
-      <p>Takvim senkronundan otomatik oluşan ve manuel eklenen tüm temizlik talepleri.</p>
+      <p>Hizmetler sekmesinden oluşturduğun talepler ve takvim senkronundan otomatik oluşanlar.</p>
     </div>
   </div>
   ${state.jobs.length === 0 ? `
-    <div class="empty-state">Henüz temizlik işi yok. Bir mülkün takvimini senkronla, check-out'lar otomatik iş oluştursun.</div>
+    <div class="empty-state">Henüz temizlik işi yok. "Hizmetler" sekmesinden bir talep oluştur.</div>
   ` : `
     <table>
       <thead><tr>
-        <th>Mülk</th><th>Check-out</th><th>Durum</th><th>Ödeme</th><th>Fiyat</th><th>Kaynak</th><th></th>
+        <th>Mülk</th><th>Hizmet</th><th>Check-out</th><th>Durum</th><th>Ödeme</th><th>Fiyat</th><th></th>
       </tr></thead>
       <tbody>
         ${state.jobs.map(j => `
           <tr>
             <td><strong>${j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
+            <td>${serviceName(j.service_key)}${j.quantity ? ` · ${j.quantity} adet` : ''}</td>
             <td>${new Date(j.checkout_at).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}</td>
             <td><span class="badge ${j.status}">${STATUS_LABELS[j.status]}</span></td>
             <td><span class="pay-badge ${j.payment_status}">${PAY_LABELS[j.payment_status]}</span></td>
             <td>${j.price} €</td>
-            <td style="color:var(--muted);font-size:12px">${j.source === 'ical_auto' ? 'Otomatik (iCal)' : 'Manuel'}</td>
             <td>
               ${j.payment_status==='unpaid' ? `<button class="btn ghost btn-sm" data-pay="${j.id}">Ödemeyi tut</button>` : ''}
               ${j.payment_status==='held' ? `<button class="btn ochre btn-sm" data-release="${j.id}">Onayla ve öde</button>` : ''}
@@ -371,7 +460,7 @@ function renderModal(){
         <form id="property-form">
           <div class="field"><label>Mülk adı</label><input name="name" required placeholder="örn. Kotor Eski Şehir Stüdyo" /></div>
           <div class="field"><label>Şehir</label><input name="city" placeholder="örn. Kotor" /></div>
-          <div class="field"><label>Temizlik başı fiyat (€)</label><input name="basePrice" type="number" value="45" /></div>
+          <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
           <div class="field"><label>Airbnb/Booking iCal linki (opsiyonel)</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
           <div class="actions">
             <button type="button" class="btn ghost" id="modal-cancel">Vazgeç</button>
@@ -386,9 +475,12 @@ function renderModal(){
 
 /* ---------- DATA LOADING ---------- */
 async function loadAll(){
-  const [props, jobs] = await Promise.all([ api('/properties'), api('/jobs') ]);
-  state.properties = props;
-  state.jobs = jobs;
+  const calls = [ api('/properties'), api('/jobs') ];
+  if(state.services.length === 0) calls.push(api('/services'));
+  const results = await Promise.all(calls);
+  state.properties = results[0];
+  state.jobs = results[1];
+  if(results[2]) state.services = results[2];
   render();
 }
 
@@ -438,19 +530,23 @@ function attachHandlers(){
   const changePhone = document.getElementById('change-phone');
   if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
 
-  // 3) Profili tamamla (yalnızca yeni kullanıcı) -> panele gir
+  // 3) Profili tamamla (yalnızca yeni kullanıcı) -> Hizmetler ekranına gir
   const profileForm = document.getElementById('profile-form');
   if(profileForm) profileForm.onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(profileForm));
+    const body = { name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName };
+    if(state.accountTypeChoice === 'individual' && (fd.propertyCity || fd.sizeSqm || fd.propertyName)){
+      body.property = { name: fd.propertyName || 'Evim', city: fd.propertyCity || null, sizeSqm: fd.sizeSqm || null };
+    }
     try{
-      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify({
-        name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName,
-      })});
+      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify(body) });
       state.token = data.token; state.user = data.user;
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       state.authError = '';
+      state.page = 'services';
+      if(data.property) showToast(`Hoş geldin! "${data.property.name}" mülkün eklendi.`);
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
   };
@@ -468,6 +564,46 @@ function attachHandlers(){
   const addPropBtn = document.getElementById('add-property');
   if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; render(); };
 
+  const gotoAddProperty = document.getElementById('goto-add-property');
+  if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
+
+  document.querySelectorAll('[data-toggle-service]').forEach(el => el.onclick = () => {
+    const key = el.dataset.toggleService;
+    state.bookingService = state.bookingService === key ? null : key;
+    state.bookingQuantity = 1;
+    if(!state.bookingPropertyId){
+      const props = [...state.properties.owned, ...state.properties.delegated];
+      state.bookingPropertyId = props[0]?.id || null;
+    }
+    render();
+  });
+
+  const bookingPropertySelect = document.getElementById('booking-property-select');
+  if(bookingPropertySelect) bookingPropertySelect.onchange = () => {
+    state.bookingPropertyId = bookingPropertySelect.value; render();
+  };
+
+  const bookingQuantityInput = document.getElementById('booking-quantity-input');
+  if(bookingQuantityInput) bookingQuantityInput.oninput = () => {
+    state.bookingQuantity = Number(bookingQuantityInput.value) || 1; render();
+  };
+
+  document.querySelectorAll('[data-confirm-booking]').forEach(el => el.onclick = async () => {
+    const serviceKey = el.dataset.confirmBooking;
+    const props = [...state.properties.owned, ...state.properties.delegated];
+    const propertyId = state.bookingPropertyId || props[0]?.id;
+    if(!propertyId) return;
+    const service = state.services.find(s => s.key === serviceKey);
+    await api('/jobs', { method:'POST', body: JSON.stringify({
+      propertyId, serviceKey,
+      quantity: service?.calcType === 'per_item' ? state.bookingQuantity : undefined,
+    })});
+    state.bookingService = null;
+    state.page = 'jobs';
+    await loadAll();
+    showToast('Temizlik talebin oluşturuldu.');
+  });
+
   const modalCancel = document.getElementById('modal-cancel');
   if(modalCancel) modalCancel.onclick = () => { state.modal = null; render(); };
 
@@ -476,7 +612,7 @@ function attachHandlers(){
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(propForm));
     await api('/properties', { method:'POST', body: JSON.stringify({
-      name: fd.name, city: fd.city, basePrice: Number(fd.basePrice)||40, icalUrl: fd.icalUrl || null,
+      name: fd.name, city: fd.city, sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
     })});
     state.modal = null;
     await loadAll();
