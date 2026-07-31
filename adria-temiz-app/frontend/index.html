@@ -184,6 +184,8 @@ let state = {
   bookingScheduledAt: '',
   bookingAddons: {},           // { carpet: {checked:true, quantity:2}, ... }
   bookingPaymentMethod: 'cash',
+  savedCard: null,             // { brand, last4, expMonth, expYear, holderName } | null
+  pendingBooking: null,        // kart formu açıkken bekleyen sipariş taslağı
   payingJobId: null,           // Siparişlerim'de hangi satırın ödeme seçenekleri açık
   authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
   phone: '',
@@ -450,6 +452,15 @@ function renderBookingPanel(service, props, selectedProperty){
       <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">💵 Nakit<br/><span style="font-weight:400; font-size:11px;">personel gelince</span></div>
       <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">💳 Kart<br/><span style="font-weight:400; font-size:11px;">şimdi öde</span></div>
     </div>
+    ${state.bookingPaymentMethod==='card' && state.savedCard ? `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
+        <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
+        <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">Değiştir</span>
+      </div>
+    ` : ''}
+    ${state.bookingPaymentMethod==='card' && !state.savedCard ? `
+      <div class="hint" style="margin:0 0 14px;">Kart bilgilerini bir sonraki adımda gireceksin, bir daha sormayacağız.</div>
+    ` : ''}
     <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Siparişi Oluştur</button>
   </div>
   `;
@@ -554,6 +565,30 @@ function renderAddonsSummary(addonsJson){
 }
 
 function renderModal(){
+  if(state.modal === 'card-form'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>Kart bilgileri</h3>
+        <div class="hint" style="margin:-8px 0 16px;">Bilgilerin güvenle saklanır — bir sonraki siparişinde tekrar girmene gerek kalmaz. Kart numaranın tamamı sunucumuzda tutulmaz, yalnızca son 4 hanesi görünür.</div>
+        <form id="card-form">
+          <div class="field"><label>Kart üzerindeki isim</label><input name="holderName" required placeholder="MARKO PETROVIC" /></div>
+          <div class="field"><label>Kart numarası</label><input name="cardNumber" required inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111" /></div>
+          <div style="display:flex; gap:10px;">
+            <div class="field" style="flex:1;"><label>Son kullanma (Ay)</label><input name="expMonth" required inputmode="numeric" maxlength="2" placeholder="12" /></div>
+            <div class="field" style="flex:1;"><label>Son kullanma (Yıl)</label><input name="expYear" required inputmode="numeric" maxlength="4" placeholder="2028" /></div>
+            <div class="field" style="flex:1;"><label>CVC</label><input name="cvc" required inputmode="numeric" maxlength="4" placeholder="123" /></div>
+          </div>
+          <div class="hint" style="margin:-6px 0 14px;">CVC yalnızca bu işlem için kullanılır, hiçbir yerde saklanmaz.</div>
+          ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+          <div class="actions">
+            <button type="button" class="btn ghost" id="modal-cancel">Vazgeç</button>
+            <button type="submit" class="btn ochre">Kaydet ve devam et</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'add-property'){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -583,16 +618,27 @@ function renderModal(){
 
 /* ---------- DATA LOADING ---------- */
 async function loadAll(){
-  const calls = [ api('/properties'), api('/jobs') ];
+  const calls = [ api('/properties'), api('/jobs'), api('/payment-methods') ];
   if(state.services.length === 0) calls.push(api('/services'));
   const results = await Promise.all(calls);
   state.properties = results[0];
   state.jobs = results[1];
-  if(results[2]){ state.services = results[2].services; state.addons = results[2].addons; }
+  state.savedCard = results[2];
+  if(results[3]){ state.services = results[3].services; state.addons = results[3].addons; }
   render();
 }
 
 /* ---------- EVENTS ---------- */
+async function submitBooking(draft){
+  try{
+    await api('/jobs', { method:'POST', body: JSON.stringify(draft) });
+    state.bookingService = null;
+    state.page = 'jobs';
+    await loadAll();
+    showToast('Siparişin oluşturuldu.');
+  }catch(err){ showToast(err.message); }
+}
+
 function attachHandlers(){
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
     state.accountTypeChoice = el.dataset.choice; render();
@@ -753,23 +799,51 @@ function attachHandlers(){
     const addons = Object.entries(state.bookingAddons)
       .filter(([, v]) => v && v.checked)
       .map(([key, v]) => ({ key, quantity: v.quantity || 1 }));
-    try{
-      await api('/jobs', { method:'POST', body: JSON.stringify({
-        propertyId, serviceKey,
-        urgency: state.bookingUrgency,
-        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
-        addons,
-        paymentMethod: state.bookingPaymentMethod,
-      })});
-      state.bookingService = null;
-      state.page = 'jobs';
-      await loadAll();
-      showToast('Siparişin oluşturuldu.');
-    }catch(err){ showToast(err.message); }
+    const draft = {
+      propertyId, serviceKey,
+      urgency: state.bookingUrgency,
+      scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+      addons,
+      paymentMethod: state.bookingPaymentMethod,
+    };
+
+    if(state.bookingPaymentMethod === 'card' && !state.savedCard){
+      // Kayıtlı kart yok - önce kart formunu göster, sipariş taslağını bekletiyoruz.
+      state.pendingBooking = draft;
+      state.modal = 'card-form';
+      render();
+      return;
+    }
+    await submitBooking(draft);
   });
 
   const modalCancel = document.getElementById('modal-cancel');
-  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; render(); };
+  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; state.pendingBooking = null; state.authError=''; render(); };
+
+  const changeCard = document.getElementById('change-card');
+  if(changeCard) changeCard.onclick = () => { state.modal = 'card-form'; state.pendingBooking = null; render(); };
+
+  const cardForm = document.getElementById('card-form');
+  if(cardForm) cardForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(cardForm));
+    try{
+      const card = await api('/payment-methods', { method:'POST', body: JSON.stringify({
+        cardNumber: fd.cardNumber, expMonth: fd.expMonth, expYear: fd.expYear, holderName: fd.holderName,
+        // cvc kasıtlı olarak gönderilmiyor - hiçbir yerde saklanmıyor.
+      })});
+      state.savedCard = card;
+      state.modal = null;
+      state.authError = '';
+      if(state.pendingBooking){
+        await submitBooking(state.pendingBooking);
+        state.pendingBooking = null;
+      } else {
+        showToast('Kartın kaydedildi.');
+        render();
+      }
+    }catch(err){ state.authError = err.message; render(); }
+  };
 
   const propForm = document.getElementById('property-form');
   if(propForm) propForm.onsubmit = async (e) => {
