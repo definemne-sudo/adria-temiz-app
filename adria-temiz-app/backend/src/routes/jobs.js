@@ -27,13 +27,19 @@ function resolveScheduledAt(urgency, scheduledAt) {
 }
 
 // Ana akış: kullanıcı bir mülk + hizmet + zamanlama + (opsiyonel) ekstra
-// hizmetler seçip siparişini oluşturur. Ödeme burada değil, hizmet
-// tamamlandıktan sonra (bkz. /:id/complete-payment) alınır.
+// hizmetler + ödeme yöntemini TEK adımda seçip siparişini tamamlar.
+// Kart seçilirse ödeme hemen alınır (escrow'da tutulur); nakit seçilirse
+// personel gelince elden tahsil edilir. Her iki durumda da müşteri burada
+// bir daha işlem yapmaz — tamamlanma anında sistem otomatik sonuçlandırır
+// (bkz. PATCH /:id/status).
 router.post('/', (req, res) => {
-  const { propertyId, serviceKey, urgency, scheduledAt, addons } = req.body;
+  const { propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod } = req.body;
 
   if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
     return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+  }
+  if (!['cash', 'card'].includes(paymentMethod)) {
+    return res.status(400).json({ error: "paymentMethod 'cash' veya 'card' olmalı." });
   }
 
   let checkoutAt;
@@ -53,20 +59,23 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: err.message });
   }
   const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm }) + addonsTotal;
+  const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
-       (id, property_id, service_key, addons, urgency, checkout_at, status, source, price, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, 'unpaid')`
+       (id, property_id, service_key, addons, urgency, payment_method, checkout_at, status, source, price, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
   ).run(
     id,
     propertyId,
     serviceKey,
     addonsList.length ? JSON.stringify(addonsList) : null,
     urgency || 'scheduled',
+    paymentMethod,
     checkoutAt,
-    price
+    price,
+    paymentStatus
   );
 
   res.status(201).json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
@@ -116,6 +125,10 @@ router.post('/:id/assign', (req, res) => {
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
 
+// Durum güncelleme. 'done' olduğunda ödeme de otomatik sonuçlanır - müşteriye
+// ikinci bir "öde" adımı çıkarmıyoruz: kart zaten sipariş anında emanete
+// alınmıştı (held), burada personelin/sistemin tamamlama onayıyla serbest
+// bırakılır; nakitte de personel tahsilatı bu onayla eş zamanlı sayılır.
 router.patch('/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
@@ -123,28 +136,18 @@ router.patch('/:id/status', (req, res) => {
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Geçersiz durum.' });
   }
-  db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
-  res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
-});
-
-// --- Ödeme: yalnızca hizmet tamamlandıktan (status='done' veya 'confirmed')
-// sonra yapılabilir. Kart/Nakit farkı yalnızca kayıt amaçlı (gerçek Stripe
-// entegrasyonunda kart burada tahsil edilecek, nakitte personel elden alır).
-router.post('/:id/complete-payment', (req, res) => {
-  const { id } = req.params;
-  const { paymentMethod } = req.body;
-  if (!['cash', 'card'].includes(paymentMethod)) {
-    return res.status(400).json({ error: "paymentMethod 'cash' veya 'card' olmalı." });
-  }
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-  if (!['done', 'confirmed'].includes(job.status)) {
-    return res.status(400).json({ error: 'Ödeme, hizmet tamamlandıktan sonra yapılabilir.' });
+
+  const shouldFinalizePayment = status === 'done' && job.payment_method && job.payment_status !== 'released';
+  if (shouldFinalizePayment) {
+    db.prepare(
+      "UPDATE cleaning_jobs SET status = ?, payment_status = 'released' WHERE id = ?"
+    ).run(status, id);
+  } else {
+    db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
   }
-  db.prepare(
-    "UPDATE cleaning_jobs SET payment_method = ?, payment_status = 'released', status = 'confirmed' WHERE id = ?"
-  ).run(paymentMethod, id);
-  res.json({ message: 'Ödeme tamamlandı.', jobId: id });
+  res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
 
 module.exports = router;
