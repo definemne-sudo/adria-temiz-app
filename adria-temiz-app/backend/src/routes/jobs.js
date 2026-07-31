@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, getService } = require('../services/catalog');
+const { calcPrice, calcAddonsTotal, getService } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -20,42 +20,54 @@ function accessiblePropertyIds(userId) {
   return rows.map((r) => r.id);
 }
 
-// Ana akış: kullanıcı bir mülk + hizmet türü seçip talep açar (Glovo tarzı
-// "ürün seç, fiyatı gör, onayla" akışının backend karşılığı).
+function resolveScheduledAt(urgency, scheduledAt) {
+  if (urgency === 'now' || urgency === 'urgent') return new Date().toISOString();
+  if (!scheduledAt) throw new Error('Planlanan tarih/saat zorunlu.');
+  return new Date(scheduledAt).toISOString();
+}
+
+// Ana akış: kullanıcı bir mülk + hizmet + zamanlama + (opsiyonel) ekstra
+// hizmetler seçip siparişini oluşturur. Ödeme burada değil, hizmet
+// tamamlandıktan sonra (bkz. /:id/complete-payment) alınır.
 router.post('/', (req, res) => {
-  const { propertyId, serviceKey, quantity, scheduledAt, notes } = req.body;
+  const { propertyId, serviceKey, urgency, scheduledAt, addons } = req.body;
 
   if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
     return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
   }
 
-  let service;
+  let checkoutAt;
   try {
-    service = getService(serviceKey);
+    getService(serviceKey);
+    checkoutAt = resolveScheduledAt(urgency || 'scheduled', scheduledAt);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
 
   const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
-  const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm, quantity });
+  const addonsList = Array.isArray(addons) ? addons.filter((a) => a && a.key) : [];
+  let addonsTotal = 0;
+  try {
+    addonsTotal = calcAddonsTotal(addonsList);
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm }) + addonsTotal;
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
-       (id, property_id, service_key, quantity, checkout_at, status, source, price)
-     VALUES (?, ?, ?, ?, ?, 'pending', 'manual', ?)`
+       (id, property_id, service_key, addons, urgency, checkout_at, status, source, price, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, 'unpaid')`
   ).run(
     id,
     propertyId,
     serviceKey,
-    service.calcType === 'per_item' ? Number(quantity) || 1 : null,
-    scheduledAt || new Date().toISOString(),
+    addonsList.length ? JSON.stringify(addonsList) : null,
+    urgency || 'scheduled',
+    checkoutAt,
     price
   );
-
-  if (notes) {
-    db.prepare('UPDATE cleaning_jobs SET notes = ? WHERE id = ?').run(notes, id);
-  }
 
   res.status(201).json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
@@ -115,28 +127,24 @@ router.patch('/:id/status', (req, res) => {
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
 
-// --- Escrow ödeme simülasyonu (şablon 6.3 / 7.3: gerçek Stripe entegrasyonu
-// prod'da bu iki adımın (hold -> release) yerine geçecek) ---
-
-router.post('/:id/pay', (req, res) => {
+// --- Ödeme: yalnızca hizmet tamamlandıktan (status='done' veya 'confirmed')
+// sonra yapılabilir. Kart/Nakit farkı yalnızca kayıt amaçlı (gerçek Stripe
+// entegrasyonunda kart burada tahsil edilecek, nakitte personel elden alır).
+router.post('/:id/complete-payment', (req, res) => {
   const { id } = req.params;
+  const { paymentMethod } = req.body;
+  if (!['cash', 'card'].includes(paymentMethod)) {
+    return res.status(400).json({ error: "paymentMethod 'cash' veya 'card' olmalı." });
+  }
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
-  if (!job) return res.status(404).json({ error: 'İş bulunamadı.' });
-  db.prepare("UPDATE cleaning_jobs SET payment_status = 'held' WHERE id = ?").run(id);
-  res.json({ message: 'Ödeme emanette tutuluyor (escrow).', jobId: id });
-});
-
-router.post('/:id/release', (req, res) => {
-  const { id } = req.params;
-  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
-  if (!job) return res.status(404).json({ error: 'İş bulunamadı.' });
-  if (job.payment_status !== 'held') {
-    return res.status(400).json({ error: 'Serbest bırakılacak bir emanet ödeme yok.' });
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (!['done', 'confirmed'].includes(job.status)) {
+    return res.status(400).json({ error: 'Ödeme, hizmet tamamlandıktan sonra yapılabilir.' });
   }
   db.prepare(
-    "UPDATE cleaning_jobs SET payment_status = 'released', status = 'confirmed' WHERE id = ?"
-  ).run(id);
-  res.json({ message: 'Müşteri onayladı, ödeme personele serbest bırakıldı.', jobId: id });
+    "UPDATE cleaning_jobs SET payment_method = ?, payment_status = 'released', status = 'confirmed' WHERE id = ?"
+  ).run(paymentMethod, id);
+  res.json({ message: 'Ödeme tamamlandı.', jobId: id });
 });
 
 module.exports = router;
