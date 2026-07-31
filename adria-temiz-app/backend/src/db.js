@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS properties (
   name TEXT NOT NULL,
   address TEXT,
   city TEXT,
+  size_sqm REAL,
   ical_url TEXT,
-  base_price REAL NOT NULL DEFAULT 40,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS property_delegates (
 CREATE TABLE IF NOT EXISTS cleaning_jobs (
   id TEXT PRIMARY KEY,
   property_id TEXT NOT NULL REFERENCES properties(id),
+  service_key TEXT NOT NULL DEFAULT 'checkin_checkout',
+  quantity INTEGER,
   checkout_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (
     status IN ('pending','assigned','in_progress','done','confirmed','cancelled')
