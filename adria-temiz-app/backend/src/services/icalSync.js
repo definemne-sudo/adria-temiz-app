@@ -30,8 +30,8 @@ async function syncPropertyCalendar(propertyId, { icsText } = {}) {
 
   const insertJob = db.prepare(`
     INSERT OR IGNORE INTO cleaning_jobs
-      (id, property_id, service_key, urgency, checkout_at, status, source, ical_uid, price)
-    VALUES (?, ?, 'checkin_checkout', 'scheduled', ?, 'pending', 'ical_auto', ?, ?)
+      (id, property_id, service_key, urgency, payment_method, checkout_at, status, source, ical_uid, price)
+    VALUES (?, ?, 'checkin_checkout', 'scheduled', 'cash', ?, 'pending', 'ical_auto', ?, ?)
   `);
 
   let created = 0;
