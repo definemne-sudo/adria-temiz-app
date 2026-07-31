@@ -126,14 +126,16 @@ router.post('/complete-profile', requireAuth, (req, res) => {
     const propertyId = uuid();
     const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
     db.prepare(
-      `INSERT INTO properties (id, owner_id, name, address, city, size_sqm)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO properties (id, owner_id, name, address, city, latitude, longitude, size_sqm)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       propertyId,
       req.user.id,
       property.name || 'Evim',
       property.address || null,
       property.city || null,
+      property.latitude ? Number(property.latitude) : null,
+      property.longitude ? Number(property.longitude) : null,
       sizeSqm
     );
     createdProperty = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
