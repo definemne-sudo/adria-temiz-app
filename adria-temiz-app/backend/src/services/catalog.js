@@ -1,19 +1,13 @@
 /**
- * Hizmet kataloğu — her hizmetin kendi fiyat hesaplama mantığı var.
- * calcType:
- *   'per_sqm'  -> taban ücret + (m² * oran)
- *   'per_item' -> taban ücret + (adet * oran)   [örn. halı/koltuk yıkama]
- * Tüm fiyatlar 'min' değerinin altına düşmez, 5€'ya yuvarlanır.
- *
- * Bu rakamlar başlangıç varsayımı — gerçek maliyet/personel verisi geldikçe
- * (şablon dokümanındaki Ablan Temizler personel finansal modeli gibi) ayarlanmalı.
+ * Ana hizmetler: m²'ye göre fiyatlanır, "Hizmetler" ekranında kart olarak gösterilir.
+ * Ekstra hizmetler (ADDONS): halı/koltuk yıkama gibi, herhangi bir ana hizmete
+ * "+" olarak eklenir, adet bazlı fiyatlanır, kendi başına ayrı bir kart değildir.
  */
 const SERVICES = [
   {
     key: 'checkin_checkout',
     name: 'Check-in / Check-out temizliği',
     description: 'Misafir çıkışı ve girişi arasında hızlı, standart temizlik.',
-    calcType: 'per_sqm',
     base: 20,
     rate: 0.28,
     min: 30,
@@ -22,7 +16,6 @@ const SERVICES = [
     key: 'deep_clean',
     name: 'Detaylı temizlik',
     description: 'Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik.',
-    calcType: 'per_sqm',
     base: 30,
     rate: 0.48,
     min: 45,
@@ -31,21 +24,15 @@ const SERVICES = [
     key: 'office',
     name: 'Ofis / iş yeri temizliği',
     description: 'Çalışma alanları için düzenli veya tek seferlik temizlik.',
-    calcType: 'per_sqm',
     base: 25,
     rate: 0.22,
     min: 40,
   },
-  {
-    key: 'carpet_upholstery',
-    name: 'Halı / koltuk yıkama',
-    description: 'Adet bazlı halı ve koltuk yıkama hizmeti.',
-    calcType: 'per_item',
-    base: 0,
-    rate: 18,
-    min: 18,
-    unitLabel: 'adet',
-  },
+];
+
+const ADDONS = [
+  { key: 'carpet', name: 'Halı yıkama', rate: 18, unitLabel: 'adet' },
+  { key: 'upholstery', name: 'Koltuk yıkama', rate: 22, unitLabel: 'adet' },
 ];
 
 function getService(key) {
@@ -54,17 +41,26 @@ function getService(key) {
   return service;
 }
 
-function calcPrice(serviceKey, { sizeSqm, quantity } = {}) {
+function getAddon(key) {
+  const addon = ADDONS.find((a) => a.key === key);
+  if (!addon) throw new Error('Geçersiz ekstra hizmet.');
+  return addon;
+}
+
+function calcPrice(serviceKey, { sizeSqm } = {}) {
   const service = getService(serviceKey);
-  let price;
-  if (service.calcType === 'per_sqm') {
-    price = service.base + (Number(sizeSqm) || 0) * service.rate;
-  } else if (service.calcType === 'per_item') {
-    price = service.base + (Number(quantity) || 1) * service.rate;
-  } else {
-    price = service.base;
-  }
+  const price = service.base + (Number(sizeSqm) || 0) * service.rate;
   return Math.max(service.min, Math.round(price / 5) * 5);
 }
 
-module.exports = { SERVICES, getService, calcPrice };
+// addons: [{ key, quantity }]
+function calcAddonsTotal(addons) {
+  if (!Array.isArray(addons) || addons.length === 0) return 0;
+  return addons.reduce((sum, a) => {
+    const addon = getAddon(a.key);
+    const qty = Math.max(1, Number(a.quantity) || 1);
+    return sum + addon.rate * qty;
+  }, 0);
+}
+
+module.exports = { SERVICES, ADDONS, getService, getAddon, calcPrice, calcAddonsTotal };
