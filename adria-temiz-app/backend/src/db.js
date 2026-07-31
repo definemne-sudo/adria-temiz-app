@@ -34,6 +34,21 @@ CREATE TABLE IF NOT EXISTS otp_requests (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Kayıtlı kart bilgisi. ÖNEMLİ: burada asla tam kart numarası veya CVC
+-- saklanmaz — gerçek bir ödeme sağlayıcısının (Stripe vb.) döndüreceği
+-- token'ı simüle ediyoruz: yalnızca son 4 hane, marka ve son kullanma
+-- tarihi. Gerçek entegrasyonda bu tablo, sağlayıcının payment_method_id'sini
+-- tutar; kart verisi hiçbir zaman bizim sunucumuza uğramaz.
+CREATE TABLE IF NOT EXISTS saved_cards (
+  user_id TEXT PRIMARY KEY REFERENCES users(id),
+  brand TEXT NOT NULL,
+  last4 TEXT NOT NULL,
+  exp_month INTEGER NOT NULL,
+  exp_year INTEGER NOT NULL,
+  holder_name TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS properties (
   id TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL REFERENCES users(id),
