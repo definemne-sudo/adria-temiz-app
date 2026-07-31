@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --navy:#12303F;
@@ -62,7 +64,10 @@
     font-size:14px; font-family:inherit; background:#fbfcfb;
   }
   .field input:focus, .field select:focus{outline:2px solid var(--sage); border-color:var(--sage);}
+  .mini-map{width:100%; height:180px; border-radius:8px; border:1px solid var(--line); margin-bottom:6px;}
+  .map-hint{font-size:11.5px; color:var(--muted); margin-bottom:14px;}
   .account-type-choice{display:flex; gap:10px; margin-bottom:14px;}
+  .option-row{display:flex; gap:10px; margin-bottom:14px;}
   .choice{
     flex:1; border:1.5px solid var(--line); border-radius:10px; padding:12px; cursor:pointer;
     text-align:center; font-size:13px; font-weight:600; color:var(--muted);
@@ -168,9 +173,17 @@ let state = {
   properties: { owned: [], delegated: [] },
   jobs: [],
   services: [],
-  bookingService: null, // hizmet kartına tıklanınca açılan rezervasyon paneli
+  addons: [],
+  // Kayıt formundaki mülk haritasında seçilen konum (geçici, submit'e kadar)
+  regLat: null,
+  regLng: null,
+  // Rezervasyon (sipariş) akışı
+  bookingService: null,        // hangi hizmet kartı açık
   bookingPropertyId: null,
-  bookingQuantity: 1,
+  bookingUrgency: 'scheduled', // 'now' | 'urgent' | 'scheduled'
+  bookingScheduledAt: '',
+  bookingAddons: {},           // { carpet: {checked:true, quantity:2}, ... }
+  payingJobId: null,           // Siparişlerim'de hangi satırın ödeme seçenekleri açık
   authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
   phone: '',
   devCode: '',
@@ -186,6 +199,30 @@ function showToast(msg){
   el.className = 'toast'; el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(()=>el.remove(), 2600);
+}
+
+// Karadağ kıyı şeridini merkez alan, tıklanınca konum seçtiren basit harita.
+// Aynı anda tek harita gösterildiği için tek bir instance'ı yeniden kullanıyoruz.
+let leafletMapInstance = null;
+function initLeafletPickerMap(containerId, onPick, initialLat, initialLng){
+  const el = document.getElementById(containerId);
+  if(!el || typeof L === 'undefined') return;
+  if(leafletMapInstance){ try{ leafletMapInstance.remove(); }catch(e){} leafletMapInstance = null; }
+  const startLat = initialLat || 42.43;
+  const startLng = initialLng || 18.9;
+  const map = L.map(containerId).setView([startLat, startLng], initialLat ? 14 : 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap',
+    maxZoom: 19,
+  }).addTo(map);
+  let marker = initialLat ? L.marker([initialLat, initialLng]).addTo(map) : null;
+  map.on('click', (e) => {
+    if(marker) marker.remove();
+    marker = L.marker(e.latlng).addTo(map);
+    onPick(e.latlng.lat, e.latlng.lng);
+  });
+  leafletMapInstance = map;
+  setTimeout(() => map.invalidateSize(), 100);
 }
 
 async function api(path, opts={}){
@@ -265,6 +302,12 @@ function renderAuth(){
             </div>
             <div class="field"><label>Mülk adı</label><input name="propertyName" placeholder="örn. Budva Sahil Daire" /></div>
             <div class="field"><label>Şehir</label><input name="propertyCity" placeholder="örn. Budva, Kotor, Tivat..." /></div>
+            <div class="field"><label>Açık adres</label><input name="propertyAddress" placeholder="örn. Njegoseva 12" /></div>
+            <div class="field">
+              <label>Konum — haritada işaretle</label>
+              <div id="reg-map" class="mini-map"></div>
+              <div class="map-hint">${state.regLat ? `Seçildi: ${state.regLat.toFixed(5)}, ${state.regLng.toFixed(5)}` : 'Personelin doğru adrese gitmesi için haritaya tıkla.'}</div>
+            </div>
             <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
           </div>
         `}
@@ -292,7 +335,7 @@ function renderPanel(){
     <div class="account-badge">${isCompany ? 'Yönetim Şirketi' : 'Bireysel Ev Sahibi'}</div>
     <div class="nav-item ${state.page==='services'?'active':''}" data-page="services">Hizmetler</div>
     <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">Mülklerim</div>
-    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Temizlik İşleri</div>
+    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Siparişlerim</div>
     <div class="spacer"></div>
     <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
     <div class="logout" id="logout">Çıkış yap</div>
@@ -304,12 +347,20 @@ function renderPanel(){
   `;
 }
 
-function calcPriceClient(service, { sizeSqm, quantity } = {}){
-  let price;
-  if(service.calcType === 'per_sqm') price = service.base + (Number(sizeSqm)||0) * service.rate;
-  else if(service.calcType === 'per_item') price = service.base + (Number(quantity)||1) * service.rate;
-  else price = service.base;
+function calcPriceClient(service, { sizeSqm } = {}){
+  const price = service.base + (Number(sizeSqm)||0) * service.rate;
   return Math.max(service.min, Math.round(price/5)*5);
+}
+
+function bookingAddonsTotal(){
+  let total = 0;
+  Object.entries(state.bookingAddons).forEach(([key, val]) => {
+    if(val && val.checked){
+      const addon = state.addons.find(a => a.key === key);
+      if(addon) total += addon.rate * Math.max(1, Number(val.quantity)||1);
+    }
+  });
+  return total;
 }
 
 function renderServices(){
@@ -329,18 +380,18 @@ function renderServices(){
   <div class="page-head">
     <div>
       <h2>Hizmetler</h2>
-      <p>İhtiyacına göre bir hizmet seç, fiyatı anında gör, talebi oluştur.</p>
+      <p>İhtiyacına göre bir hizmet seç, zamanlamasını ve ekstralarını belirle, siparişini tamamla.</p>
     </div>
   </div>
   <div class="grid">
     ${state.services.map(s => {
-      const preview = calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm, quantity: state.bookingQuantity });
+      const preview = calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm });
       const isOpen = state.bookingService === s.key;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
         <h3>${s.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${s.description}</div>
-        <div class="price">${preview} €${s.calcType!=='per_item' && selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
+        <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
         <div class="row-actions">
           <button class="btn ${isOpen?'ochre':'ghost'} btn-sm" data-toggle-service="${s.key}">${isOpen ? 'Kapat' : 'Talep oluştur'}</button>
         </div>
@@ -352,6 +403,10 @@ function renderServices(){
 }
 
 function renderBookingPanel(service, props, selectedProperty){
+  const addonChecked = (key) => state.bookingAddons[key]?.checked;
+  const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
+  const total = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm }) + bookingAddonsTotal();
+
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
     ${props.length > 1 ? `
@@ -362,13 +417,33 @@ function renderBookingPanel(service, props, selectedProperty){
         </select>
       </div>
     ` : ''}
-    ${service.calcType === 'per_item' ? `
+
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Ne zaman?</div>
+    <div class="option-row">
+      <div class="choice ${state.bookingUrgency==='now'?'selected':''}" data-urgency="now">Şimdi</div>
+      <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">⚡ Acil</div>
+      <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">Planla</div>
+    </div>
+    ${state.bookingUrgency==='scheduled' ? `
       <div class="field">
-        <label>Adet (${service.unitLabel || 'adet'})</label>
-        <input type="number" min="1" id="booking-quantity-input" value="${state.bookingQuantity}" />
+        <label>Tarih ve saat</label>
+        <input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" />
       </div>
     ` : ''}
-    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Talebi onayla</button>
+
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">Ekstra hizmetler</div>
+    ${state.addons.map(a => `
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
+          <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
+          ${a.name} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€/${a.unitLabel})</span>
+        </label>
+        ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
+      </div>
+    `).join('')}
+
+    <div class="price" style="margin:14px 0;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">toplam · ödeme hizmet tamamlanınca alınır</span></div>
+    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Siparişi Oluştur</button>
   </div>
   `;
 }
@@ -419,36 +494,60 @@ function renderJobs(){
   return `
   <div class="page-head">
     <div>
-      <h2>Temizlik İşleri</h2>
-      <p>Hizmetler sekmesinden oluşturduğun talepler ve takvim senkronundan otomatik oluşanlar.</p>
+      <h2>Siparişlerim</h2>
+      <p>Aldığın hizmetler ve durumları.</p>
     </div>
   </div>
   ${state.jobs.length === 0 ? `
-    <div class="empty-state">Henüz temizlik işi yok. "Hizmetler" sekmesinden bir talep oluştur.</div>
+    <div class="empty-state">Henüz sipariş yok. "Hizmetler" sekmesinden bir sipariş oluştur.</div>
   ` : `
     <table>
       <thead><tr>
-        <th>Mülk</th><th>Hizmet</th><th>Check-out</th><th>Durum</th><th>Ödeme</th><th>Fiyat</th><th></th>
+        <th>Mülk</th><th>Hizmet</th><th>Zaman</th><th>Durum</th><th>Fiyat</th><th></th>
       </tr></thead>
       <tbody>
         ${state.jobs.map(j => `
           <tr>
             <td><strong>${j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
-            <td>${serviceName(j.service_key)}${j.quantity ? ` · ${j.quantity} adet` : ''}</td>
-            <td>${new Date(j.checkout_at).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}</td>
+            <td>${serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
+            <td>${j.urgency==='urgent' ? '⚡ Acil' : j.urgency==='now' ? 'Şimdi' : new Date(j.checkout_at).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}</td>
             <td><span class="badge ${j.status}">${STATUS_LABELS[j.status]}</span></td>
-            <td><span class="pay-badge ${j.payment_status}">${PAY_LABELS[j.payment_status]}</span></td>
             <td>${j.price} €</td>
-            <td>
-              ${j.payment_status==='unpaid' ? `<button class="btn ghost btn-sm" data-pay="${j.id}">Ödemeyi tut</button>` : ''}
-              ${j.payment_status==='held' ? `<button class="btn ochre btn-sm" data-release="${j.id}">Onayla ve öde</button>` : ''}
-            </td>
+            <td>${renderJobAction(j)}</td>
           </tr>
         `).join('')}
       </tbody>
     </table>
   `}
   `;
+}
+
+function renderJobAction(j){
+  if(j.payment_status === 'released'){
+    return `<span class="pay-badge released">✓ Ödendi</span>`;
+  }
+  if(!['done','confirmed'].includes(j.status)){
+    return `<button class="btn ghost btn-sm" data-mark-done="${j.id}">Tamamlandı olarak işaretle</button>`;
+  }
+  if(state.payingJobId === j.id){
+    return `
+      <div style="display:flex; gap:6px;">
+        <button class="btn ochre btn-sm" data-pay-method="cash" data-pay-job="${j.id}">💵 Nakit</button>
+        <button class="btn ochre btn-sm" data-pay-method="card" data-pay-job="${j.id}">💳 Kart</button>
+      </div>`;
+  }
+  return `<button class="btn ochre btn-sm" data-open-pay="${j.id}">Öde</button>`;
+}
+
+function renderAddonsSummary(addonsJson){
+  if(!addonsJson) return '';
+  try{
+    const list = JSON.parse(addonsJson);
+    return list.map(a => {
+      const addon = state.addons.find(x => x.key === a.key);
+      return ` <span style="color:var(--muted); font-size:12px;">+ ${addon ? addon.name : a.key} (${a.quantity})</span>`;
+    }).join('');
+  }catch(e){ return ''; }
 }
 
 function renderModal(){
@@ -460,6 +559,12 @@ function renderModal(){
         <form id="property-form">
           <div class="field"><label>Mülk adı</label><input name="name" required placeholder="örn. Kotor Eski Şehir Stüdyo" /></div>
           <div class="field"><label>Şehir</label><input name="city" placeholder="örn. Kotor" /></div>
+          <div class="field"><label>Açık adres</label><input name="address" placeholder="örn. Stari Grad 45" /></div>
+          <div class="field">
+            <label>Konum — haritada işaretle</label>
+            <div id="modal-map" class="mini-map"></div>
+            <div class="map-hint">${state.regLat ? `Seçildi: ${state.regLat.toFixed(5)}, ${state.regLng.toFixed(5)}` : 'Personelin doğru adrese gitmesi için haritaya tıkla.'}</div>
+          </div>
           <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
           <div class="field"><label>Airbnb/Booking iCal linki (opsiyonel)</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
           <div class="actions">
@@ -480,7 +585,7 @@ async function loadAll(){
   const results = await Promise.all(calls);
   state.properties = results[0];
   state.jobs = results[1];
-  if(results[2]) state.services = results[2];
+  if(results[2]){ state.services = results[2].services; state.addons = results[2].addons; }
   render();
 }
 
@@ -489,6 +594,20 @@ function attachHandlers(){
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
     state.accountTypeChoice = el.dataset.choice; render();
   });
+
+  // Kayıt formunda mülk haritası (yalnızca bireysel + profil adımındaysa var)
+  initLeafletPickerMap('reg-map', (lat, lng) => {
+    state.regLat = lat; state.regLng = lng;
+    const hint = document.querySelector('#reg-map ~ .map-hint');
+    if(hint) hint.textContent = `Seçildi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }, state.regLat, state.regLng);
+
+  // Panelden "Mülk ekle" modalındaki harita
+  initLeafletPickerMap('modal-map', (lat, lng) => {
+    state.regLat = lat; state.regLng = lng;
+    const hint = document.querySelector('#modal-map ~ .map-hint');
+    if(hint) hint.textContent = `Seçildi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }, state.regLat, state.regLng);
 
   // 1) Telefon gönder -> kod iste
   const phoneForm = document.getElementById('phone-form');
@@ -537,7 +656,14 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(profileForm));
     const body = { name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName };
     if(state.accountTypeChoice === 'individual' && (fd.propertyCity || fd.sizeSqm || fd.propertyName)){
-      body.property = { name: fd.propertyName || 'Evim', city: fd.propertyCity || null, sizeSqm: fd.sizeSqm || null };
+      body.property = {
+        name: fd.propertyName || 'Evim',
+        city: fd.propertyCity || null,
+        address: fd.propertyAddress || null,
+        sizeSqm: fd.sizeSqm || null,
+        latitude: state.regLat,
+        longitude: state.regLng,
+      };
     }
     try{
       const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify(body) });
@@ -546,6 +672,7 @@ function attachHandlers(){
       localStorage.setItem('user', JSON.stringify(data.user));
       state.authError = '';
       state.page = 'services';
+      state.regLat = null; state.regLng = null;
       if(data.property) showToast(`Hoş geldin! "${data.property.name}" mülkün eklendi.`);
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
@@ -562,7 +689,7 @@ function attachHandlers(){
   };
 
   const addPropBtn = document.getElementById('add-property');
-  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; render(); };
+  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; render(); };
 
   const gotoAddProperty = document.getElementById('goto-add-property');
   if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
@@ -570,7 +697,9 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-service]').forEach(el => el.onclick = () => {
     const key = el.dataset.toggleService;
     state.bookingService = state.bookingService === key ? null : key;
-    state.bookingQuantity = 1;
+    state.bookingUrgency = 'scheduled';
+    state.bookingScheduledAt = '';
+    state.bookingAddons = {};
     if(!state.bookingPropertyId){
       const props = [...state.properties.owned, ...state.properties.delegated];
       state.bookingPropertyId = props[0]?.id || null;
@@ -583,41 +712,76 @@ function attachHandlers(){
     state.bookingPropertyId = bookingPropertySelect.value; render();
   };
 
-  const bookingQuantityInput = document.getElementById('booking-quantity-input');
-  if(bookingQuantityInput) bookingQuantityInput.oninput = () => {
-    state.bookingQuantity = Number(bookingQuantityInput.value) || 1; render();
+  document.querySelectorAll('[data-urgency]').forEach(el => el.onclick = () => {
+    state.bookingUrgency = el.dataset.urgency; render();
+  });
+
+  const bookingDatetime = document.getElementById('booking-datetime');
+  if(bookingDatetime) bookingDatetime.onchange = () => {
+    state.bookingScheduledAt = bookingDatetime.value;
   };
+
+  document.querySelectorAll('[data-addon-toggle]').forEach(el => el.onchange = () => {
+    const key = el.dataset.addonToggle;
+    const current = state.bookingAddons[key] || { quantity: 1 };
+    state.bookingAddons = { ...state.bookingAddons, [key]: { ...current, checked: el.checked } };
+    render();
+  });
+  document.querySelectorAll('[data-addon-qty]').forEach(el => el.oninput = () => {
+    const key = el.dataset.addonQty;
+    const current = state.bookingAddons[key] || { checked: true };
+    state.bookingAddons = { ...state.bookingAddons, [key]: { ...current, quantity: Number(el.value)||1 } };
+    render();
+  });
 
   document.querySelectorAll('[data-confirm-booking]').forEach(el => el.onclick = async () => {
     const serviceKey = el.dataset.confirmBooking;
     const props = [...state.properties.owned, ...state.properties.delegated];
     const propertyId = state.bookingPropertyId || props[0]?.id;
     if(!propertyId) return;
-    const service = state.services.find(s => s.key === serviceKey);
-    await api('/jobs', { method:'POST', body: JSON.stringify({
-      propertyId, serviceKey,
-      quantity: service?.calcType === 'per_item' ? state.bookingQuantity : undefined,
-    })});
-    state.bookingService = null;
-    state.page = 'jobs';
-    await loadAll();
-    showToast('Temizlik talebin oluşturuldu.');
+    if(state.bookingUrgency === 'scheduled' && !state.bookingScheduledAt){
+      showToast('Lütfen bir tarih/saat seç.'); return;
+    }
+    const addons = Object.entries(state.bookingAddons)
+      .filter(([, v]) => v && v.checked)
+      .map(([key, v]) => ({ key, quantity: v.quantity || 1 }));
+    try{
+      await api('/jobs', { method:'POST', body: JSON.stringify({
+        propertyId, serviceKey,
+        urgency: state.bookingUrgency,
+        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+        addons,
+      })});
+      state.bookingService = null;
+      state.page = 'jobs';
+      await loadAll();
+      showToast('Siparişin oluşturuldu. Hizmet tamamlanınca ödeme adımı açılacak.');
+    }catch(err){ showToast(err.message); }
   });
 
   const modalCancel = document.getElementById('modal-cancel');
-  if(modalCancel) modalCancel.onclick = () => { state.modal = null; render(); };
+  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; render(); };
 
   const propForm = document.getElementById('property-form');
   if(propForm) propForm.onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(propForm));
     await api('/properties', { method:'POST', body: JSON.stringify({
-      name: fd.name, city: fd.city, sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
+      name: fd.name, city: fd.city, address: fd.address || null,
+      latitude: state.regLat, longitude: state.regLng,
+      sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
     })});
     state.modal = null;
+    state.regLat = null; state.regLng = null;
     await loadAll();
     showToast('Mülk eklendi.');
   };
+
+  document.querySelectorAll('[data-book]').forEach(el => el.onclick = () => {
+    state.bookingPropertyId = el.dataset.book;
+    state.page = 'services';
+    render();
+  });
 
   document.querySelectorAll('[data-sync]').forEach(el => el.onclick = async () => {
     const SAMPLE_ICS = `BEGIN:VCALENDAR
@@ -644,14 +808,20 @@ END:VCALENDAR`;
     await loadAll();
   });
 
-  document.querySelectorAll('[data-pay]').forEach(el => el.onclick = async () => {
-    await api(`/jobs/${el.dataset.pay}/pay`, { method:'POST' });
-    showToast('Ödeme emanete alındı (escrow).');
+  document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
+    await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
+    showToast('Hizmet tamamlandı olarak işaretlendi. Şimdi ödeyebilirsin.');
     await loadAll();
   });
-  document.querySelectorAll('[data-release]').forEach(el => el.onclick = async () => {
-    await api(`/jobs/${el.dataset.release}/release`, { method:'POST' });
-    showToast('Ödeme personele serbest bırakıldı.');
+  document.querySelectorAll('[data-open-pay]').forEach(el => el.onclick = () => {
+    state.payingJobId = el.dataset.openPay; render();
+  });
+  document.querySelectorAll('[data-pay-job]').forEach(el => el.onclick = async () => {
+    await api(`/jobs/${el.dataset.payJob}/complete-payment`, {
+      method:'POST', body: JSON.stringify({ paymentMethod: el.dataset.payMethod }),
+    });
+    state.payingJobId = null;
+    showToast('Ödeme tamamlandı.');
     await loadAll();
   });
 }
