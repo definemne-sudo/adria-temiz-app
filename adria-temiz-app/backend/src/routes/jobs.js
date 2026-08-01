@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcAddonsTotal, getService } = require('../services/catalog');
+const { calcPrice, calcAddonsTotal, calcSuppliesFee, getService } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -33,7 +33,10 @@ function resolveScheduledAt(urgency, scheduledAt) {
 // bir daha işlem yapmaz — tamamlanma anında sistem otomatik sonuçlandırır
 // (bkz. PATCH /:id/status).
 router.post('/', (req, res) => {
-  const { propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod } = req.body;
+  const {
+    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    hasEquipment, hasChemicals,
+  } = req.body;
 
   if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
     return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
@@ -58,19 +61,25 @@ router.post('/', (req, res) => {
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
-  const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm }) + addonsTotal;
+  const equipmentOk = hasEquipment !== false;
+  const chemicalsOk = hasChemicals !== false;
+  const suppliesFee = calcSuppliesFee({ hasEquipment: equipmentOk, hasChemicals: chemicalsOk });
+  const price = calcPrice(serviceKey, { sizeSqm: property.size_sqm }) + addonsTotal + suppliesFee;
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
-       (id, property_id, service_key, addons, urgency, payment_method, checkout_at, status, source, price, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
+       (id, property_id, service_key, addons, has_equipment, has_chemicals,
+        urgency, payment_method, checkout_at, status, source, price, payment_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
   ).run(
     id,
     propertyId,
     serviceKey,
     addonsList.length ? JSON.stringify(addonsList) : null,
+    equipmentOk ? 1 : 0,
+    chemicalsOk ? 1 : 0,
     urgency || 'scheduled',
     paymentMethod,
     checkoutAt,
