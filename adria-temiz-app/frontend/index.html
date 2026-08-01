@@ -238,7 +238,7 @@ const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="htt
 
 const TRANSLATIONS = {
   tr: {
-    tagline: "Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.",
+    tagline: "Tek tıkla, temiz ev.",
     authPhoneLabel: "Telefon numarası",
     authSendCode: "Kod gönder",
     authPhoneHint: "Şifre yok, e-posta yok — telefonuna gelen 6 haneli kodla giriş yapıyorsun. Yeni numaraysan otomatik hesap açılır.",
@@ -293,8 +293,20 @@ const TRANSLATIONS = {
     cardSub: "şimdi öde",
     changeCard: "Değiştir",
     cardWillAskLater: "Kart bilgilerini bir sonraki adımda gireceksin, bir daha sormayacağız.",
-    createOrderBtn: "Siparişi Oluştur",
+    createOrderBtn: "Devam et",
     pleaseSelectDatetime: "Lütfen bir tarih/saat seç.",
+    suppliesLabel: "Temizlik araçları ve kimyasalları",
+    equipmentLabel: "Temizlik araçları (süpürge, bez vb.)",
+    chemicalsLabel: "Temizlik kimyasalları",
+    availableOpt: "Var",
+    notAvailableOpt: "Yok",
+    suppliesFeeHint: "\"Yok\" seçilirse ek ücret uygulanır.",
+    receiptTitle: "Sipariş özeti",
+    noEquipmentFeeLabel: "Temizlik araçları (yok)",
+    noChemicalsFeeLabel: "Temizlik kimyasalları (yok)",
+    receiptTotalLabel: "Toplam",
+    confirmPaymentBtn: "Ödemeyi Onayla",
+    backBtn: "Geri",
     propertiesTitle: "Mülklerim",
     propertiesSubtitle: "Airbnb/Booking iCal linkini ekleyip her check-out için otomatik temizlik talebi oluştur.",
     propertiesEmptyState: "Henüz mülk eklenmedi. Başlamak için \"Mülk ekle\" butonunu kullan.",
@@ -335,7 +347,7 @@ const TRANSLATIONS = {
     genericError: "Bir hata oluştu.",
   },
   en: {
-    tagline: "One panel for property owners and management companies on the Montenegrin coast.",
+    tagline: "One click, a clean home.",
     authPhoneLabel: "Phone number",
     authSendCode: "Send code",
     authPhoneHint: "No password, no email — sign in with a 6-digit code sent to your phone. New number? An account is created automatically.",
@@ -390,8 +402,20 @@ const TRANSLATIONS = {
     cardSub: "pay now",
     changeCard: "Change",
     cardWillAskLater: "You'll enter your card details on the next step — we won't ask again.",
-    createOrderBtn: "Create Order",
+    createOrderBtn: "Continue",
     pleaseSelectDatetime: "Please pick a date and time.",
+    suppliesLabel: "Cleaning tools and chemicals",
+    equipmentLabel: "Cleaning equipment (vacuum, cloths, etc.)",
+    chemicalsLabel: "Cleaning chemicals",
+    availableOpt: "Available",
+    notAvailableOpt: "Not available",
+    suppliesFeeHint: "Choosing \"Not available\" adds an extra fee.",
+    receiptTitle: "Order summary",
+    noEquipmentFeeLabel: "Cleaning equipment (not available)",
+    noChemicalsFeeLabel: "Cleaning chemicals (not available)",
+    receiptTotalLabel: "Total",
+    confirmPaymentBtn: "Confirm Payment",
+    backBtn: "Back",
     propertiesTitle: "My Properties",
     propertiesSubtitle: "Add your Airbnb/Booking iCal link to auto-create a cleaning request after every check-out.",
     propertiesEmptyState: "No properties yet. Use the \"Add property\" button to get started.",
@@ -432,7 +456,7 @@ const TRANSLATIONS = {
     genericError: "Something went wrong.",
   },
   me: {
-    tagline: "Jedan panel za vlasnike nekretnina i menadžment kompanije na crnogorskoj obali.",
+    tagline: "Jedan klik, čist dom.",
     authPhoneLabel: "Broj telefona",
     authSendCode: "Pošalji kod",
     authPhoneHint: "Bez šifre, bez e-mail-a — prijavljuješ se šestocifrenim kodom poslatim na telefon. Novi broj? Nalog se otvara automatski.",
@@ -487,8 +511,20 @@ const TRANSLATIONS = {
     cardSub: "plati odmah",
     changeCard: "Promijeni",
     cardWillAskLater: "Podatke o kartici unijećeš u sljedećem koraku — nećemo pitati ponovo.",
-    createOrderBtn: "Naruči",
+    createOrderBtn: "Nastavi",
     pleaseSelectDatetime: "Molimo izaberi datum i vrijeme.",
+    suppliesLabel: "Sredstva i hemija za čišćenje",
+    equipmentLabel: "Sredstva za čišćenje (usisivač, krpe i sl.)",
+    chemicalsLabel: "Hemija za čišćenje",
+    availableOpt: "Imam",
+    notAvailableOpt: "Nemam",
+    suppliesFeeHint: "Ako izabereš \"Nemam\", dodaje se dodatna naknada.",
+    receiptTitle: "Pregled narudžbe",
+    noEquipmentFeeLabel: "Sredstva za čišćenje (nema)",
+    noChemicalsFeeLabel: "Hemija za čišćenje (nema)",
+    receiptTotalLabel: "Ukupno",
+    confirmPaymentBtn: "Potvrdi plaćanje",
+    backBtn: "Nazad",
     propertiesTitle: "Moje nekretnine",
     propertiesSubtitle: "Dodaj Airbnb/Booking iCal link da se nakon svakog check-outa automatski otvori zahtjev za čišćenje.",
     propertiesEmptyState: "Još nema dodatih nekretnina. Klikni \"Dodaj nekretninu\" da počneš.",
@@ -533,27 +569,31 @@ const TRANSLATIONS = {
 const SERVICE_I18N = {
   checkin_checkout: {
     icon: '🔑',
-    tr: { name: "Check-in / Check-out temizliği", description: "Misafir çıkışı ve girişi arasında hızlı, standart temizlik." },
-    en: { name: "Check-in / Check-out cleaning", description: "Fast, standard cleaning between guest check-out and check-in." },
-    me: { name: "Check-in / Check-out čišćenje", description: "Brzo, standardno čišćenje između odjave i prijave gosta." },
+    tr: { name: "Airbnb/Booking Temizliği", description: "Misafir çıkışı ve girişi arasında hızlı, standart temizlik." },
+    en: { name: "Airbnb/Booking Cleaning", description: "Fast, standard cleaning between guest check-out and check-in." },
+    me: { name: "Airbnb/Booking čišćenje", description: "Brzo, standardno čišćenje između odjave i prijave gosta." },
   },
   deep_clean: {
     icon: '✨',
     tr: { name: "Detaylı temizlik", description: "Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik." },
-    en: { name: "Deep cleaning", description: "Thorough cleaning covering cupboards, the oven, windows and more." },
+    en: { name: "Detailed cleaning", description: "Thorough cleaning covering cupboards, the oven, windows and more." },
     me: { name: "Detaljno čišćenje", description: "Temeljito čišćenje koje pokriva ormare, rernu, prozore i još mnogo toga." },
   },
   office: {
     icon: '🏢',
-    tr: { name: "Ofis / iş yeri temizliği", description: "Çalışma alanları için düzenli veya tek seferlik temizlik." },
-    en: { name: "Office / workplace cleaning", description: "Regular or one-off cleaning for workspaces." },
-    me: { name: "Čišćenje kancelarije / radnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
+    tr: { name: "Ofis / Dükkan / Çalışma Alanı Temizliği", description: "Çalışma alanları için düzenli veya tek seferlik temizlik." },
+    en: { name: "Office/Shop/Workspace Cleaning", description: "Regular or one-off cleaning for workspaces." },
+    me: { name: "Čišćenje poslovnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
   },
 };
 const ADDON_I18N = {
   carpet: { icon: '🧶', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
   upholstery: { icon: '🛋️', tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
 };
+// Backend'deki catalog.js'teki SUPPLIES_FEES ile birebir aynı olmalı -
+// burada sadece anlık fiyat önizlemesi için kullanılıyor, gerçek fiyat
+// backend'de hesaplanır.
+const SUPPLIES_FEES = { noEquipment: 15, noChemicals: 10 };
 
 const ERROR_TRANSLATIONS = {
   "Geçerli bir telefon numarası gir.": { en: "Enter a valid phone number.", me: "Unesi ispravan broj telefona." },
@@ -630,9 +670,12 @@ let state = {
   regLat: null,
   regLng: null,
   bookingService: null,
+  bookingStep: 'config', // 'config' -> 'receipt'
   bookingPropertyId: null,
   bookingUrgency: 'scheduled',
   bookingScheduledAt: '',
+  bookingHasEquipment: true,
+  bookingHasChemicals: true,
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -655,9 +698,9 @@ function render(){
 function langSwitch(){
   return `
   <div class="lang-switch">
-    <button class="${state.lang==='tr'?'active':''}" data-lang="tr">TR</button>
-    <button class="${state.lang==='en'?'active':''}" data-lang="en">EN</button>
     <button class="${state.lang==='me'?'active':''}" data-lang="me">CG</button>
+    <button class="${state.lang==='en'?'active':''}" data-lang="en">EN</button>
+    <button class="${state.lang==='tr'?'active':''}" data-lang="tr">TR</button>
   </div>`;
 }
 
@@ -878,10 +921,32 @@ function renderServices(){
   `;
 }
 
+function buildReceiptLines(draft){
+  const service = state.services.find(s => s.key === draft.serviceKey);
+  const label = serviceLabel(draft.serviceKey);
+  const props = [...state.properties.owned, ...state.properties.delegated];
+  const property = props.find(p => p.id === draft.propertyId);
+  const lines = [];
+  lines.push({ label: label.name, amount: calcPriceClient(service, { sizeSqm: property?.size_sqm }) });
+  if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
+  if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
+  (draft.addons||[]).forEach(a => {
+    const addon = state.addons.find(x => x.key === a.key);
+    if(addon) lines.push({ label: `${addonIcon(a.key)} ${addonLabel(a.key)} × ${a.quantity}`, amount: addon.rate * a.quantity });
+  });
+  const total = lines.reduce((s,l) => s+l.amount, 0);
+  return { lines, total, property };
+}
+
 function renderBookingPanel(service, props, selectedProperty){
+  if(state.bookingStep === 'receipt' && state.pendingBooking && state.pendingBooking.serviceKey === service.key){
+    return renderReceiptPanel(state.pendingBooking);
+  }
+
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
-  const total = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm }) + bookingAddonsTotal();
+  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
+  const total = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm }) + suppliesFee + bookingAddonsTotal();
 
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
@@ -896,7 +961,6 @@ function renderBookingPanel(service, props, selectedProperty){
 
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('whenLabel')}</div>
     <div class="option-row">
-      <div class="choice ${state.bookingUrgency==='now'?'selected':''}" data-urgency="now">${t('now')}</div>
       <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">${t('urgent')}</div>
       <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">${t('scheduleOpt')}</div>
     </div>
@@ -906,6 +970,19 @@ function renderBookingPanel(service, props, selectedProperty){
         <input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" />
       </div>
     ` : ''}
+
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
+    <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
+    <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
+    <div class="option-row">
+      <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
+      <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noEquipment}€)</div>
+    </div>
+    <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
+    <div class="option-row">
+      <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
+      <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
+    </div>
 
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
     ${state.addons.map(a => `
@@ -934,7 +1011,31 @@ function renderBookingPanel(service, props, selectedProperty){
     ${state.bookingPaymentMethod==='card' && !state.savedCard ? `
       <div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>
     ` : ''}
-    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">${t('createOrderBtn')}</button>
+    <button class="btn ochre btn-sm" style="width:100%;" data-goto-receipt="${service.key}">${t('createOrderBtn')}</button>
+  </div>
+  `;
+}
+
+function renderReceiptPanel(draft){
+  const { lines, total } = buildReceiptLines(draft);
+  return `
+  <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+    <h3 style="font-size:15px; margin-bottom:12px;">${t('receiptTitle')}</h3>
+    <div style="border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; background:var(--bg);">
+      ${lines.map(l => `
+        <div style="display:flex; justify-content:space-between; font-size:13px; padding:5px 0;">
+          <span>${l.label}</span><span>${l.amount} €</span>
+        </div>
+      `).join('')}
+      <div style="display:flex; justify-content:space-between; font-family:'Fraunces',serif; font-size:17px; color:var(--navy); border-top:1px dashed var(--line); margin-top:8px; padding-top:10px;">
+        <span>${t('receiptTotalLabel')}</span><span>${total} €</span>
+      </div>
+    </div>
+    <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+      ${draft.paymentMethod==='card' ? t('cardPaidNote') : t('cashPaidNote')}
+    </div>
+    <button class="btn ochre btn-sm" style="width:100%; margin-bottom:8px;" data-confirm-booking="true">${t('confirmPaymentBtn')}</button>
+    <button class="btn ghost btn-sm" style="width:100%;" data-back-to-config="true">${t('backBtn')}</button>
   </div>
   `;
 }
@@ -1211,10 +1312,14 @@ function attachHandlers(){
   document.querySelectorAll('[data-toggle-service]').forEach(el => el.onclick = () => {
     const key = el.dataset.toggleService;
     state.bookingService = state.bookingService === key ? null : key;
+    state.bookingStep = 'config';
     state.bookingUrgency = 'scheduled';
     state.bookingScheduledAt = '';
+    state.bookingHasEquipment = true;
+    state.bookingHasChemicals = true;
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
+    state.pendingBooking = null;
     if(!state.bookingPropertyId){
       const props = [...state.properties.owned, ...state.properties.delegated];
       state.bookingPropertyId = props[0]?.id || null;
@@ -1229,6 +1334,13 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-urgency]').forEach(el => el.onclick = () => {
     state.bookingUrgency = el.dataset.urgency; render();
+  });
+
+  document.querySelectorAll('[data-equipment]').forEach(el => el.onclick = () => {
+    state.bookingHasEquipment = el.dataset.equipment === 'true'; render();
+  });
+  document.querySelectorAll('[data-chemicals]').forEach(el => el.onclick = () => {
+    state.bookingHasChemicals = el.dataset.chemicals === 'true'; render();
   });
 
   const bookingDatetime = document.getElementById('booking-datetime');
@@ -1253,8 +1365,8 @@ function attachHandlers(){
     state.bookingPaymentMethod = el.dataset.paymentMethod; render();
   });
 
-  document.querySelectorAll('[data-confirm-booking]').forEach(el => el.onclick = async () => {
-    const serviceKey = el.dataset.confirmBooking;
+  document.querySelectorAll('[data-goto-receipt]').forEach(el => el.onclick = async () => {
+    const serviceKey = el.dataset.gotoReceipt;
     const props = [...state.properties.owned, ...state.properties.delegated];
     const propertyId = state.bookingPropertyId || props[0]?.id;
     if(!propertyId) return;
@@ -1268,6 +1380,8 @@ function attachHandlers(){
       propertyId, serviceKey,
       urgency: state.bookingUrgency,
       scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+      hasEquipment: state.bookingHasEquipment,
+      hasChemicals: state.bookingHasChemicals,
       addons,
       paymentMethod: state.bookingPaymentMethod,
     };
@@ -1278,8 +1392,21 @@ function attachHandlers(){
       render();
       return;
     }
-    await submitBooking(draft);
+    state.pendingBooking = draft;
+    state.bookingStep = 'receipt';
+    render();
   });
+
+  const backToConfig = document.querySelector('[data-back-to-config]');
+  if(backToConfig) backToConfig.onclick = () => { state.bookingStep = 'config'; render(); };
+
+  const confirmBooking = document.querySelector('[data-confirm-booking]');
+  if(confirmBooking) confirmBooking.onclick = async () => {
+    if(!state.pendingBooking) return;
+    await submitBooking(state.pendingBooking);
+    state.bookingStep = 'config';
+    state.pendingBooking = null;
+  };
 
   const modalCancel = document.getElementById('modal-cancel');
   if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; state.pendingBooking = null; state.authError=''; render(); };
@@ -1299,8 +1426,8 @@ function attachHandlers(){
       state.modal = null;
       state.authError = '';
       if(state.pendingBooking){
-        await submitBooking(state.pendingBooking);
-        state.pendingBooking = null;
+        state.bookingStep = 'receipt';
+        render();
       } else {
         showToast(t('toastCardSaved'));
         render();
