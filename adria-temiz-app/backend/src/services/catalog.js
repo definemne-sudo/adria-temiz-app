@@ -6,7 +6,7 @@
 const SERVICES = [
   {
     key: 'checkin_checkout',
-    name: 'Check-in / Check-out temizliği',
+    name: 'Airbnb/Booking Temizliği',
     description: 'Misafir çıkışı ve girişi arasında hızlı, standart temizlik.',
     base: 20,
     rate: 0.28,
@@ -22,7 +22,7 @@ const SERVICES = [
   },
   {
     key: 'office',
-    name: 'Ofis / iş yeri temizliği',
+    name: 'Ofis / Dükkan / Çalışma Alanı Temizliği',
     description: 'Çalışma alanları için düzenli veya tek seferlik temizlik.',
     base: 25,
     rate: 0.22,
@@ -34,6 +34,14 @@ const ADDONS = [
   { key: 'carpet', name: 'Halı yıkama', rate: 18, unitLabel: 'adet' },
   { key: 'upholstery', name: 'Koltuk yıkama', rate: 22, unitLabel: 'adet' },
 ];
+
+// Müşteride temizlik aracı/kimyasalı yoksa uygulanan ek ücret.
+// NOT: Bu rakamlar başlangıç varsayımı - gerçek maliyet verisi geldikçe
+// birlikte ayarlanacak (kullanıcıyla konuşulduğu üzere).
+const SUPPLIES_FEES = {
+  noEquipment: 15,
+  noChemicals: 10,
+};
 
 function getService(key) {
   const service = SERVICES.find((s) => s.key === key);
@@ -63,4 +71,14 @@ function calcAddonsTotal(addons) {
   }, 0);
 }
 
-module.exports = { SERVICES, ADDONS, getService, getAddon, calcPrice, calcAddonsTotal };
+function calcSuppliesFee({ hasEquipment, hasChemicals }) {
+  let fee = 0;
+  if (!hasEquipment) fee += SUPPLIES_FEES.noEquipment;
+  if (!hasChemicals) fee += SUPPLIES_FEES.noChemicals;
+  return fee;
+}
+
+module.exports = {
+  SERVICES, ADDONS, SUPPLIES_FEES,
+  getService, getAddon, calcPrice, calcAddonsTotal, calcSuppliesFee,
+};
