@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   service_key TEXT NOT NULL DEFAULT 'checkin_checkout',
   quantity INTEGER,
   addons TEXT,
+  has_equipment INTEGER NOT NULL DEFAULT 1,
+  has_chemicals INTEGER NOT NULL DEFAULT 1,
   urgency TEXT NOT NULL DEFAULT 'scheduled' CHECK (urgency IN ('now','urgent','scheduled')),
   payment_method TEXT CHECK (payment_method IS NULL OR payment_method IN ('cash','card')),
   checkout_at TEXT NOT NULL,
