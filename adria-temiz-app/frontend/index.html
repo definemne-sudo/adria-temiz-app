@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="me" id="html-root">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Adria Temiz — Ev Sahibi / Yönetim Paneli</title>
+<title>Adria Temiz</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12303F" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -37,7 +37,6 @@
   h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
   .app{display:flex; min-height:100vh;}
 
-  /* --- Auth ekranı --- */
   .auth-wrap{
     display:flex; align-items:center; justify-content:center;
     width:100%; min-height:100vh; padding:24px;
@@ -54,9 +53,6 @@
   .brand .mark{color:var(--ochre); font-size:28px;}
   .brand h1{font-size:24px; color:var(--navy);}
   .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
-  .tabs{display:flex; gap:4px; background:var(--bg); border-radius:8px; padding:4px; margin-bottom:20px;}
-  .tab{flex:1; text-align:center; padding:8px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:600; color:var(--muted);}
-  .tab.active{background:var(--navy); color:#fff;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
   .field input, .field select{
@@ -84,7 +80,15 @@
   .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
   .hint{font-size:12px; color:var(--muted); margin-top:16px; line-height:1.5;}
 
-  /* --- Panel --- */
+  .lang-switch{display:flex; gap:4px; justify-content:flex-end; margin-bottom:14px;}
+  .lang-switch button{
+    background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 9px;
+    font-size:11px; font-weight:700; color:var(--muted); cursor:pointer; font-family:inherit;
+  }
+  .lang-switch button.active{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .sidebar .lang-switch button{border-color:rgba(255,255,255,.25); color:#C9D6D2;}
+  .sidebar .lang-switch button.active{background:var(--ochre); border-color:var(--ochre); color:#fff;}
+
   .sidebar{
     width:230px; background:var(--navy); color:#EAF0EE; padding:22px 18px; flex-shrink:0;
     display:flex; flex-direction:column;
@@ -92,7 +96,7 @@
   .sidebar .brand{color:#fff; margin-bottom:2px;}
   .sidebar .brand h1{color:#fff; font-size:19px;}
   .account-badge{
-    margin-top:6px; margin-bottom:28px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
+    margin-top:6px; margin-bottom:20px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
     color:var(--sage); font-weight:700;
   }
   .nav-item{
@@ -153,9 +157,6 @@
 <div id="app" class="app"></div>
 
 <script>
-// Yerelde çalışırken backend'e localhost:4000 üzerinden bağlanır.
-// Deploy ettiğinde bu satırı gerçek backend adresinle değiştir, örn:
-// const API = 'https://api.adriatemiz.com/api';
 const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
   ? 'http://localhost:4000/api'
   : 'https://adria-temiz-app-production.up.railway.app/api';
@@ -166,28 +167,394 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+/* ================== CEVIRILER ================== */
+const LOCALES = { tr:'tr-TR', en:'en-GB', me:'sr-Latn-ME' };
+
+const TRANSLATIONS = {
+  tr: {
+    tagline: "Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.",
+    authPhoneLabel: "Telefon numarası",
+    authSendCode: "Kod gönder",
+    authPhoneHint: "Şifre yok, e-posta yok — telefonuna gelen 6 haneli kodla giriş yapıyorsun. Yeni numaraysan otomatik hesap açılır.",
+    authOtpTagline: "{{phone}} numarasına gönderdiğimiz 6 haneli kodu gir.",
+    authOtpLabel: "Doğrulama kodu",
+    authVerify: "Doğrula",
+    authDemoModeHint: "Demo modu — gerçek SMS servisi henüz bağlı değil, kodun: <strong>{{code}}</strong>",
+    authChangeNumber: "Numarayı değiştir",
+    authProfileTagline: "Son bir adım — seni tanıyalım.",
+    accountIndividual: "Bireysel<br/>ev sahibi",
+    accountCompany: "Yönetim<br/>şirketi",
+    profileNameLabel: "Ad soyad / yetkili adı",
+    profileCompanyNameLabel: "Şirket adı",
+    profileCompanyHint: "Mülklerini panele girdikten sonra, \"Mülklerim\" sekmesinden tek tek ekleyebilirsin.",
+    propertyHeading: "Mülkün (opsiyonel, sonra da ekleyebilirsin)",
+    propertyNameLabel: "Mülk adı",
+    propertyNamePlaceholder: "örn. Budva Sahil Daire",
+    propertyCityLabel: "Şehir",
+    propertyCityPlaceholder: "örn. Budva, Kotor, Tivat...",
+    propertyAddressLabel: "Açık adres",
+    propertyAddressPlaceholder: "örn. Njegoseva 12",
+    propertyLocationLabel: "Konum — haritada işaretle",
+    mapHintDefault: "Personelin doğru adrese gitmesi için haritaya tıkla.",
+    mapHintSelected: "Seçildi: {{lat}}, {{lng}}",
+    propertySizeLabel: "Büyüklük (m²)",
+    enterPanel: "Panele gir",
+    navServices: "Hizmetler",
+    navProperties: "Mülklerim",
+    navOrders: "Siparişlerim",
+    accountBadgeCompany: "Yönetim Şirketi",
+    accountBadgeIndividual: "Bireysel Ev Sahibi",
+    logout: "Çıkış yap",
+    servicesTitle: "Hizmetler",
+    servicesSubtitle: "İhtiyacına göre bir hizmet seç, zamanlamasını ve ekstralarını belirle, siparişini tamamla.",
+    servicesEmptyIntro: "İhtiyacına göre bir hizmet seç, fiyatı anında gör.",
+    servicesEmptyState: "Hizmet talep etmeden önce bir mülk eklemen lazım.",
+    addPropertyCta: "+ Mülk ekle",
+    requestBtn: "Talep oluştur",
+    closeBtn: "Kapat",
+    bookingPropertyLabel: "Mülk",
+    whenLabel: "Ne zaman?",
+    now: "Şimdi",
+    urgent: "⚡ Acil",
+    scheduleOpt: "Planla",
+    datetimeLabel: "Tarih ve saat",
+    extrasLabel: "Ekstra hizmetler",
+    totalLabel: "toplam",
+    paymentMethodLabel: "Ödeme yöntemi",
+    cashLabel: "💵 Nakit",
+    cashSub: "personel gelince",
+    cardLabel: "💳 Kart",
+    cardSub: "şimdi öde",
+    changeCard: "Değiştir",
+    cardWillAskLater: "Kart bilgilerini bir sonraki adımda gireceksin, bir daha sormayacağız.",
+    createOrderBtn: "Siparişi Oluştur",
+    pleaseSelectDatetime: "Lütfen bir tarih/saat seç.",
+    propertiesTitle: "Mülklerim",
+    propertiesSubtitle: "Airbnb/Booking iCal linkini ekleyip her check-out için otomatik temizlik talebi oluştur.",
+    propertiesEmptyState: "Henüz mülk eklenmedi. Başlamak için \"Mülk ekle\" butonunu kullan.",
+    cityUnknown: "Şehir belirtilmedi",
+    icalLinked: "iCal bağlı",
+    icalNotLinked: "iCal bağlı değil (demo verisiyle senkronla)",
+    requestServiceBtn: "Hizmet talep et",
+    syncDemoBtn: "Takvimi senkronla (demo)",
+    statusPending: "Bekliyor", statusAssigned: "Atandı", statusInProgress: "Devam ediyor",
+    statusDone: "Tamamlandı", statusConfirmed: "Onaylandı", statusCancelled: "İptal",
+    ordersTitle: "Siparişlerim",
+    ordersSubtitle: "Aldığın hizmetler ve durumları.",
+    ordersEmptyState: "Henüz sipariş yok. \"Hizmetler\" sekmesinden bir sipariş oluştur.",
+    colProperty: "Mülk", colService: "Hizmet", colWhen: "Zaman", colStatus: "Durum", colPrice: "Fiyat",
+    markDoneBtn: "Tamamlandı olarak işaretle",
+    paidBadge: "✓ Ödendi",
+    settlingBadge: "Ödeme sonuçlanıyor…",
+    cardPaidNote: "💳 Kart · ödeme alındı, tamamlanınca serbest kalır",
+    cashPaidNote: "💵 Nakit · personel gelince tahsil edilir",
+    cardModalTitle: "Kart bilgileri",
+    cardModalHint: "Bilgilerin güvenle saklanır — bir sonraki siparişinde tekrar girmene gerek kalmaz. Kart numaranın tamamı sunucumuzda tutulmaz, yalnızca son 4 hanesi görünür.",
+    cardHolderLabel: "Kart üzerindeki isim",
+    cardNumberLabel: "Kart numarası",
+    cardExpMonthLabel: "Son kullanma (Ay)",
+    cardExpYearLabel: "Son kullanma (Yıl)",
+    cardCvcLabel: "CVC",
+    cardCvcHint: "CVC yalnızca bu işlem için kullanılır, hiçbir yerde saklanmaz.",
+    cancelBtn: "Vazgeç",
+    saveContinueBtn: "Kaydet ve devam et",
+    addPropertyModalTitle: "Yeni mülk ekle",
+    icalOptionalLabel: "Airbnb/Booking iCal linki (opsiyonel)",
+    addBtn: "Ekle",
+    toastOrderCreated: "Siparişin oluşturuldu.",
+    toastCardSaved: "Kartın kaydedildi.",
+    toastSyncDone: "Senkron tamam: {{count}} yeni temizlik işi oluşturuldu.",
+    toastMarkedDone: "Hizmet tamamlandı, ödeme otomatik sonuçlandı.",
+    toastWelcomeProperty: "Hoş geldin! \"{{name}}\" mülkün eklendi.",
+    genericError: "Bir hata oluştu.",
+  },
+  en: {
+    tagline: "One panel for property owners and management companies on the Montenegrin coast.",
+    authPhoneLabel: "Phone number",
+    authSendCode: "Send code",
+    authPhoneHint: "No password, no email — sign in with a 6-digit code sent to your phone. New number? An account is created automatically.",
+    authOtpTagline: "Enter the 6-digit code we sent to {{phone}}.",
+    authOtpLabel: "Verification code",
+    authVerify: "Verify",
+    authDemoModeHint: "Demo mode — a real SMS service isn't connected yet, your code: <strong>{{code}}</strong>",
+    authChangeNumber: "Change number",
+    authProfileTagline: "One last step — tell us about yourself.",
+    accountIndividual: "Individual<br/>owner",
+    accountCompany: "Management<br/>company",
+    profileNameLabel: "Full name / contact person",
+    profileCompanyNameLabel: "Company name",
+    profileCompanyHint: "Once you're in, you can add your properties one by one from the \"My Properties\" tab.",
+    propertyHeading: "Your property (optional, you can add it later)",
+    propertyNameLabel: "Property name",
+    propertyNamePlaceholder: "e.g. Budva Seaside Apartment",
+    propertyCityLabel: "City",
+    propertyCityPlaceholder: "e.g. Budva, Kotor, Tivat...",
+    propertyAddressLabel: "Street address",
+    propertyAddressPlaceholder: "e.g. Njegoseva 12",
+    propertyLocationLabel: "Location — pin it on the map",
+    mapHintDefault: "Tap the map so cleaning staff know exactly where to go.",
+    mapHintSelected: "Selected: {{lat}}, {{lng}}",
+    propertySizeLabel: "Size (m²)",
+    enterPanel: "Enter panel",
+    navServices: "Services",
+    navProperties: "My Properties",
+    navOrders: "My Orders",
+    accountBadgeCompany: "Management Company",
+    accountBadgeIndividual: "Individual Owner",
+    logout: "Log out",
+    servicesTitle: "Services",
+    servicesSubtitle: "Pick a service, choose the timing and extras, and place your order.",
+    servicesEmptyIntro: "Pick a service to see the price instantly.",
+    servicesEmptyState: "You need to add a property before requesting a service.",
+    addPropertyCta: "+ Add property",
+    requestBtn: "Request",
+    closeBtn: "Close",
+    bookingPropertyLabel: "Property",
+    whenLabel: "When?",
+    now: "Now",
+    urgent: "⚡ Urgent",
+    scheduleOpt: "Schedule",
+    datetimeLabel: "Date and time",
+    extrasLabel: "Extra services",
+    totalLabel: "total",
+    paymentMethodLabel: "Payment method",
+    cashLabel: "💵 Cash",
+    cashSub: "when staff arrives",
+    cardLabel: "💳 Card",
+    cardSub: "pay now",
+    changeCard: "Change",
+    cardWillAskLater: "You'll enter your card details on the next step — we won't ask again.",
+    createOrderBtn: "Create Order",
+    pleaseSelectDatetime: "Please pick a date and time.",
+    propertiesTitle: "My Properties",
+    propertiesSubtitle: "Add your Airbnb/Booking iCal link to auto-create a cleaning request after every check-out.",
+    propertiesEmptyState: "No properties yet. Use the \"Add property\" button to get started.",
+    cityUnknown: "City not set",
+    icalLinked: "iCal linked",
+    icalNotLinked: "iCal not linked (sync with demo data)",
+    requestServiceBtn: "Request service",
+    syncDemoBtn: "Sync calendar (demo)",
+    statusPending: "Pending", statusAssigned: "Assigned", statusInProgress: "In progress",
+    statusDone: "Done", statusConfirmed: "Confirmed", statusCancelled: "Cancelled",
+    ordersTitle: "My Orders",
+    ordersSubtitle: "The services you've booked and their status.",
+    ordersEmptyState: "No orders yet. Create one from the \"Services\" tab.",
+    colProperty: "Property", colService: "Service", colWhen: "When", colStatus: "Status", colPrice: "Price",
+    markDoneBtn: "Mark as completed",
+    paidBadge: "✓ Paid",
+    settlingBadge: "Settling payment…",
+    cardPaidNote: "💳 Card · charged, released once completed",
+    cashPaidNote: "💵 Cash · collected when staff arrives",
+    cardModalTitle: "Card details",
+    cardModalHint: "Saved securely — you won't need to enter it again next time. We never store your full card number, only the last 4 digits.",
+    cardHolderLabel: "Name on card",
+    cardNumberLabel: "Card number",
+    cardExpMonthLabel: "Expiry month",
+    cardExpYearLabel: "Expiry year",
+    cardCvcLabel: "CVC",
+    cardCvcHint: "The CVC is only used for this transaction and is never stored.",
+    cancelBtn: "Cancel",
+    saveContinueBtn: "Save and continue",
+    addPropertyModalTitle: "Add a new property",
+    icalOptionalLabel: "Airbnb/Booking iCal link (optional)",
+    addBtn: "Add",
+    toastOrderCreated: "Your order has been created.",
+    toastCardSaved: "Your card has been saved.",
+    toastSyncDone: "Sync complete: {{count}} new cleaning job(s) created.",
+    toastMarkedDone: "Service marked as completed, payment settled automatically.",
+    toastWelcomeProperty: "Welcome! Your property \"{{name}}\" has been added.",
+    genericError: "Something went wrong.",
+  },
+  me: {
+    tagline: "Jedan panel za vlasnike nekretnina i menadžment kompanije na crnogorskoj obali.",
+    authPhoneLabel: "Broj telefona",
+    authSendCode: "Pošalji kod",
+    authPhoneHint: "Bez šifre, bez e-mail-a — prijavljuješ se šestocifrenim kodom poslatim na telefon. Novi broj? Nalog se otvara automatski.",
+    authOtpTagline: "Unesi šestocifreni kod koji smo poslali na {{phone}}.",
+    authOtpLabel: "Kod za potvrdu",
+    authVerify: "Potvrdi",
+    authDemoModeHint: "Demo režim — prava SMS usluga još nije povezana, tvoj kod: <strong>{{code}}</strong>",
+    authChangeNumber: "Promijeni broj",
+    authProfileTagline: "Još jedan korak — da te upoznamo.",
+    accountIndividual: "Individualni<br/>vlasnik",
+    accountCompany: "Menadžment<br/>kompanija",
+    profileNameLabel: "Ime i prezime / kontakt osoba",
+    profileCompanyNameLabel: "Naziv kompanije",
+    profileCompanyHint: "Kada uđeš u panel, nekretnine možeš dodavati jednu po jednu iz kartice \"Moje nekretnine\".",
+    propertyHeading: "Tvoja nekretnina (opciono, možeš dodati i kasnije)",
+    propertyNameLabel: "Naziv nekretnine",
+    propertyNamePlaceholder: "npr. Apartman Budva more",
+    propertyCityLabel: "Grad",
+    propertyCityPlaceholder: "npr. Budva, Kotor, Tivat...",
+    propertyAddressLabel: "Adresa",
+    propertyAddressPlaceholder: "npr. Njegoševa 12",
+    propertyLocationLabel: "Lokacija — označi na mapi",
+    mapHintDefault: "Klikni na mapu kako bi osoblje znalo tačno gdje treba da dođe.",
+    mapHintSelected: "Izabrano: {{lat}}, {{lng}}",
+    propertySizeLabel: "Površina (m²)",
+    enterPanel: "Uđi u panel",
+    navServices: "Usluge",
+    navProperties: "Moje nekretnine",
+    navOrders: "Moje narudžbe",
+    accountBadgeCompany: "Menadžment kompanija",
+    accountBadgeIndividual: "Individualni vlasnik",
+    logout: "Odjavi se",
+    servicesTitle: "Usluge",
+    servicesSubtitle: "Izaberi uslugu, odredi termin i dodatne usluge, pa završi narudžbu.",
+    servicesEmptyIntro: "Izaberi uslugu da odmah vidiš cijenu.",
+    servicesEmptyState: "Prije naručivanja usluge moraš dodati nekretninu.",
+    addPropertyCta: "+ Dodaj nekretninu",
+    requestBtn: "Naruči",
+    closeBtn: "Zatvori",
+    bookingPropertyLabel: "Nekretnina",
+    whenLabel: "Kada?",
+    now: "Sada",
+    urgent: "⚡ Hitno",
+    scheduleOpt: "Zakaži",
+    datetimeLabel: "Datum i vrijeme",
+    extrasLabel: "Dodatne usluge",
+    totalLabel: "ukupno",
+    paymentMethodLabel: "Način plaćanja",
+    cashLabel: "💵 Keš",
+    cashSub: "kad osoblje dođe",
+    cardLabel: "💳 Kartica",
+    cardSub: "plati odmah",
+    changeCard: "Promijeni",
+    cardWillAskLater: "Podatke o kartici unijećeš u sljedećem koraku — nećemo pitati ponovo.",
+    createOrderBtn: "Naruči",
+    pleaseSelectDatetime: "Molimo izaberi datum i vrijeme.",
+    propertiesTitle: "Moje nekretnine",
+    propertiesSubtitle: "Dodaj Airbnb/Booking iCal link da se nakon svakog check-outa automatski otvori zahtjev za čišćenje.",
+    propertiesEmptyState: "Još nema dodatih nekretnina. Klikni \"Dodaj nekretninu\" da počneš.",
+    cityUnknown: "Grad nije naveden",
+    icalLinked: "iCal povezan",
+    icalNotLinked: "iCal nije povezan (sinhronizuj sa demo podacima)",
+    requestServiceBtn: "Naruči uslugu",
+    syncDemoBtn: "Sinhronizuj kalendar (demo)",
+    statusPending: "Na čekanju", statusAssigned: "Dodijeljeno", statusInProgress: "U toku",
+    statusDone: "Završeno", statusConfirmed: "Potvrđeno", statusCancelled: "Otkazano",
+    ordersTitle: "Moje narudžbe",
+    ordersSubtitle: "Usluge koje si naručio/la i njihov status.",
+    ordersEmptyState: "Još nema narudžbi. Napravi jednu iz kartice \"Usluge\".",
+    colProperty: "Nekretnina", colService: "Usluga", colWhen: "Termin", colStatus: "Status", colPrice: "Cijena",
+    markDoneBtn: "Označi kao završeno",
+    paidBadge: "✓ Plaćeno",
+    settlingBadge: "Plaćanje se obrađuje…",
+    cardPaidNote: "💳 Kartica · naplaćeno, oslobađa se po završetku",
+    cashPaidNote: "💵 Keš · naplaćuje se kad osoblje dođe",
+    cardModalTitle: "Podaci o kartici",
+    cardModalHint: "Podaci se čuvaju bezbjedno — sledeći put ih nećeš morati ponovo unositi. Pun broj kartice se ne čuva na našem serveru, samo posljednje 4 cifre.",
+    cardHolderLabel: "Ime na kartici",
+    cardNumberLabel: "Broj kartice",
+    cardExpMonthLabel: "Ističe (mjesec)",
+    cardExpYearLabel: "Ističe (godina)",
+    cardCvcLabel: "CVC",
+    cardCvcHint: "CVC se koristi samo za ovu transakciju i nigdje se ne čuva.",
+    cancelBtn: "Otkaži",
+    saveContinueBtn: "Sačuvaj i nastavi",
+    addPropertyModalTitle: "Dodaj novu nekretninu",
+    icalOptionalLabel: "Airbnb/Booking iCal link (opciono)",
+    addBtn: "Dodaj",
+    toastOrderCreated: "Tvoja narudžba je kreirana.",
+    toastCardSaved: "Kartica je sačuvana.",
+    toastSyncDone: "Sinhronizacija gotova: kreirano {{count}} novih zadataka čišćenja.",
+    toastMarkedDone: "Usluga označena kao završena, plaćanje je automatski obrađeno.",
+    toastWelcomeProperty: "Dobrodošao/la! Nekretnina \"{{name}}\" je dodata.",
+    genericError: "Došlo je do greške.",
+  },
+};
+
+const SERVICE_I18N = {
+  checkin_checkout: {
+    tr: { name: "Check-in / Check-out temizliği", description: "Misafir çıkışı ve girişi arasında hızlı, standart temizlik." },
+    en: { name: "Check-in / Check-out cleaning", description: "Fast, standard cleaning between guest check-out and check-in." },
+    me: { name: "Check-in / Check-out čišćenje", description: "Brzo, standardno čišćenje između odjave i prijave gosta." },
+  },
+  deep_clean: {
+    tr: { name: "Detaylı temizlik", description: "Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik." },
+    en: { name: "Deep cleaning", description: "Thorough cleaning covering cupboards, the oven, windows and more." },
+    me: { name: "Detaljno čišćenje", description: "Temeljito čišćenje koje pokriva ormare, rernu, prozore i još mnogo toga." },
+  },
+  office: {
+    tr: { name: "Ofis / iş yeri temizliği", description: "Çalışma alanları için düzenli veya tek seferlik temizlik." },
+    en: { name: "Office / workplace cleaning", description: "Regular or one-off cleaning for workspaces." },
+    me: { name: "Čišćenje kancelarije / radnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
+  },
+};
+const ADDON_I18N = {
+  carpet: { tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
+  upholstery: { tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
+};
+
+const ERROR_TRANSLATIONS = {
+  "Geçerli bir telefon numarası gir.": { en: "Enter a valid phone number.", me: "Unesi ispravan broj telefona." },
+  "Kod hatalı.": { en: "Incorrect code.", me: "Netačan kod." },
+  "Kodun süresi doldu, yeni kod iste.": { en: "The code has expired, request a new one.", me: "Kod je istekao, zatraži novi." },
+  "Çok fazla yanlış deneme. Yeni kod iste.": { en: "Too many incorrect attempts. Request a new code.", me: "Previše netačnih pokušaja. Zatraži novi kod." },
+  "Önce bir doğrulama kodu iste.": { en: "Request a verification code first.", me: "Prvo zatraži kod za potvrdu." },
+  "name ve accountType zorunlu.": { en: "Name and account type are required.", me: "Ime i tip naloga su obavezni." },
+  "accountType 'individual' veya 'company' olmalı.": { en: "Account type must be 'individual' or 'company'.", me: "Tip naloga mora biti 'individual' ili 'company'." },
+  "Yönetim şirketi için companyName zorunlu.": { en: "Company name is required for a management company.", me: "Naziv kompanije je obavezan za menadžment kompaniju." },
+  "name zorunlu.": { en: "Name is required.", me: "Ime je obavezno." },
+  "Bu mülke erişim yetkiniz yok.": { en: "You don't have access to this property.", me: "Nemaš pristup ovoj nekretnini." },
+  "Mülk bulunamadı.": { en: "Property not found.", me: "Nekretnina nije pronađena." },
+  "Geçersiz hizmet türü.": { en: "Invalid service type.", me: "Nevažeći tip usluge." },
+  "Geçersiz ekstra hizmet.": { en: "Invalid extra service.", me: "Nevažeća dodatna usluga." },
+  "Planlanan tarih/saat zorunlu.": { en: "A scheduled date/time is required.", me: "Zakazani datum/vrijeme su obavezni." },
+  "paymentMethod 'cash' veya 'card' olmalı.": { en: "Payment method must be 'cash' or 'card'.", me: "Način plaćanja mora biti 'cash' ili 'card'." },
+  "Geçersiz durum.": { en: "Invalid status.", me: "Nevažeći status." },
+  "Sipariş bulunamadı.": { en: "Order not found.", me: "Narudžba nije pronađena." },
+  "Geçerli bir kart numarası gir.": { en: "Enter a valid card number.", me: "Unesi ispravan broj kartice." },
+  "Son kullanma tarihi geçersiz.": { en: "The expiry date is invalid.", me: "Datum isteka nije ispravan." },
+  "Oturum bulunamadı, lütfen giriş yapın.": { en: "No session found, please log in.", me: "Sesija nije pronađena, molimo prijavi se." },
+  "Oturum geçersiz veya süresi dolmuş.": { en: "Your session is invalid or has expired.", me: "Sesija je nevažeća ili je istekla." },
+  "Bir hata oluştu.": { en: "Something went wrong.", me: "Došlo je do greške." },
+};
+
+function t(key, vars){
+  let str = (TRANSLATIONS[state.lang] && TRANSLATIONS[state.lang][key]) || TRANSLATIONS.tr[key] || key;
+  if(vars) Object.keys(vars).forEach(k => { str = str.split('{{'+k+'}}').join(vars[k]); });
+  return str;
+}
+function translateError(msg){
+  const found = ERROR_TRANSLATIONS[msg];
+  if(found && found[state.lang]) return found[state.lang];
+  return msg;
+}
+function serviceLabel(key){
+  const s = SERVICE_I18N[key];
+  return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
+}
+function addonLabel(key){
+  const a = ADDON_I18N[key];
+  return a ? (a[state.lang] || a.tr) : key;
+}
+function statusLabel(status){
+  const map = { pending:'statusPending', assigned:'statusAssigned', in_progress:'statusInProgress', done:'statusDone', confirmed:'statusConfirmed', cancelled:'statusCancelled' };
+  return t(map[status] || status);
+}
+
 let state = {
   token: localStorage.getItem('token') || null,
   user: JSON.parse(localStorage.getItem('user') || 'null'),
+  lang: localStorage.getItem('lang') || 'me',
   page: 'services',
   properties: { owned: [], delegated: [] },
   jobs: [],
   services: [],
   addons: [],
-  // Kayıt formundaki mülk haritasında seçilen konum (geçici, submit'e kadar)
   regLat: null,
   regLng: null,
-  // Rezervasyon (sipariş) akışı
-  bookingService: null,        // hangi hizmet kartı açık
+  bookingService: null,
   bookingPropertyId: null,
-  bookingUrgency: 'scheduled', // 'now' | 'urgent' | 'scheduled'
+  bookingUrgency: 'scheduled',
   bookingScheduledAt: '',
-  bookingAddons: {},           // { carpet: {checked:true, quantity:2}, ... }
+  bookingAddons: {},
   bookingPaymentMethod: 'cash',
-  savedCard: null,             // { brand, last4, expMonth, expYear, holderName } | null
-  pendingBooking: null,        // kart formu açıkken bekleyen sipariş taslağı
-  payingJobId: null,           // Siparişlerim'de hangi satırın ödeme seçenekleri açık
-  authStep: 'phone', // 'phone' -> 'otp' -> 'profile' (yalnızca yeni kullanıcı)
+  savedCard: null,
+  pendingBooking: null,
+  payingJobId: null,
+  authStep: 'phone',
   phone: '',
   devCode: '',
   accountTypeChoice: 'individual',
@@ -195,7 +562,20 @@ let state = {
   modal: null,
 };
 
-function render(){ document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth(); attachHandlers(); }
+function render(){
+  document.getElementById('html-root').lang = state.lang;
+  document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth();
+  attachHandlers();
+}
+
+function langSwitch(){
+  return `
+  <div class="lang-switch">
+    <button class="${state.lang==='tr'?'active':''}" data-lang="tr">TR</button>
+    <button class="${state.lang==='en'?'active':''}" data-lang="en">EN</button>
+    <button class="${state.lang==='me'?'active':''}" data-lang="me">CG</button>
+  </div>`;
+}
 
 function showToast(msg){
   const el = document.createElement('div');
@@ -204,8 +584,6 @@ function showToast(msg){
   setTimeout(()=>el.remove(), 2600);
 }
 
-// Karadağ kıyı şeridini merkez alan, tıklanınca konum seçtiren basit harita.
-// Aynı anda tek harita gösterildiği için tek bir instance'ı yeniden kullanıyoruz.
 let leafletMapInstance = null;
 function initLeafletPickerMap(containerId, onPick, initialLat, initialLng){
   const el = document.getElementById(containerId);
@@ -238,84 +616,79 @@ async function api(path, opts={}){
     },
   });
   const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error || 'Bir hata oluştu.');
+  if(!res.ok) throw new Error(translateError(data.error || t('genericError')));
   return data;
 }
 
-/* ---------- AUTH: telefon -> SMS kod -> (yeni kullanıcıysa) profil ---------- */
 function renderAuth(){
   let inner = '';
 
   if(state.authStep === 'phone'){
     inner = `
-      <div class="tagline">Karadağ kıyısında ev sahipleri ve yönetim şirketleri için tek panel.</div>
+      <div class="tagline">${t('tagline')}</div>
       <form id="phone-form">
         <div class="field">
-          <label>Telefon numarası</label>
+          <label>${t('authPhoneLabel')}</label>
           <input name="phone" type="tel" placeholder="+382 67 123 456" required autofocus />
         </div>
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">Kod gönder</button>
+        <button class="btn ochre" type="submit">${t('authSendCode')}</button>
       </form>
-      <div class="hint">Şifre yok, e-posta yok — telefonuna gelen 6 haneli kodla giriş yapıyorsun. Yeni numaraysan otomatik hesap açılır.</div>
+      <div class="hint">${t('authPhoneHint')}</div>
     `;
   }
 
   if(state.authStep === 'otp'){
     inner = `
-      <div class="tagline">${state.phone} numarasına gönderdiğimiz 6 haneli kodu gir.</div>
+      <div class="tagline">${t('authOtpTagline', { phone: state.phone })}</div>
       <form id="otp-form">
         <div class="field">
-          <label>Doğrulama kodu</label>
+          <label>${t('authOtpLabel')}</label>
           <input name="code" inputmode="numeric" maxlength="6" placeholder="••••••" required autofocus
             style="letter-spacing:6px; font-size:20px; text-align:center;" />
         </div>
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">Doğrula</button>
+        <button class="btn ochre" type="submit">${t('authVerify')}</button>
       </form>
       <div class="hint">
-        ${state.devCode ? `Demo modu — gerçek SMS servisi henüz bağlı değil, kodun: <strong>${state.devCode}</strong>` : ''}
+        ${state.devCode ? t('authDemoModeHint', { code: state.devCode }) : ''}
       </div>
       <div style="text-align:center; margin-top:10px;">
-        <span id="change-phone" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">Numarayı değiştir</span>
+        <span id="change-phone" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('authChangeNumber')}</span>
       </div>
     `;
   }
 
   if(state.authStep === 'profile'){
     inner = `
-      <div class="tagline">Son bir adım — seni tanıyalım.</div>
+      <div class="tagline">${t('authProfileTagline')}</div>
       <div class="account-type-choice">
-        <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">
-          Bireysel<br/>ev sahibi
-        </div>
-        <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">
-          Yönetim<br/>şirketi
-        </div>
+        <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">${t('accountIndividual')}</div>
+        <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">${t('accountCompany')}</div>
       </div>
       <form id="profile-form">
-        <div class="field"><label>Ad soyad / yetkili adı</label><input name="name" required autofocus /></div>
+        <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
         ${state.accountTypeChoice==='company' ? `
-          <div class="field"><label>Şirket adı</label><input name="companyName" required /></div>
-          <div class="hint" style="margin:0 0 14px;">Mülklerini panele girdikten sonra, "Mülklerim" sekmesinden tek tek ekleyebilirsin.</div>
+          <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
+          <div class="hint" style="margin:0 0 14px;">${t('profileCompanyHint')}</div>
         ` : `
           <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
             <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
-              Mülkün (opsiyonel, sonra da ekleyebilirsin)
+              ${t('propertyHeading')}
             </div>
-            <div class="field"><label>Mülk adı</label><input name="propertyName" placeholder="örn. Budva Sahil Daire" /></div>
-            <div class="field"><label>Şehir</label><input name="propertyCity" placeholder="örn. Budva, Kotor, Tivat..." /></div>
-            <div class="field"><label>Açık adres</label><input name="propertyAddress" placeholder="örn. Njegoseva 12" /></div>
+            <div class="field"><label>${t('propertyNameLabel')}</label><input name="propertyName" placeholder="${t('propertyNamePlaceholder')}" /></div>
+            <div class="field"><label>${t('propertyCityLabel')}</label><input name="propertyCity" placeholder="${t('propertyCityPlaceholder')}" /></div>
+            <div class="field"><label>${t('propertyAddressLabel')}</label><input name="propertyAddress" placeholder="${t('propertyAddressPlaceholder')}" /></div>
             <div class="field">
-              <label>Konum — haritada işaretle</label>
+              <label>${t('propertyLocationLabel')}</label>
               <div id="reg-map" class="mini-map"></div>
-              <div class="map-hint">${state.regLat ? `Seçildi: ${state.regLat.toFixed(5)}, ${state.regLng.toFixed(5)}` : 'Personelin doğru adrese gitmesi için haritaya tıkla.'}</div>
+              <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
             </div>
-            <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
+            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
           </div>
         `}
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">Panele gir</button>
+        <button class="btn ochre" type="submit">${t('enterPanel')}</button>
       </form>
     `;
   }
@@ -323,25 +696,26 @@ function renderAuth(){
   return `
   <div class="auth-wrap">
     <div class="auth-card">
+      ${langSwitch()}
       <div class="brand"><span class="mark">◆</span><h1>Adria Temiz</h1></div>
       ${inner}
     </div>
   </div>`;
 }
 
-/* ---------- PANEL ---------- */
 function renderPanel(){
   const isCompany = state.user.accountType === 'company';
   return `
   <div class="sidebar">
     <div class="brand"><span class="mark" style="color:#E7B98C">◆</span><h1>Adria Temiz</h1></div>
-    <div class="account-badge">${isCompany ? 'Yönetim Şirketi' : 'Bireysel Ev Sahibi'}</div>
-    <div class="nav-item ${state.page==='services'?'active':''}" data-page="services">Hizmetler</div>
-    <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">Mülklerim</div>
-    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">Siparişlerim</div>
+    <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
+    <div class="nav-item ${state.page==='services'?'active':''}" data-page="services">${t('navServices')}</div>
+    <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">${t('navProperties')}</div>
+    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">${t('navOrders')}</div>
     <div class="spacer"></div>
+    ${langSwitch()}
     <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
-    <div class="logout" id="logout">Çıkış yap</div>
+    <div class="logout" id="logout">${t('logout')}</div>
   </div>
   <div class="main">
     ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : renderJobs()}
@@ -372,31 +746,32 @@ function renderServices(){
 
   if(props.length === 0){
     return `
-    <div class="page-head"><div><h2>Hizmetler</h2><p>İhtiyacına göre bir hizmet seç, fiyatı anında gör.</p></div></div>
+    <div class="page-head"><div><h2>${t('servicesTitle')}</h2><p>${t('servicesEmptyIntro')}</p></div></div>
     <div class="empty-state">
-      Hizmet talep etmeden önce bir mülk eklemen lazım.
-      <div style="margin-top:12px;"><button class="btn ochre btn-sm" id="goto-add-property">+ Mülk ekle</button></div>
+      ${t('servicesEmptyState')}
+      <div style="margin-top:12px;"><button class="btn ochre btn-sm" id="goto-add-property">${t('addPropertyCta')}</button></div>
     </div>`;
   }
 
   return `
   <div class="page-head">
     <div>
-      <h2>Hizmetler</h2>
-      <p>İhtiyacına göre bir hizmet seç, zamanlamasını ve ekstralarını belirle, siparişini tamamla.</p>
+      <h2>${t('servicesTitle')}</h2>
+      <p>${t('servicesSubtitle')}</p>
     </div>
   </div>
   <div class="grid">
     ${state.services.map(s => {
+      const label = serviceLabel(s.key);
       const preview = calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm });
       const isOpen = state.bookingService === s.key;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
-        <h3>${s.name}</h3>
-        <div class="meta" style="margin-bottom:10px;">${s.description}</div>
+        <h3>${label.name}</h3>
+        <div class="meta" style="margin-bottom:10px;">${label.description}</div>
         <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
         <div class="row-actions">
-          <button class="btn ${isOpen?'ochre':'ghost'} btn-sm" data-toggle-service="${s.key}">${isOpen ? 'Kapat' : 'Talep oluştur'}</button>
+          <button class="btn ${isOpen?'ochre':'ghost'} btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
         ${isOpen ? renderBookingPanel(s, props, selectedProperty) : ''}
       </div>
@@ -414,54 +789,54 @@ function renderBookingPanel(service, props, selectedProperty){
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
     ${props.length > 1 ? `
       <div class="field">
-        <label>Mülk</label>
+        <label>${t('bookingPropertyLabel')}</label>
         <select id="booking-property-select">
           ${props.map(p => `<option value="${p.id}" ${p.id===selectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
         </select>
       </div>
     ` : ''}
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Ne zaman?</div>
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('whenLabel')}</div>
     <div class="option-row">
-      <div class="choice ${state.bookingUrgency==='now'?'selected':''}" data-urgency="now">Şimdi</div>
-      <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">⚡ Acil</div>
-      <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">Planla</div>
+      <div class="choice ${state.bookingUrgency==='now'?'selected':''}" data-urgency="now">${t('now')}</div>
+      <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">${t('urgent')}</div>
+      <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">${t('scheduleOpt')}</div>
     </div>
     ${state.bookingUrgency==='scheduled' ? `
       <div class="field">
-        <label>Tarih ve saat</label>
+        <label>${t('datetimeLabel')}</label>
         <input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" />
       </div>
     ` : ''}
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">Ekstra hizmetler</div>
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
     ${state.addons.map(a => `
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
         <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
           <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
-          ${a.name} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€/${a.unitLabel})</span>
+          ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
         </label>
         ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
       </div>
     `).join('')}
 
-    <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">toplam</span></div>
+    <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">Ödeme yöntemi</div>
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
     <div class="option-row">
-      <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">💵 Nakit<br/><span style="font-weight:400; font-size:11px;">personel gelince</span></div>
-      <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">💳 Kart<br/><span style="font-weight:400; font-size:11px;">şimdi öde</span></div>
+      <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
+      <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
     </div>
     ${state.bookingPaymentMethod==='card' && state.savedCard ? `
       <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
         <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
-        <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">Değiştir</span>
+        <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
       </div>
     ` : ''}
     ${state.bookingPaymentMethod==='card' && !state.savedCard ? `
-      <div class="hint" style="margin:0 0 14px;">Kart bilgilerini bir sonraki adımda gireceksin, bir daha sormayacağız.</div>
+      <div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>
     ` : ''}
-    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">Siparişi Oluştur</button>
+    <button class="btn ochre btn-sm" style="width:100%;" data-confirm-booking="${service.key}">${t('createOrderBtn')}</button>
   </div>
   `;
 }
@@ -471,24 +846,24 @@ function renderProperties(){
   return `
   <div class="page-head">
     <div>
-      <h2>Mülklerim</h2>
-      <p>Airbnb/Booking iCal linkini ekleyip her check-out için otomatik temizlik talebi oluştur.</p>
+      <h2>${t('propertiesTitle')}</h2>
+      <p>${t('propertiesSubtitle')}</p>
     </div>
   </div>
   <div class="toolbar">
-    <button class="btn ochre" id="add-property">+ Mülk ekle</button>
+    <button class="btn ochre" id="add-property">${t('addPropertyCta')}</button>
   </div>
   ${props.length === 0 ? `
-    <div class="empty-state">Henüz mülk eklenmedi. Başlamak için "Mülk ekle" butonunu kullan.</div>
+    <div class="empty-state">${t('propertiesEmptyState')}</div>
   ` : `
     <div class="grid">
       ${props.map(p => `
         <div class="card">
           <h3>${p.name}</h3>
-          <div class="meta" style="margin-bottom:14px;">${p.city || 'Şehir belirtilmedi'}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · iCal bağlı' : ' · iCal bağlı değil (demo verisiyle senkronla)'}</div>
+          <div class="meta" style="margin-bottom:14px;">${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
           <div class="row-actions">
-            <button class="btn ochre btn-sm" data-book="${p.id}">Hizmet talep et</button>
-            <button class="btn ghost btn-sm" data-sync="${p.id}">Takvimi senkronla (demo)</button>
+            <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
+            <button class="btn ghost btn-sm" data-sync="${p.id}">${t('syncDemoBtn')}</button>
           </div>
         </div>
       `).join('')}
@@ -497,39 +872,32 @@ function renderProperties(){
   `;
 }
 
-const STATUS_LABELS = {
-  pending:'Bekliyor', assigned:'Atandı', in_progress:'Devam ediyor',
-  done:'Tamamlandı', confirmed:'Onaylandı', cancelled:'İptal',
-};
-const PAY_LABELS = { unpaid:'Ödenmedi', held:'Emanette', released:'Serbest bırakıldı', refunded:'İade edildi' };
-
 function serviceName(key){
-  const s = state.services.find(x => x.key === key);
-  return s ? s.name : key;
+  return serviceLabel(key).name;
 }
 
 function renderJobs(){
   return `
   <div class="page-head">
     <div>
-      <h2>Siparişlerim</h2>
-      <p>Aldığın hizmetler ve durumları.</p>
+      <h2>${t('ordersTitle')}</h2>
+      <p>${t('ordersSubtitle')}</p>
     </div>
   </div>
   ${state.jobs.length === 0 ? `
-    <div class="empty-state">Henüz sipariş yok. "Hizmetler" sekmesinden bir sipariş oluştur.</div>
+    <div class="empty-state">${t('ordersEmptyState')}</div>
   ` : `
     <table>
       <thead><tr>
-        <th>Mülk</th><th>Hizmet</th><th>Zaman</th><th>Durum</th><th>Fiyat</th><th></th>
+        <th>${t('colProperty')}</th><th>${t('colService')}</th><th>${t('colWhen')}</th><th>${t('colStatus')}</th><th>${t('colPrice')}</th><th></th>
       </tr></thead>
       <tbody>
         ${state.jobs.map(j => `
           <tr>
             <td><strong>${j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
             <td>${serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
-            <td>${j.urgency==='urgent' ? '⚡ Acil' : j.urgency==='now' ? 'Şimdi' : new Date(j.checkout_at).toLocaleString('tr-TR',{dateStyle:'medium',timeStyle:'short'})}</td>
-            <td><span class="badge ${j.status}">${STATUS_LABELS[j.status]}</span></td>
+            <td>${j.urgency==='urgent' ? t('urgent') : j.urgency==='now' ? t('now') : new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</td>
+            <td><span class="badge ${j.status}">${statusLabel(j.status)}</span></td>
             <td>${j.price} €</td>
             <td>${renderJobAction(j)}</td>
           </tr>
@@ -542,25 +910,22 @@ function renderJobs(){
 
 function renderJobAction(j){
   if(j.payment_status === 'released'){
-    return `<span class="pay-badge released">✓ Ödendi</span>`;
+    return `<span class="pay-badge released">${t('paidBadge')}</span>`;
   }
   if(!['done','confirmed'].includes(j.status)){
     return `
-      <button class="btn ghost btn-sm" data-mark-done="${j.id}">Tamamlandı olarak işaretle</button>
-      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? '💳 Kart · ödeme alındı, tamamlanınca serbest kalır' : '💵 Nakit · personel gelince tahsil edilir'}</div>
+      <button class="btn ghost btn-sm" data-mark-done="${j.id}">${t('markDoneBtn')}</button>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? t('cardPaidNote') : t('cashPaidNote')}</div>
     `;
   }
-  return `<span class="pay-badge held">Ödeme sonuçlanıyor…</span>`;
+  return `<span class="pay-badge held">${t('settlingBadge')}</span>`;
 }
 
 function renderAddonsSummary(addonsJson){
   if(!addonsJson) return '';
   try{
     const list = JSON.parse(addonsJson);
-    return list.map(a => {
-      const addon = state.addons.find(x => x.key === a.key);
-      return ` <span style="color:var(--muted); font-size:12px;">+ ${addon ? addon.name : a.key} (${a.quantity})</span>`;
-    }).join('');
+    return list.map(a => ` <span style="color:var(--muted); font-size:12px;">+ ${addonLabel(a.key)} (${a.quantity})</span>`).join('');
   }catch(e){ return ''; }
 }
 
@@ -569,21 +934,21 @@ function renderModal(){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>Kart bilgileri</h3>
-        <div class="hint" style="margin:-8px 0 16px;">Bilgilerin güvenle saklanır — bir sonraki siparişinde tekrar girmene gerek kalmaz. Kart numaranın tamamı sunucumuzda tutulmaz, yalnızca son 4 hanesi görünür.</div>
+        <h3>${t('cardModalTitle')}</h3>
+        <div class="hint" style="margin:-8px 0 16px;">${t('cardModalHint')}</div>
         <form id="card-form">
-          <div class="field"><label>Kart üzerindeki isim</label><input name="holderName" required placeholder="MARKO PETROVIC" /></div>
-          <div class="field"><label>Kart numarası</label><input name="cardNumber" required inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111" /></div>
+          <div class="field"><label>${t('cardHolderLabel')}</label><input name="holderName" required placeholder="MARKO PETROVIC" /></div>
+          <div class="field"><label>${t('cardNumberLabel')}</label><input name="cardNumber" required inputmode="numeric" maxlength="19" placeholder="4111 1111 1111 1111" /></div>
           <div style="display:flex; gap:10px;">
-            <div class="field" style="flex:1;"><label>Son kullanma (Ay)</label><input name="expMonth" required inputmode="numeric" maxlength="2" placeholder="12" /></div>
-            <div class="field" style="flex:1;"><label>Son kullanma (Yıl)</label><input name="expYear" required inputmode="numeric" maxlength="4" placeholder="2028" /></div>
-            <div class="field" style="flex:1;"><label>CVC</label><input name="cvc" required inputmode="numeric" maxlength="4" placeholder="123" /></div>
+            <div class="field" style="flex:1;"><label>${t('cardExpMonthLabel')}</label><input name="expMonth" required inputmode="numeric" maxlength="2" placeholder="12" /></div>
+            <div class="field" style="flex:1;"><label>${t('cardExpYearLabel')}</label><input name="expYear" required inputmode="numeric" maxlength="4" placeholder="2028" /></div>
+            <div class="field" style="flex:1;"><label>${t('cardCvcLabel')}</label><input name="cvc" required inputmode="numeric" maxlength="4" placeholder="123" /></div>
           </div>
-          <div class="hint" style="margin:-6px 0 14px;">CVC yalnızca bu işlem için kullanılır, hiçbir yerde saklanmaz.</div>
+          <div class="hint" style="margin:-6px 0 14px;">${t('cardCvcHint')}</div>
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
           <div class="actions">
-            <button type="button" class="btn ghost" id="modal-cancel">Vazgeç</button>
-            <button type="submit" class="btn ochre">Kaydet ve devam et</button>
+            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="submit" class="btn ochre">${t('saveContinueBtn')}</button>
           </div>
         </form>
       </div>
@@ -593,21 +958,21 @@ function renderModal(){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
-        <h3>Yeni mülk ekle</h3>
+        <h3>${t('addPropertyModalTitle')}</h3>
         <form id="property-form">
-          <div class="field"><label>Mülk adı</label><input name="name" required placeholder="örn. Kotor Eski Şehir Stüdyo" /></div>
-          <div class="field"><label>Şehir</label><input name="city" placeholder="örn. Kotor" /></div>
-          <div class="field"><label>Açık adres</label><input name="address" placeholder="örn. Stari Grad 45" /></div>
+          <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
+          <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+          <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
           <div class="field">
-            <label>Konum — haritada işaretle</label>
+            <label>${t('propertyLocationLabel')}</label>
             <div id="modal-map" class="mini-map"></div>
-            <div class="map-hint">${state.regLat ? `Seçildi: ${state.regLat.toFixed(5)}, ${state.regLng.toFixed(5)}` : 'Personelin doğru adrese gitmesi için haritaya tıkla.'}</div>
+            <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
           </div>
-          <div class="field"><label>Büyüklük (m²)</label><input name="sizeSqm" type="number" min="1" placeholder="örn. 75" /></div>
-          <div class="field"><label>Airbnb/Booking iCal linki (opsiyonel)</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
+          <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
+          <div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
           <div class="actions">
-            <button type="button" class="btn ghost" id="modal-cancel">Vazgeç</button>
-            <button type="submit" class="btn ochre">Ekle</button>
+            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="submit" class="btn ochre">${t('addBtn')}</button>
           </div>
         </form>
       </div>
@@ -616,7 +981,6 @@ function renderModal(){
   return '';
 }
 
-/* ---------- DATA LOADING ---------- */
 async function loadAll(){
   const calls = [ api('/properties'), api('/jobs'), api('/payment-methods') ];
   if(state.services.length === 0) calls.push(api('/services'));
@@ -628,37 +992,39 @@ async function loadAll(){
   render();
 }
 
-/* ---------- EVENTS ---------- */
 async function submitBooking(draft){
   try{
     await api('/jobs', { method:'POST', body: JSON.stringify(draft) });
     state.bookingService = null;
     state.page = 'jobs';
     await loadAll();
-    showToast('Siparişin oluşturuldu.');
+    showToast(t('toastOrderCreated'));
   }catch(err){ showToast(err.message); }
 }
 
 function attachHandlers(){
+  document.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => {
+    state.lang = el.dataset.lang;
+    localStorage.setItem('lang', state.lang);
+    render();
+  });
+
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
     state.accountTypeChoice = el.dataset.choice; render();
   });
 
-  // Kayıt formunda mülk haritası (yalnızca bireysel + profil adımındaysa var)
   initLeafletPickerMap('reg-map', (lat, lng) => {
     state.regLat = lat; state.regLng = lng;
     const hint = document.querySelector('#reg-map ~ .map-hint');
-    if(hint) hint.textContent = `Seçildi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if(hint) hint.textContent = t('mapHintSelected', { lat: lat.toFixed(5), lng: lng.toFixed(5) });
   }, state.regLat, state.regLng);
 
-  // Panelden "Mülk ekle" modalındaki harita
   initLeafletPickerMap('modal-map', (lat, lng) => {
     state.regLat = lat; state.regLng = lng;
     const hint = document.querySelector('#modal-map ~ .map-hint');
-    if(hint) hint.textContent = `Seçildi: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if(hint) hint.textContent = t('mapHintSelected', { lat: lat.toFixed(5), lng: lng.toFixed(5) });
   }, state.regLat, state.regLng);
 
-  // 1) Telefon gönder -> kod iste
   const phoneForm = document.getElementById('phone-form');
   if(phoneForm) phoneForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -673,7 +1039,6 @@ function attachHandlers(){
     }catch(err){ state.authError = err.message; render(); }
   };
 
-  // 2) Kodu doğrula -> yeni kullanıcıysa profil adımına geç, değilse direkt panele gir
   const otpForm = document.getElementById('otp-form');
   if(otpForm) otpForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -698,7 +1063,6 @@ function attachHandlers(){
   const changePhone = document.getElementById('change-phone');
   if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
 
-  // 3) Profili tamamla (yalnızca yeni kullanıcı) -> Hizmetler ekranına gir
   const profileForm = document.getElementById('profile-form');
   if(profileForm) profileForm.onsubmit = async (e) => {
     e.preventDefault();
@@ -722,7 +1086,7 @@ function attachHandlers(){
       state.authError = '';
       state.page = 'services';
       state.regLat = null; state.regLng = null;
-      if(data.property) showToast(`Hoş geldin! "${data.property.name}" mülkün eklendi.`);
+      if(data.property) showToast(t('toastWelcomeProperty', { name: data.property.name }));
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
   };
@@ -794,7 +1158,7 @@ function attachHandlers(){
     const propertyId = state.bookingPropertyId || props[0]?.id;
     if(!propertyId) return;
     if(state.bookingUrgency === 'scheduled' && !state.bookingScheduledAt){
-      showToast('Lütfen bir tarih/saat seç.'); return;
+      showToast(t('pleaseSelectDatetime')); return;
     }
     const addons = Object.entries(state.bookingAddons)
       .filter(([, v]) => v && v.checked)
@@ -808,7 +1172,6 @@ function attachHandlers(){
     };
 
     if(state.bookingPaymentMethod === 'card' && !state.savedCard){
-      // Kayıtlı kart yok - önce kart formunu göster, sipariş taslağını bekletiyoruz.
       state.pendingBooking = draft;
       state.modal = 'card-form';
       render();
@@ -830,7 +1193,6 @@ function attachHandlers(){
     try{
       const card = await api('/payment-methods', { method:'POST', body: JSON.stringify({
         cardNumber: fd.cardNumber, expMonth: fd.expMonth, expYear: fd.expYear, holderName: fd.holderName,
-        // cvc kasıtlı olarak gönderilmiyor - hiçbir yerde saklanmıyor.
       })});
       state.savedCard = card;
       state.modal = null;
@@ -839,7 +1201,7 @@ function attachHandlers(){
         await submitBooking(state.pendingBooking);
         state.pendingBooking = null;
       } else {
-        showToast('Kartın kaydedildi.');
+        showToast(t('toastCardSaved'));
         render();
       }
     }catch(err){ state.authError = err.message; render(); }
@@ -857,7 +1219,6 @@ function attachHandlers(){
     state.modal = null;
     state.regLat = null; state.regLng = null;
     await loadAll();
-    showToast('Mülk eklendi.');
   };
 
   document.querySelectorAll('[data-book]').forEach(el => el.onclick = () => {
@@ -886,22 +1247,20 @@ SUMMARY:Reserved
 END:VEVENT
 END:VCALENDAR`;
     const result = await api(`/properties/${el.dataset.sync}/sync`, { method:'POST', body: JSON.stringify({ icsText: SAMPLE_ICS }) });
-    showToast(`Senkron tamam: ${result.created} yeni temizlik işi oluşturuldu.`);
+    showToast(t('toastSyncDone', { count: result.created }));
     state.page = 'jobs';
     await loadAll();
   });
 
   document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
     await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
-    showToast('Hizmet tamamlandı, ödeme otomatik sonuçlandı.');
+    showToast(t('toastMarkedDone'));
     await loadAll();
   });
 }
 
-/* ---------- INIT ---------- */
 (async function init(){
   if(state.token && !state.user){
-    // Profil tamamlama adımında yarım kalmış olabilir - güvenli şekilde baştan başlat.
     localStorage.removeItem('token'); state.token = null;
   }
   render();
