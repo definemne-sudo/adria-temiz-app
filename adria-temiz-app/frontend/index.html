@@ -2,28 +2,28 @@
 <html lang="me" id="html-root">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Adria Temiz</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>CallMaid</title>
 <link rel="manifest" href="manifest.json" />
-<meta name="theme-color" content="#12303F" />
+<meta name="theme-color" content="#0F3D2E" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
-    --navy:#12303F;
-    --navy-2:#1B4353;
-    --sage:#7C9C82;
-    --sage-dark:#5B7A62;
-    --ochre:#C98A3E;
-    --bg:#EEF2EF;
+    --navy:#0F3D2E;
+    --navy-2:#14503D;
+    --sage:#1D9E73;
+    --sage-dark:#14503D;
+    --ochre:#1D9E73;
+    --bg:#EFF7F2;
     --panel:#FFFFFF;
-    --line:#DCE3DF;
-    --text:#16262B;
-    --muted:#5C7178;
+    --line:#D7E7DE;
+    --text:#16241C;
+    --muted:#5B7A6C;
     --danger:#B5542A;
     --radius:10px;
   }
@@ -35,6 +35,7 @@
     color:var(--text);
   }
   h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .brand h1, .brand-word{font-family:'Poppins',sans-serif; font-weight:700;}
   .app{display:flex; min-height:100vh;}
 
   .auth-wrap{
@@ -49,9 +50,9 @@
     width:100%; max-width:420px; background:var(--panel);
     border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35);
   }
-  .brand{display:flex; align-items:baseline; gap:8px; margin-bottom:6px;}
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
   .brand .mark{color:var(--ochre); font-size:28px;}
-  .brand h1{font-size:24px; color:var(--navy);}
+  .brand h1{font-size:22px; color:var(--navy);}
   .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
@@ -118,6 +119,14 @@
   .card h3{font-size:15px; color:var(--navy); margin-bottom:4px;}
   .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
   .card .price{font-family:'Fraunces',serif; font-size:20px; color:var(--ochre); margin-bottom:12px;}
+  .service-icon{
+    width:46px; height:46px; border-radius:14px; background:rgba(29,158,115,.12);
+    display:flex; align-items:center; justify-content:center; font-size:23px; margin-bottom:12px;
+  }
+  .property-avatar{
+    width:44px; height:44px; border-radius:50%; color:#fff; font-family:'Fraunces',serif;
+    font-weight:600; font-size:18px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;
+  }
   .row-actions{display:flex; gap:8px;}
   .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:6px;}
 
@@ -151,6 +160,57 @@
     position:fixed; bottom:24px; right:24px; background:var(--navy); color:#fff; padding:12px 18px;
     border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60;
   }
+
+  /* --- Mobil düzen --- */
+  .bottom-nav{ display:none; }
+  .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+
+  @media (max-width: 760px){
+    .app{ flex-direction:column; }
+
+    .sidebar{
+      width:100%; flex-direction:row; align-items:center; justify-content:space-between;
+      padding:12px 16px; position:sticky; top:0; z-index:45; gap:10px;
+    }
+    .sidebar-top{ display:flex; align-items:center; gap:10px; }
+    .sidebar .brand{ margin-bottom:0; }
+    .sidebar .brand h1{ font-size:17px; }
+    .sidebar .account-badge{ display:none; }
+    .sidebar .nav-item{ display:none; }
+    .sidebar .spacer{ display:none; }
+    .sidebar .who{ display:none; }
+    .sidebar .lang-switch{ margin-bottom:0; }
+    .sidebar .logout{ font-size:11px; white-space:nowrap; }
+
+    .bottom-nav{
+      display:flex; position:fixed; bottom:0; left:0; right:0;
+      background:var(--navy); justify-content:space-around; align-items:center;
+      padding:8px 6px calc(6px + env(safe-area-inset-bottom)); z-index:45;
+      box-shadow:0 -6px 20px rgba(0,0,0,.18);
+    }
+    .nav-item-mobile{
+      display:flex; flex-direction:column; align-items:center; gap:2px;
+      font-size:10.5px; font-weight:700; color:#9FB3AE; padding:5px 16px; border-radius:10px; cursor:pointer;
+    }
+    .nav-item-mobile .icon{ font-size:19px; }
+    .nav-item-mobile.active{ color:#fff; background:rgba(255,255,255,.12); }
+
+    .main{ padding:16px; padding-bottom:88px; max-width:100%; }
+    .page-head{ flex-direction:column; align-items:flex-start; gap:10px; }
+    .grid{ grid-template-columns:1fr; gap:12px; }
+
+    .modal-backdrop{ align-items:flex-end; padding:0; }
+    .modal{
+      max-width:100%; width:100%; border-radius:16px 16px 0 0;
+      max-height:88vh; overflow-y:auto; padding:22px 20px calc(22px + env(safe-area-inset-bottom));
+    }
+
+    .auth-wrap{ padding:16px; }
+    .auth-card{ padding:26px 22px; }
+
+    .row-actions{ flex-wrap:wrap; }
+    .row-actions .btn-sm{ flex:1; min-width:120px; }
+  }
 </style>
 </head>
 <body>
@@ -169,6 +229,12 @@ if ('serviceWorker' in navigator) {
 
 /* ================== CEVIRILER ================== */
 const LOCALES = { tr:'tr-TR', en:'en-GB', me:'sr-Latn-ME' };
+
+const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+  <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
+  <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
+  <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
 
 const TRANSLATIONS = {
   tr: {
@@ -466,24 +532,27 @@ const TRANSLATIONS = {
 
 const SERVICE_I18N = {
   checkin_checkout: {
+    icon: '🔑',
     tr: { name: "Check-in / Check-out temizliği", description: "Misafir çıkışı ve girişi arasında hızlı, standart temizlik." },
     en: { name: "Check-in / Check-out cleaning", description: "Fast, standard cleaning between guest check-out and check-in." },
     me: { name: "Check-in / Check-out čišćenje", description: "Brzo, standardno čišćenje između odjave i prijave gosta." },
   },
   deep_clean: {
+    icon: '✨',
     tr: { name: "Detaylı temizlik", description: "Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik." },
     en: { name: "Deep cleaning", description: "Thorough cleaning covering cupboards, the oven, windows and more." },
     me: { name: "Detaljno čišćenje", description: "Temeljito čišćenje koje pokriva ormare, rernu, prozore i još mnogo toga." },
   },
   office: {
+    icon: '🏢',
     tr: { name: "Ofis / iş yeri temizliği", description: "Çalışma alanları için düzenli veya tek seferlik temizlik." },
     en: { name: "Office / workplace cleaning", description: "Regular or one-off cleaning for workspaces." },
     me: { name: "Čišćenje kancelarije / radnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
   },
 };
 const ADDON_I18N = {
-  carpet: { tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
-  upholstery: { tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
+  carpet: { icon: '🧶', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
+  upholstery: { icon: '🛋️', tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
 };
 
 const ERROR_TRANSLATIONS = {
@@ -525,9 +594,24 @@ function serviceLabel(key){
   const s = SERVICE_I18N[key];
   return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
 }
+function serviceIcon(key){
+  return (SERVICE_I18N[key] && SERVICE_I18N[key].icon) || '🧹';
+}
 function addonLabel(key){
   const a = ADDON_I18N[key];
   return a ? (a[state.lang] || a.tr) : key;
+}
+function addonIcon(key){
+  return (ADDON_I18N[key] && ADDON_I18N[key].icon) || '➕';
+}
+// Her mülk için tutarlı, markaya uygun bir renk üretir - kullanıcı her
+// mülkünü kendine özgü, tanıdık bir renkle görsün diye (gerçek fotoğraf
+// olmadan da "özel" hissettiren bir dokunuş).
+const AVATAR_PALETTE = ['#1D9E73','#0F3D2E','#2FBE8F','#3D6B57','#5B7A6C','#0C7A5C'];
+function avatarColor(str){
+  let hash = 0;
+  for(let i=0;i<(str||'').length;i++) hash = str.charCodeAt(i) + ((hash<<5)-hash);
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
 }
 function statusLabel(status){
   const map = { pending:'statusPending', assigned:'statusAssigned', in_progress:'statusInProgress', done:'statusDone', confirmed:'statusConfirmed', cancelled:'statusCancelled' };
@@ -697,7 +781,7 @@ function renderAuth(){
   <div class="auth-wrap">
     <div class="auth-card">
       ${langSwitch()}
-      <div class="brand"><span class="mark">◆</span><h1>Adria Temiz</h1></div>
+      <div class="brand">${BRAND_MARK}<h1>Call<span style="color:var(--sage);">Maid</span></h1></div>
       ${inner}
     </div>
   </div>`;
@@ -705,18 +789,31 @@ function renderAuth(){
 
 function renderPanel(){
   const isCompany = state.user.accountType === 'company';
+  const NAV_ICONS = { services:'🧹', properties:'🏠', jobs:'🧾' };
+  const navItem = (page, label) => `<div class="nav-item ${state.page===page?'active':''}" data-page="${page}">${label}</div>`;
+  const bottomNavItem = (page, label) => `
+    <div class="nav-item-mobile ${state.page===page?'active':''}" data-page="${page}">
+      <span class="icon">${NAV_ICONS[page]}</span><span>${label}</span>
+    </div>`;
   return `
   <div class="sidebar">
-    <div class="brand"><span class="mark" style="color:#E7B98C">◆</span><h1>Adria Temiz</h1></div>
-    <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
-    <div class="nav-item ${state.page==='services'?'active':''}" data-page="services">${t('navServices')}</div>
-    <div class="nav-item ${state.page==='properties'?'active':''}" data-page="properties">${t('navProperties')}</div>
-    <div class="nav-item ${state.page==='jobs'?'active':''}" data-page="jobs">${t('navOrders')}</div>
+    <div class="sidebar-top">
+      <div class="brand">${BRAND_MARK}<h1>Call<span style="color:#5EE0AE;">Maid</span></h1></div>
+      <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
+    </div>
+    ${navItem('services', t('navServices'))}
+    ${navItem('properties', t('navProperties'))}
+    ${navItem('jobs', t('navOrders'))}
     <div class="spacer"></div>
     ${langSwitch()}
     <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
     <div class="logout" id="logout">${t('logout')}</div>
   </div>
+  <nav class="bottom-nav">
+    ${bottomNavItem('services', t('navServices'))}
+    ${bottomNavItem('properties', t('navProperties'))}
+    ${bottomNavItem('jobs', t('navOrders'))}
+  </nav>
   <div class="main">
     ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : renderJobs()}
   </div>
@@ -767,6 +864,7 @@ function renderServices(){
       const isOpen = state.bookingService === s.key;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
+        <div class="service-icon">${serviceIcon(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
         <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
@@ -814,7 +912,7 @@ function renderBookingPanel(service, props, selectedProperty){
       <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
         <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
           <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
-          ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
+          <span style="font-size:16px;">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
         </label>
         ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
       </div>
@@ -859,6 +957,7 @@ function renderProperties(){
     <div class="grid">
       ${props.map(p => `
         <div class="card">
+          <div class="property-avatar" style="background:${avatarColor(p.id)};">${(p.name||'?').trim().charAt(0).toUpperCase()}</div>
           <h3>${p.name}</h3>
           <div class="meta" style="margin-bottom:14px;">${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
           <div class="row-actions">
@@ -887,6 +986,7 @@ function renderJobs(){
   ${state.jobs.length === 0 ? `
     <div class="empty-state">${t('ordersEmptyState')}</div>
   ` : `
+    <div class="table-wrap">
     <table>
       <thead><tr>
         <th>${t('colProperty')}</th><th>${t('colService')}</th><th>${t('colWhen')}</th><th>${t('colStatus')}</th><th>${t('colPrice')}</th><th></th>
@@ -904,6 +1004,7 @@ function renderJobs(){
         `).join('')}
       </tbody>
     </table>
+    </div>
   `}
   `;
 }
