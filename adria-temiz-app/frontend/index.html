@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>CallMaid</title>
+<title>CISTO</title>
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0F3D2E" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -52,7 +52,7 @@
   }
   .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
   .brand .mark{color:var(--ochre); font-size:28px;}
-  .brand h1{font-size:22px; color:var(--navy);}
+  .brand h1{font-size:22px; color:var(--navy); letter-spacing:0.03em;}
   .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
@@ -781,7 +781,7 @@ function renderAuth(){
   <div class="auth-wrap">
     <div class="auth-card">
       ${langSwitch()}
-      <div class="brand">${BRAND_MARK}<h1>Call<span style="color:var(--sage);">Maid</span></h1></div>
+      <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
       ${inner}
     </div>
   </div>`;
@@ -798,7 +798,7 @@ function renderPanel(){
   return `
   <div class="sidebar">
     <div class="sidebar-top">
-      <div class="brand">${BRAND_MARK}<h1>Call<span style="color:#5EE0AE;">Maid</span></h1></div>
+      <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
       <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
     </div>
     ${navItem('services', t('navServices'))}
