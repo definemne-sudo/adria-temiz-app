@@ -303,6 +303,10 @@ const TRANSLATIONS = {
     profileCompanyNameLabel: "Şirket adı",
     profileCompanyHint: "Mülklerini panele girdikten sonra, \"Mülklerim\" sekmesinden tek tek ekleyebilirsin.",
     propertyHeading: "Mülkün (opsiyonel, sonra da ekleyebilirsin)",
+    propertyCategoryLabel: "Mülk Türü",
+    categoryApartment: "Apartman Dairesi",
+    categoryHouse: "Müstakil Ev / Villa",
+    categoryOffice: "Ofis / İşyeri",
     propertyNameLabel: "Mülk adı",
     propertyNamePlaceholder: "örn. Budva Sahil Daire",
     propertyCityLabel: "Şehir",
@@ -412,6 +416,10 @@ const TRANSLATIONS = {
     profileCompanyNameLabel: "Company name",
     profileCompanyHint: "Once you're in, you can add your properties one by one from the \"My Properties\" tab.",
     propertyHeading: "Your property (optional, you can add it later)",
+    propertyCategoryLabel: "Property Type",
+    categoryApartment: "Apartment",
+    categoryHouse: "House/Villa",
+    categoryOffice: "Office/Shop",
     propertyNameLabel: "Property name",
     propertyNamePlaceholder: "e.g. Budva Seaside Apartment",
     propertyCityLabel: "City",
@@ -521,6 +529,10 @@ const TRANSLATIONS = {
     profileCompanyNameLabel: "Naziv kompanije",
     profileCompanyHint: "Kada uđeš u panel, nekretnine možeš dodavati jednu po jednu iz kartice \"Moje nekretnine\".",
     propertyHeading: "Tvoja nekretnina (opciono, možeš dodati i kasnije)",
+    propertyCategoryLabel: "Tip nekretnine",
+    categoryApartment: "Stan",
+    categoryHouse: "Kuća/Villa",
+    categoryOffice: "Poslovni prostor",
     propertyNameLabel: "Naziv nekretnine",
     propertyNamePlaceholder: "npr. Apartman Budva more",
     propertyCityLabel: "Grad",
@@ -735,6 +747,7 @@ let state = {
   countryCode: '+382',
   devCode: '',
   accountTypeChoice: 'individual',
+  propertyCategory: 'apartment',
   authError: '',
   modal: null,
 };
@@ -857,6 +870,12 @@ function renderAuth(){
           <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
             <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
               ${t('propertyHeading')}
+            </div>
+            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
+            <div class="option-row">
+              <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
+              <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
+              <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
             </div>
             <div class="field"><label>${t('propertyNameLabel')}</label><input name="propertyName" placeholder="${t('propertyNamePlaceholder')}" /></div>
             <div class="field"><label>${t('propertyCityLabel')}</label><input name="propertyCity" placeholder="${t('propertyCityPlaceholder')}" /></div>
@@ -1117,7 +1136,7 @@ function renderProperties(){
         <div class="card">
           <div class="property-avatar" style="background:${avatarColor(p.id)};">${(p.name||'?').trim().charAt(0).toUpperCase()}</div>
           <h3>${p.name}</h3>
-          <div class="meta" style="margin-bottom:14px;">${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
+          <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
           <div class="row-actions">
             <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
             <button class="btn ghost btn-sm" data-sync="${p.id}">${t('syncDemoBtn')}</button>
@@ -1127,6 +1146,11 @@ function renderProperties(){
     </div>
   `}
   `;
+}
+
+function categoryLabel(cat){
+  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice' };
+  return t(map[cat] || 'categoryApartment');
 }
 
 function serviceName(key){
@@ -1219,6 +1243,12 @@ function renderModal(){
       <div class="modal">
         <h3>${t('addPropertyModalTitle')}</h3>
         <form id="property-form">
+          <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
+          <div class="option-row">
+            <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
+            <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
+            <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
+          </div>
           <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
           <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
           <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
@@ -1270,6 +1300,10 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
     state.accountTypeChoice = el.dataset.choice; render();
+  });
+
+  document.querySelectorAll('[data-property-category]').forEach(el => el.onclick = () => {
+    state.propertyCategory = el.dataset.propertyCategory; render();
   });
 
   initLeafletPickerMap('reg-map', (lat, lng) => {
@@ -1338,6 +1372,7 @@ function attachHandlers(){
         name: fd.propertyName || 'Evim',
         city: fd.propertyCity || null,
         address: fd.propertyAddress || null,
+        category: state.propertyCategory,
         sizeSqm: fd.sizeSqm || null,
         latitude: state.regLat,
         longitude: state.regLng,
@@ -1367,7 +1402,7 @@ function attachHandlers(){
   };
 
   const addPropBtn = document.getElementById('add-property');
-  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; render(); };
+  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; state.propertyCategory = 'apartment'; render(); };
 
   const gotoAddProperty = document.getElementById('goto-add-property');
   if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
@@ -1504,6 +1539,7 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(propForm));
     await api('/properties', { method:'POST', body: JSON.stringify({
       name: fd.name, city: fd.city, address: fd.address || null,
+      category: state.propertyCategory,
       latitude: state.regLat, longitude: state.regLng,
       sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
     })});
