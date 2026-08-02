@@ -51,8 +51,11 @@
     border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35);
   }
   .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
-  .brand .mark{color:var(--ochre); font-size:28px;}
-  .brand h1{font-size:22px; color:var(--navy); letter-spacing:0.03em;}
+  .brand svg{width:40px; height:40px; display:block; flex-shrink:0;}
+  .brand h1{font-size:27px; color:var(--navy); letter-spacing:0.03em;}
+  .header-row{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:22px;}
+  .header-row .brand{margin-bottom:0;}
+  .header-row .lang-switch{margin-bottom:0;}
   .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
@@ -95,7 +98,7 @@
     display:flex; flex-direction:column;
   }
   .sidebar .brand{color:#fff; margin-bottom:2px;}
-  .sidebar .brand h1{color:#fff; font-size:19px;}
+  .sidebar .brand h1{color:#fff; font-size:24px;}
   .account-badge{
     margin-top:6px; margin-bottom:20px; font-size:11px; text-transform:uppercase; letter-spacing:.05em;
     color:var(--sage); font-weight:700;
@@ -174,7 +177,11 @@
     }
     .sidebar-top{ display:flex; align-items:center; gap:10px; }
     .sidebar .brand{ margin-bottom:0; }
-    .sidebar .brand h1{ font-size:17px; }
+    .sidebar .brand h1{ font-size:19px; }
+    .sidebar .brand svg{ width:30px; height:30px; }
+    .sidebar .header-row{ margin-bottom:0; gap:10px; }
+    .sidebar .lang-switch{ gap:3px; }
+    .sidebar .lang-switch button{ padding:3px 6px; font-size:10px; }
     .sidebar .account-badge{ display:none; }
     .sidebar .nav-item{ display:none; }
     .sidebar .spacer{ display:none; }
@@ -207,6 +214,9 @@
 
     .auth-wrap{ padding:16px; }
     .auth-card{ padding:26px 22px; }
+    .auth-card .brand svg{ width:32px; height:32px; }
+    .auth-card .brand h1{ font-size:22px; }
+    .auth-card .header-row{ gap:8px; }
 
     .row-actions{ flex-wrap:wrap; }
     .row-actions .btn-sm{ flex:1; min-width:120px; }
@@ -237,40 +247,42 @@ const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="htt
 </svg>`;
 
 // Karadağ varsayılan/ilk sırada; kullanıcı isterse listeden başka ülke seçebilir.
+// iso: flagcdn.com üzerinden küçük bayrak görseli çekmek için (emoji bayraklar
+// Windows gibi platformlarda native <select> içinde düzgün görünmüyor).
 const COUNTRY_CODES = [
-  { flag:'🇲🇪', name:'Crna Gora', code:'+382' },
-  { flag:'🇷🇸', name:'Srbija', code:'+381' },
-  { flag:'🇭🇷', name:'Hrvatska', code:'+385' },
-  { flag:'🇧🇦', name:'Bosna i Hercegovina', code:'+387' },
-  { flag:'🇦🇱', name:'Shqipëria', code:'+355' },
-  { flag:'🇽🇰', name:'Kosova', code:'+383' },
-  { flag:'🇲🇰', name:'Severna Makedonija', code:'+389' },
-  { flag:'🇸🇮', name:'Slovenija', code:'+386' },
-  { flag:'🇹🇷', name:'Türkiye', code:'+90' },
-  { flag:'🇷🇺', name:'Россия', code:'+7' },
-  { flag:'🇩🇪', name:'Deutschland', code:'+49' },
-  { flag:'🇦🇹', name:'Österreich', code:'+43' },
-  { flag:'🇮🇹', name:'Italia', code:'+39' },
-  { flag:'🇫🇷', name:'France', code:'+33' },
-  { flag:'🇬🇧', name:'United Kingdom', code:'+44' },
-  { flag:'🇨🇭', name:'Schweiz', code:'+41' },
-  { flag:'🇳🇱', name:'Nederland', code:'+31' },
-  { flag:'🇧🇪', name:'België', code:'+32' },
-  { flag:'🇵🇱', name:'Polska', code:'+48' },
-  { flag:'🇨🇿', name:'Česko', code:'+420' },
-  { flag:'🇺🇦', name:'Україна', code:'+380' },
-  { flag:'🇬🇷', name:'Ελλάδα', code:'+30' },
-  { flag:'🇧🇬', name:'България', code:'+359' },
-  { flag:'🇷🇴', name:'România', code:'+40' },
-  { flag:'🇭🇺', name:'Magyarország', code:'+36' },
-  { flag:'🇪🇸', name:'España', code:'+34' },
-  { flag:'🇵🇹', name:'Portugal', code:'+351' },
-  { flag:'🇸🇪', name:'Sverige', code:'+46' },
-  { flag:'🇳🇴', name:'Norge', code:'+47' },
-  { flag:'🇩🇰', name:'Danmark', code:'+45' },
-  { flag:'🇫🇮', name:'Suomi', code:'+358' },
-  { flag:'🇮🇪', name:'Ireland', code:'+353' },
-  { flag:'🇺🇸', name:'United States', code:'+1' },
+  { iso:'me', name:'Crna Gora', code:'+382' },
+  { iso:'rs', name:'Srbija', code:'+381' },
+  { iso:'hr', name:'Hrvatska', code:'+385' },
+  { iso:'ba', name:'Bosna i Hercegovina', code:'+387' },
+  { iso:'al', name:'Shqipëria', code:'+355' },
+  { iso:'xk', name:'Kosova', code:'+383' },
+  { iso:'mk', name:'Severna Makedonija', code:'+389' },
+  { iso:'si', name:'Slovenija', code:'+386' },
+  { iso:'tr', name:'Türkiye', code:'+90' },
+  { iso:'ru', name:'Россия', code:'+7' },
+  { iso:'de', name:'Deutschland', code:'+49' },
+  { iso:'at', name:'Österreich', code:'+43' },
+  { iso:'it', name:'Italia', code:'+39' },
+  { iso:'fr', name:'France', code:'+33' },
+  { iso:'gb', name:'United Kingdom', code:'+44' },
+  { iso:'ch', name:'Schweiz', code:'+41' },
+  { iso:'nl', name:'Nederland', code:'+31' },
+  { iso:'be', name:'België', code:'+32' },
+  { iso:'pl', name:'Polska', code:'+48' },
+  { iso:'cz', name:'Česko', code:'+420' },
+  { iso:'ua', name:'Україна', code:'+380' },
+  { iso:'gr', name:'Ελλάδα', code:'+30' },
+  { iso:'bg', name:'България', code:'+359' },
+  { iso:'ro', name:'România', code:'+40' },
+  { iso:'hu', name:'Magyarország', code:'+36' },
+  { iso:'es', name:'España', code:'+34' },
+  { iso:'pt', name:'Portugal', code:'+351' },
+  { iso:'se', name:'Sverige', code:'+46' },
+  { iso:'no', name:'Norge', code:'+47' },
+  { iso:'dk', name:'Danmark', code:'+45' },
+  { iso:'fi', name:'Suomi', code:'+358' },
+  { iso:'ie', name:'Ireland', code:'+353' },
+  { iso:'us', name:'United States', code:'+1' },
 ];
 
 const TRANSLATIONS = {
@@ -278,7 +290,7 @@ const TRANSLATIONS = {
     tagline: "Tek tıkla, temiz ev.",
     authPhoneLabel: "Telefon numarası",
     authSendCode: "Kod gönder",
-    authPhoneHint: "Şifre yok, e-posta yok — telefonuna gelen 6 haneli kodla giriş yapıyorsun. Yeni numaraysan otomatik hesap açılır.",
+    authPhoneHint: "E-mail veya uzun kayıt işlemlerine gerek kalmadan mobil numaranız ile SMS yoluyla hızlı kayıt!",
     authOtpTagline: "{{phone}} numarasına gönderdiğimiz 6 haneli kodu gir.",
     authOtpLabel: "Doğrulama kodu",
     authVerify: "Doğrula",
@@ -387,7 +399,7 @@ const TRANSLATIONS = {
     tagline: "One click, a clean home.",
     authPhoneLabel: "Phone number",
     authSendCode: "Send code",
-    authPhoneHint: "No password, no email — sign in with a 6-digit code sent to your phone. New number? An account is created automatically.",
+    authPhoneHint: "Fast sign-up via SMS with just your mobile number — no e-mail or lengthy registration needed!",
     authOtpTagline: "Enter the 6-digit code we sent to {{phone}}.",
     authOtpLabel: "Verification code",
     authVerify: "Verify",
@@ -496,7 +508,7 @@ const TRANSLATIONS = {
     tagline: "Jedan klik, čist dom.",
     authPhoneLabel: "Broj telefona",
     authSendCode: "Pošalji kod",
-    authPhoneHint: "Bez šifre, bez e-mail-a — prijavljuješ se šestocifrenim kodom poslatim na telefon. Novi broj? Nalog se otvara automatski.",
+    authPhoneHint: "Brza prijava SMS kodom uz broj telefona — bez e-maila i dugih formulara za registraciju!",
     authOtpTagline: "Unesi šestocifreni kod koji smo poslali na {{phone}}.",
     authOtpLabel: "Kod za potvrdu",
     authVerify: "Potvrdi",
@@ -866,8 +878,10 @@ function renderAuth(){
   return `
   <div class="auth-wrap">
     <div class="auth-card">
-      ${langSwitch()}
-      <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
+      <div class="header-row">
+        <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
+        ${langSwitch()}
+      </div>
       ${inner}
     </div>
   </div>`;
@@ -884,14 +898,16 @@ function renderPanel(){
   return `
   <div class="sidebar">
     <div class="sidebar-top">
-      <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
+      <div class="header-row">
+        <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
+        ${langSwitch()}
+      </div>
       <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
     </div>
     ${navItem('services', t('navServices'))}
     ${navItem('properties', t('navProperties'))}
     ${navItem('jobs', t('navOrders'))}
     <div class="spacer"></div>
-    ${langSwitch()}
     <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
     <div class="logout" id="logout">${t('logout')}</div>
   </div>
