@@ -109,8 +109,8 @@ router.post('/complete-profile', requireAuth, (req, res) => {
   if (!name || !accountType) {
     return res.status(400).json({ error: 'name ve accountType zorunlu.' });
   }
-  if (!['individual', 'company'].includes(accountType)) {
-    return res.status(400).json({ error: "accountType 'individual' veya 'company' olmalı." });
+  if (!['individual', 'company', 'staff'].includes(accountType)) {
+    return res.status(400).json({ error: "accountType 'individual', 'company' veya 'staff' olmalı." });
   }
   if (accountType === 'company' && !companyName) {
     return res.status(400).json({ error: 'Yönetim şirketi için companyName zorunlu.' });
