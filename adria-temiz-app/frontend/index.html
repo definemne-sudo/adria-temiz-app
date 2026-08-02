@@ -136,9 +136,10 @@
   }
   .service-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
   .property-avatar{
-    width:44px; height:44px; border-radius:50%; color:#fff; font-family:'Fraunces',serif;
-    font-weight:600; font-size:18px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;
+    width:92px; height:92px; border-radius:22px; overflow:hidden; margin-bottom:14px;
+    box-shadow:0 4px 14px rgba(15,61,46,.18);
   }
+  .property-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
   .row-actions{display:flex; gap:8px;}
   .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:6px;}
 
@@ -766,6 +767,11 @@ function addonIcon(key){
 // mülkünü kendine özgü, tanıdık bir renkle görsün diye (gerçek fotoğraf
 // olmadan da "özel" hissettiren bir dokunuş).
 const AVATAR_PALETTE = ['#1D9E73','#0F3D2E','#2FBE8F','#3D6B57','#5B7A6C','#0C7A5C'];
+function categoryIconSrc(cat){
+  const map = { apartment:'icon-property-apartment.png', house:'icon-property-house.png', office:'icon-property-office.png' };
+  return map[cat] || map.apartment;
+}
+
 function avatarColor(str){
   let hash = 0;
   for(let i=0;i<(str||'').length;i++) hash = str.charCodeAt(i) + ((hash<<5)-hash);
@@ -1254,7 +1260,7 @@ function renderProperties(){
     <div class="grid">
       ${props.map(p => `
         <div class="card">
-          <div class="property-avatar" style="background:${avatarColor(p.id)};">${(p.name||'?').trim().charAt(0).toUpperCase()}</div>
+          <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
           <h3>${p.name}</h3>
           <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
           <div class="row-actions">
