@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
+const { syncPropertyCalendar } = require('../services/icalSync');
 
 const router = express.Router();
 
@@ -104,7 +105,7 @@ router.post('/verify-otp', (req, res) => {
 // Bireysel ev sahibi ise, Glovo tarzı akışla aynı adımda ilk mülkünü de kaydeder
 // (property alanı gönderilirse). Yönetim şirketi mülk eklemeyi panelden yapar,
 // çünkü genelde çok sayıda mülk portföy olarak eklenir, kayıt formuna sığmaz.
-router.post('/complete-profile', requireAuth, (req, res) => {
+router.post('/complete-profile', requireAuth, async (req, res) => {
   const { name, accountType, companyName, property } = req.body;
   if (!name || !accountType) {
     return res.status(400).json({ error: 'name ve accountType zorunlu.' });
@@ -122,13 +123,14 @@ router.post('/complete-profile', requireAuth, (req, res) => {
   ).run(name, accountType, companyName || null, req.user.id);
 
   let createdProperty = null;
+  let syncResult = null;
   if (accountType === 'individual' && property && (property.city || property.sizeSqm || property.name)) {
     const propertyId = uuid();
     const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
     const category = ['apartment', 'house', 'office'].includes(property.category) ? property.category : 'apartment';
     db.prepare(
-      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       propertyId,
       req.user.id,
@@ -138,9 +140,21 @@ router.post('/complete-profile', requireAuth, (req, res) => {
       property.city || null,
       property.latitude ? Number(property.latitude) : null,
       property.longitude ? Number(property.longitude) : null,
-      sizeSqm
+      sizeSqm,
+      property.icalUrl || null
     );
     createdProperty = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+
+    // Kayıt sırasında bir iCal linki verildiyse, kullanıcıya ikinci bir
+    // adım çıkarmadan takvimi hemen (nakit ödeme varsayımıyla) senkronla.
+    // Link geçersiz/erişilemezse kayıt akışını bozmasın diye sessizce geçiyoruz.
+    if (property.icalUrl) {
+      try {
+        syncResult = await syncPropertyCalendar(propertyId, { paymentMethod: 'cash' });
+      } catch (err) {
+        syncResult = { error: err.message };
+      }
+    }
   }
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
@@ -161,6 +175,7 @@ router.post('/complete-profile', requireAuth, (req, res) => {
       profileCompleted: true,
     },
     property: createdProperty,
+    syncResult,
   });
 });
 
