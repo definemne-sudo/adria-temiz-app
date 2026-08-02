@@ -125,13 +125,15 @@ router.post('/complete-profile', requireAuth, (req, res) => {
   if (accountType === 'individual' && property && (property.city || property.sizeSqm || property.name)) {
     const propertyId = uuid();
     const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
+    const category = ['apartment', 'house', 'office'].includes(property.category) ? property.category : 'apartment';
     db.prepare(
-      `INSERT INTO properties (id, owner_id, name, address, city, latitude, longitude, size_sqm)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       propertyId,
       req.user.id,
       property.name || 'Evim',
+      category,
       property.address || null,
       property.city || null,
       property.latitude ? Number(property.latitude) : null,
