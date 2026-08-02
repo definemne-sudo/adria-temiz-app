@@ -26,15 +26,16 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, city, icalUrl, sizeSqm, latitude, longitude } = req.body;
+  const { name, address, city, icalUrl, sizeSqm, latitude, longitude, category } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
+  const finalCategory = ['apartment', 'house', 'office'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
-    `INSERT INTO properties (id, owner_id, name, address, city, latitude, longitude, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    id, req.user.id, name, address || null, city || null,
+    id, req.user.id, name, finalCategory, address || null, city || null,
     latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
     sizeSqm ? Number(sizeSqm) : null, icalUrl || null
   );
