@@ -72,8 +72,6 @@
     flex:1; border:1.5px solid var(--line); border-radius:10px; padding:12px; cursor:pointer;
     text-align:center; font-size:13px; font-weight:600; color:var(--muted);
   }
-  .btn.light-sage{ background:rgba(29,158,115,.14); color:var(--sage-dark); }
-  .btn.light-sage:hover{ background:rgba(29,158,115,.24); }
   .choice.selected{border-color:var(--sage-dark); background:rgba(124,156,130,.12); color:var(--navy);}
   .rating-icon-btn{
     flex:1; display:flex; align-items:center; justify-content:center;
@@ -1201,7 +1199,7 @@ function renderServices(){
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
         <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
         <div class="row-actions">
-          <button class="btn ${isOpen?'ochre':'light-sage'} btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
+          <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
         ${isOpen ? renderBookingPanel(s, props, selectedProperty) : ''}
       </div>
