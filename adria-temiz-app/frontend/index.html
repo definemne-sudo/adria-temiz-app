@@ -123,9 +123,10 @@
   .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
   .card .price{font-family:'Fraunces',serif; font-size:20px; color:var(--ochre); margin-bottom:12px;}
   .service-icon{
-    width:46px; height:46px; border-radius:14px; background:rgba(29,158,115,.12);
-    display:flex; align-items:center; justify-content:center; font-size:23px; margin-bottom:12px;
+    width:52px; height:52px; border-radius:14px; overflow:hidden; margin-bottom:12px;
+    display:flex; align-items:center; justify-content:center; background:rgba(29,158,115,.08);
   }
+  .service-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
   .property-avatar{
     width:44px; height:44px; border-radius:50%; color:#fff; font-family:'Fraunces',serif;
     font-weight:600; font-size:18px; display:flex; align-items:center; justify-content:center; margin-bottom:12px;
@@ -616,19 +617,19 @@ const TRANSLATIONS = {
 
 const SERVICE_I18N = {
   checkin_checkout: {
-    icon: '🔑',
+    iconImg: 'icon-service-checkin.png',
     tr: { name: "Airbnb/Booking Temizliği", description: "Misafir çıkışı ve girişi arasında hızlı, standart temizlik." },
     en: { name: "Airbnb/Booking Cleaning", description: "Fast, standard cleaning between guest check-out and check-in." },
     me: { name: "Airbnb/Booking čišćenje", description: "Brzo, standardno čišćenje između odjave i prijave gosta." },
   },
   deep_clean: {
-    icon: '✨',
+    iconImg: 'icon-service-deep.png',
     tr: { name: "Detaylı temizlik", description: "Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik." },
     en: { name: "Detailed cleaning", description: "Thorough cleaning covering cupboards, the oven, windows and more." },
     me: { name: "Detaljno čišćenje", description: "Temeljito čišćenje koje pokriva ormare, rernu, prozore i još mnogo toga." },
   },
   office: {
-    icon: '🏢',
+    iconImg: 'icon-service-office.png',
     tr: { name: "Ofis / Dükkan / Çalışma Alanı Temizliği", description: "Çalışma alanları için düzenli veya tek seferlik temizlik." },
     en: { name: "Office/Shop/Workspace Cleaning", description: "Regular or one-off cleaning for workspaces." },
     me: { name: "Čišćenje poslovnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
@@ -683,7 +684,7 @@ function serviceLabel(key){
   return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
 }
 function serviceIcon(key){
-  return (SERVICE_I18N[key] && SERVICE_I18N[key].icon) || '🧹';
+  return (SERVICE_I18N[key] && SERVICE_I18N[key].iconImg) || null;
 }
 function addonLabel(key){
   const a = ADDON_I18N[key];
@@ -963,7 +964,7 @@ function renderServices(){
       const isOpen = state.bookingService === s.key;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
-        <div class="service-icon">${serviceIcon(s.key)}</div>
+        <div class="service-icon"><img src="${serviceIcon(s.key)}" alt="" /></div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
         <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
