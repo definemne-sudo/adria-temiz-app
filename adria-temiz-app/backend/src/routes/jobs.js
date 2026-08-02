@@ -110,12 +110,15 @@ router.get('/', (req, res) => {
 });
 
 // Personel uygulamasının kullanacağı endpoint: atanmamış (pending) işler.
-// MVP'de basit tutuluyor - "en yakın/uygun personel" eşleştirme mantığı
-// ilerleyen aşamada eklenebilir.
+// Sadece personel hesapları görebilir.
 router.get('/pending', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
   const rows = db
     .prepare(
-      `SELECT j.*, p.name AS property_name, p.address AS property_address, p.city AS property_city
+      `SELECT j.*, p.name AS property_name, p.address AS property_address, p.city AS property_city,
+              p.latitude AS property_latitude, p.longitude AS property_longitude
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
        WHERE j.status = 'pending'
@@ -145,6 +148,11 @@ router.patch('/:id/status', (req, res) => {
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Geçersiz durum.' });
   }
+  // "Tamamlandı" onayını yalnızca personel verebilir - müşteri kendi
+  // siparişini tamamlandı olarak işaretleyemez.
+  if (status === 'done' && req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
 
@@ -156,6 +164,37 @@ router.patch('/:id/status', (req, res) => {
   } else {
     db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
   }
+  res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+});
+
+// Müşteri, personel tarafından tamamlanmış (status='done') bir siparişi
+// değerlendirir - hem hizmetin genelini hem de personeli ayrı ayrı.
+// Uygulamayı açtığında bu değerlendirme ekranı otomatik çıkar (bkz. frontend),
+// bu da gerçek bir push bildirimi olmasa da "tamamlandı" haberini iletir.
+router.post('/:id/rate', (req, res) => {
+  const { id } = req.params;
+  const { serviceRating, serviceFeedback, staffRating, staffFeedback } = req.body;
+
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (!accessiblePropertyIds(req.user.id).includes(job.property_id)) {
+    return res.status(403).json({ error: 'Bu siparişe erişim yetkiniz yok.' });
+  }
+  if (job.status !== 'done') {
+    return res.status(400).json({ error: 'Yalnızca tamamlanmış siparişler değerlendirilebilir.' });
+  }
+  if (!['like', 'dislike'].includes(serviceRating) || !['like', 'dislike'].includes(staffRating)) {
+    return res.status(400).json({ error: 'Geçerli bir değerlendirme seç.' });
+  }
+
+  db.prepare(
+    `UPDATE cleaning_jobs SET
+       service_rating = ?, service_feedback = ?,
+       staff_rating = ?, staff_feedback = ?,
+       rated_at = datetime('now')
+     WHERE id = ?`
+  ).run(serviceRating, serviceFeedback || null, staffRating, staffFeedback || null, id);
+
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
 
