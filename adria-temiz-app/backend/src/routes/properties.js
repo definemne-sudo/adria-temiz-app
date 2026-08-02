@@ -81,12 +81,16 @@ router.post('/:id/delegates', (req, res) => {
   res.status(201).json({ message: 'Delege erişimi eklendi.', delegateId });
 });
 
-// Takvim senkronu tetikleme. Body'de test/demo amaçlı ham .ics metni
-// (icsText) gönderilebilir; prod'da mülkte kayıtlı ical_url kullanılır.
+// Takvim senkronu tetikleme. Body'de gerçek bir Airbnb/Booking iCal linki
+// (icalUrl) gönderilirse önce mülke kaydedilir, sonra o linkten gerçek
+// senkron yapılır. Test/demo amaçlı ham .ics metni (icsText) de kabul edilir.
 router.post('/:id/sync', async (req, res) => {
   const { id: propertyId } = req.params;
   if (!canAccessProperty(req.user.id, propertyId)) {
     return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+  }
+  if (req.body.icalUrl) {
+    db.prepare('UPDATE properties SET ical_url = ? WHERE id = ?').run(req.body.icalUrl, propertyId);
   }
   try {
     const result = await syncPropertyCalendar(propertyId, {
