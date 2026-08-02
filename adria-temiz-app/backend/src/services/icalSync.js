@@ -12,11 +12,17 @@ const { calcPrice } = require('./catalog');
  *
  * source: URL'den canlı okuma (prod) veya doğrudan .ics metni (test/demo).
  */
-async function syncPropertyCalendar(propertyId, { icsText } = {}) {
+async function syncPropertyCalendar(propertyId, { icsText, paymentMethod } = {}) {
   const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
   if (!property) {
     throw new Error('Mülk bulunamadı.');
   }
+  if (property.category === 'office') {
+    throw new Error('Ofis/işyeri mülklerinde takvim senkronu kullanılamaz.');
+  }
+
+  const method = paymentMethod === 'card' ? 'card' : 'cash';
+  const paymentStatus = method === 'card' ? 'held' : 'unpaid';
 
   let events;
   if (icsText) {
@@ -30,8 +36,8 @@ async function syncPropertyCalendar(propertyId, { icsText } = {}) {
 
   const insertJob = db.prepare(`
     INSERT OR IGNORE INTO cleaning_jobs
-      (id, property_id, service_key, urgency, payment_method, checkout_at, status, source, ical_uid, price)
-    VALUES (?, ?, 'checkin_checkout', 'scheduled', 'cash', ?, 'pending', 'ical_auto', ?, ?)
+      (id, property_id, service_key, urgency, payment_method, checkout_at, status, source, ical_uid, price, payment_status)
+    VALUES (?, ?, 'checkin_checkout', 'scheduled', ?, ?, 'pending', 'ical_auto', ?, ?, ?)
   `);
 
   let created = 0;
@@ -48,9 +54,11 @@ async function syncPropertyCalendar(propertyId, { icsText } = {}) {
     const result = insertJob.run(
       uuid(),
       propertyId,
+      method,
       checkoutAt,
       icalUid,
-      price
+      price,
+      paymentStatus
     );
     if (result.changes > 0) created += 1;
     else skipped += 1;
