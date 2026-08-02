@@ -302,7 +302,7 @@ const TRANSLATIONS = {
     profileNameLabel: "Ad soyad / yetkili adı",
     profileCompanyNameLabel: "Şirket adı",
     profileCompanyHint: "Mülklerini panele girdikten sonra, \"Mülklerim\" sekmesinden tek tek ekleyebilirsin.",
-    propertyHeading: "Mülkün (opsiyonel, sonra da ekleyebilirsin)",
+    propertyHeading: "Mülkün",
     propertyCategoryLabel: "Mülk Türü",
     categoryApartment: "Apartman Dairesi",
     categoryHouse: "Müstakil Ev / Villa",
@@ -415,7 +415,7 @@ const TRANSLATIONS = {
     profileNameLabel: "Full name / contact person",
     profileCompanyNameLabel: "Company name",
     profileCompanyHint: "Once you're in, you can add your properties one by one from the \"My Properties\" tab.",
-    propertyHeading: "Your property (optional, you can add it later)",
+    propertyHeading: "Your property",
     propertyCategoryLabel: "Property Type",
     categoryApartment: "Apartment",
     categoryHouse: "House/Villa",
@@ -528,7 +528,7 @@ const TRANSLATIONS = {
     profileNameLabel: "Ime i prezime / kontakt osoba",
     profileCompanyNameLabel: "Naziv kompanije",
     profileCompanyHint: "Kada uđeš u panel, nekretnine možeš dodavati jednu po jednu iz kartice \"Moje nekretnine\".",
-    propertyHeading: "Tvoja nekretnina (opciono, možeš dodati i kasnije)",
+    propertyHeading: "Tvoja nekretnina",
     propertyCategoryLabel: "Tip nekretnine",
     categoryApartment: "Stan",
     categoryHouse: "Kuća/Villa",
@@ -748,6 +748,9 @@ let state = {
   devCode: '',
   accountTypeChoice: 'individual',
   propertyCategory: 'apartment',
+  regPropertyName: '',
+  regPropertyCity: '',
+  regPropertyAddress: '',
   authError: '',
   modal: null,
 };
@@ -862,6 +865,14 @@ function renderAuth(){
         <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">${t('accountCompany')}</div>
       </div>
       <form id="profile-form">
+        ${state.accountTypeChoice==='individual' ? `
+          <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
+          <div class="option-row">
+            <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
+            <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
+            <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
+          </div>
+        ` : ''}
         <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
         ${state.accountTypeChoice==='company' ? `
           <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
@@ -871,21 +882,15 @@ function renderAuth(){
             <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
               ${t('propertyHeading')}
             </div>
-            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
-            <div class="option-row">
-              <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
-              <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
-              <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
-            </div>
-            <div class="field"><label>${t('propertyNameLabel')}</label><input name="propertyName" placeholder="${t('propertyNamePlaceholder')}" /></div>
-            <div class="field"><label>${t('propertyCityLabel')}</label><input name="propertyCity" placeholder="${t('propertyCityPlaceholder')}" /></div>
-            <div class="field"><label>${t('propertyAddressLabel')}</label><input name="propertyAddress" placeholder="${t('propertyAddressPlaceholder')}" /></div>
+            <div class="field"><label>${t('propertyNameLabel')}</label><input id="reg-property-name" name="propertyName" required placeholder="${t('propertyNamePlaceholder')}" value="${state.regPropertyName}" /></div>
+            <div class="field"><label>${t('propertyCityLabel')}</label><input id="reg-property-city" name="propertyCity" required placeholder="${t('propertyCityPlaceholder')}" value="${state.regPropertyCity}" /></div>
+            <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" /></div>
             <div class="field">
               <label>${t('propertyLocationLabel')}</label>
               <div id="reg-map" class="mini-map"></div>
               <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
             </div>
-            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
+            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" /></div>
           </div>
         `}
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
@@ -1306,6 +1311,16 @@ function attachHandlers(){
     state.propertyCategory = el.dataset.propertyCategory; render();
   });
 
+  // Kategori değiştiğinde render() tüm formu yeniden çiziyor - kullanıcının
+  // az önce yazdığı isim/şehir/adres bilgilerinin silinmemesi için bunları
+  // state'te tutuyoruz (m² kasıtlı olarak tutulmuyor, sıfırdan giriliyor).
+  const regPropName = document.getElementById('reg-property-name');
+  if(regPropName) regPropName.oninput = () => { state.regPropertyName = regPropName.value; };
+  const regPropCity = document.getElementById('reg-property-city');
+  if(regPropCity) regPropCity.oninput = () => { state.regPropertyCity = regPropCity.value; };
+  const regPropAddress = document.getElementById('reg-property-address');
+  if(regPropAddress) regPropAddress.oninput = () => { state.regPropertyAddress = regPropAddress.value; };
+
   initLeafletPickerMap('reg-map', (lat, lng) => {
     state.regLat = lat; state.regLng = lng;
     const hint = document.querySelector('#reg-map ~ .map-hint');
@@ -1386,6 +1401,7 @@ function attachHandlers(){
       state.authError = '';
       state.page = 'services';
       state.regLat = null; state.regLng = null;
+      state.regPropertyName = ''; state.regPropertyCity = ''; state.regPropertyAddress = '';
       if(data.property) showToast(t('toastWelcomeProperty', { name: data.property.name }));
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
