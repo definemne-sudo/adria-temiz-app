@@ -425,6 +425,9 @@ const TRANSLATIONS = {
     toastOrderCreated: "Siparişin oluşturuldu.",
     toastCardSaved: "Kartın kaydedildi.",
     toastSyncDone: "Senkron tamam: {{count}} yeni temizlik işi oluşturuldu.",
+    syncPaymentModalTitle: "Ödeme yöntemi",
+    syncPaymentModalHint: "Bu takvimden otomatik oluşacak temizlik talepleri için ödeme yöntemini seç.",
+    syncContinueBtn: "Senkronu Başlat",
     toastMarkedDone: "Hizmet tamamlandı, ödeme otomatik sonuçlandı.",
     toastWelcomeProperty: "Hoş geldin! \"{{name}}\" mülkün eklendi.",
     genericError: "Bir hata oluştu.",
@@ -552,6 +555,9 @@ const TRANSLATIONS = {
     toastOrderCreated: "Your order has been created.",
     toastCardSaved: "Your card has been saved.",
     toastSyncDone: "Sync complete: {{count}} new cleaning job(s) created.",
+    syncPaymentModalTitle: "Payment method",
+    syncPaymentModalHint: "Choose the payment method for cleaning jobs auto-created from this calendar.",
+    syncContinueBtn: "Start Sync",
     toastMarkedDone: "Service marked as completed, payment settled automatically.",
     toastWelcomeProperty: "Welcome! Your property \"{{name}}\" has been added.",
     genericError: "Something went wrong.",
@@ -679,6 +685,9 @@ const TRANSLATIONS = {
     toastOrderCreated: "Tvoja narudžba je kreirana.",
     toastCardSaved: "Kartica je sačuvana.",
     toastSyncDone: "Sinhronizacija gotova: kreirano {{count}} novih zadataka čišćenja.",
+    syncPaymentModalTitle: "Način plaćanja",
+    syncPaymentModalHint: "Izaberi način plaćanja za zadatke čišćenja koji se automatski kreiraju iz ovog kalendara.",
+    syncContinueBtn: "Pokreni sinhronizaciju",
     toastMarkedDone: "Usluga označena kao završena, plaćanje je automatski obrađeno.",
     toastWelcomeProperty: "Dobrodošao/la! Nekretnina \"{{name}}\" je dodata.",
     genericError: "Došlo je do greške.",
@@ -804,6 +813,9 @@ let state = {
   bookingPaymentMethod: 'cash',
   savedCard: null,
   pendingBooking: null,
+  syncPropertyId: null,
+  syncPaymentMethod: 'cash',
+  pendingSyncPropertyId: null,
   payingJobId: null,
   authStep: 'phone',
   phone: '',
@@ -1262,10 +1274,10 @@ function renderProperties(){
         <div class="card">
           <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
           <h3>${p.name}</h3>
-          <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')}</div>
+          <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}</div>
           <div class="row-actions">
             <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
-            <button class="btn ghost btn-sm" data-sync="${p.id}">${t('syncDemoBtn')}</button>
+            ${p.category!=='office' ? `<button class="btn ghost btn-sm" data-sync="${p.id}">${t('syncDemoBtn')}</button>` : ''}
           </div>
         </div>
       `).join('')}
@@ -1339,6 +1351,32 @@ function renderAddonsSummary(addonsJson){
 }
 
 function renderModal(){
+  if(state.modal === 'sync-payment'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${t('syncPaymentModalTitle')}</h3>
+        <div class="hint" style="margin:-8px 0 16px;">${t('syncPaymentModalHint')}</div>
+        <div class="option-row">
+          <div class="choice ${state.syncPaymentMethod==='cash'?'selected':''}" data-sync-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
+          <div class="choice ${state.syncPaymentMethod==='card'?'selected':''}" data-sync-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+        </div>
+        ${state.syncPaymentMethod==='card' && state.savedCard ? `
+          <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
+            <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
+            <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
+          </div>
+        ` : ''}
+        ${state.syncPaymentMethod==='card' && !state.savedCard ? `
+          <div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>
+        ` : ''}
+        <div class="actions">
+          <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+          <button type="button" class="btn ochre" id="confirm-sync-payment">${t('syncContinueBtn')}</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'card-form'){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -1384,7 +1422,7 @@ function renderModal(){
             <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
           </div>
           <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
-          <div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>
+          ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
           <div class="actions">
             <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
             <button type="submit" class="btn ochre">${t('addBtn')}</button>
@@ -1416,6 +1454,37 @@ async function submitBooking(draft){
     await loadAll();
     showToast(t('toastOrderCreated'));
   }catch(err){ showToast(err.message); }
+}
+
+async function performSync(propertyId, paymentMethod){
+  const SAMPLE_ICS = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Airbnb Inc//Hosting Calendar//EN
+BEGIN:VEVENT
+UID:demo-${Date.now()}-1@airbnb.com
+DTSTAMP:20260701T000000Z
+DTSTART:20260805T140000Z
+DTEND:20260810T100000Z
+SUMMARY:Reserved
+END:VEVENT
+BEGIN:VEVENT
+UID:demo-${Date.now()}-2@airbnb.com
+DTSTAMP:20260701T000000Z
+DTSTART:20260812T140000Z
+DTEND:20260815T100000Z
+SUMMARY:Reserved
+END:VEVENT
+END:VCALENDAR`;
+  try{
+    const result = await api(`/properties/${propertyId}/sync`, {
+      method:'POST', body: JSON.stringify({ icsText: SAMPLE_ICS, paymentMethod }),
+    });
+    state.modal = null;
+    state.syncPropertyId = null;
+    showToast(t('toastSyncDone', { count: result.created }));
+    state.page = 'jobs';
+    await loadAll();
+  }catch(err){ showToast(err.message); render(); }
 }
 
 function attachHandlers(){
@@ -1645,7 +1714,7 @@ function attachHandlers(){
   };
 
   const modalCancel = document.getElementById('modal-cancel');
-  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; state.pendingBooking = null; state.authError=''; render(); };
+  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; state.pendingBooking = null; state.pendingSyncPropertyId = null; state.authError=''; render(); };
 
   const changeCard = document.getElementById('change-card');
   if(changeCard) changeCard.onclick = () => { state.modal = 'card-form'; state.pendingBooking = null; render(); };
@@ -1661,11 +1730,16 @@ function attachHandlers(){
       state.savedCard = card;
       state.modal = null;
       state.authError = '';
-      if(state.pendingBooking){
+      if(state.pendingSyncPropertyId){
+        const propId = state.pendingSyncPropertyId;
+        state.pendingSyncPropertyId = null;
+        await performSync(propId, 'card');
+      } else if(state.pendingBooking){
         state.bookingStep = 'receipt';
         render();
       } else {
         showToast(t('toastCardSaved'));
+        if(state.syncPropertyId) state.modal = 'sync-payment';
         render();
       }
     }catch(err){ state.authError = err.message; render(); }
@@ -1692,30 +1766,27 @@ function attachHandlers(){
     render();
   });
 
-  document.querySelectorAll('[data-sync]').forEach(el => el.onclick = async () => {
-    const SAMPLE_ICS = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Airbnb Inc//Hosting Calendar//EN
-BEGIN:VEVENT
-UID:demo-${Date.now()}-1@airbnb.com
-DTSTAMP:20260701T000000Z
-DTSTART:20260805T140000Z
-DTEND:20260810T100000Z
-SUMMARY:Reserved
-END:VEVENT
-BEGIN:VEVENT
-UID:demo-${Date.now()}-2@airbnb.com
-DTSTAMP:20260701T000000Z
-DTSTART:20260812T140000Z
-DTEND:20260815T100000Z
-SUMMARY:Reserved
-END:VEVENT
-END:VCALENDAR`;
-    const result = await api(`/properties/${el.dataset.sync}/sync`, { method:'POST', body: JSON.stringify({ icsText: SAMPLE_ICS }) });
-    showToast(t('toastSyncDone', { count: result.created }));
-    state.page = 'jobs';
-    await loadAll();
+  document.querySelectorAll('[data-sync]').forEach(el => el.onclick = () => {
+    state.syncPropertyId = el.dataset.sync;
+    state.syncPaymentMethod = 'cash';
+    state.modal = 'sync-payment';
+    render();
   });
+
+  document.querySelectorAll('[data-sync-payment-method]').forEach(el => el.onclick = () => {
+    state.syncPaymentMethod = el.dataset.syncPaymentMethod; render();
+  });
+
+  const confirmSyncPayment = document.getElementById('confirm-sync-payment');
+  if(confirmSyncPayment) confirmSyncPayment.onclick = async () => {
+    if(state.syncPaymentMethod === 'card' && !state.savedCard){
+      state.pendingSyncPropertyId = state.syncPropertyId;
+      state.modal = 'card-form';
+      render();
+      return;
+    }
+    await performSync(state.syncPropertyId, state.syncPaymentMethod);
+  };
 
   document.querySelectorAll('[data-rating-service]').forEach(el => el.onclick = () => {
     state.ratingServiceChoice = el.dataset.ratingService; render();
