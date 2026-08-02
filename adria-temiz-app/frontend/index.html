@@ -299,6 +299,20 @@ const TRANSLATIONS = {
     authProfileTagline: "Son bir adım — seni tanıyalım.",
     accountIndividual: "Bireysel<br/>ev sahibi",
     accountCompany: "Yönetim<br/>şirketi",
+    staffRegisterLink: "Personel misiniz? Buradan kayıt olun",
+    staffPanelTitle: "Bekleyen İşler",
+    staffPanelSubtitle: "Sadece personel görebilir. Bir işi tamamlayınca aşağıdan işaretle.",
+    staffEmptyState: "Şu an bekleyen iş yok.",
+    staffRoleBadge: "Personel",
+    ratingServiceQuestion: "Temizlik Nasıldı?",
+    ratingStaffQuestion: "Temizlik Personelinden Memnun Kaldınız mı?",
+    ratingLikeLabel: "İyi",
+    ratingDislikeLabel: "Kötü",
+    ratingServiceFeedbackPlaceholder: "Varsa şikayetini yaz (opsiyonel)",
+    ratingStaffFeedbackPlaceholder: "Personelle ilgili şikayetini yaz (opsiyonel)",
+    submitRatingBtn: "Gönder",
+    skipRatingBtn: "Şimdi değil",
+    toastRatingSubmitted: "Değerlendirmen için teşekkürler!",
     profileNameLabel: "Ad soyad / yetkili adı",
     profileCompanyNameLabel: "Şirket adı",
     profileCompanyHint: "Mülklerini panele girdikten sonra, \"Mülklerim\" sekmesinden tek tek ekleyebilirsin.",
@@ -412,6 +426,20 @@ const TRANSLATIONS = {
     authProfileTagline: "One last step — tell us about yourself.",
     accountIndividual: "Individual<br/>owner",
     accountCompany: "Management<br/>company",
+    staffRegisterLink: "Are you a staff member? Register here",
+    staffPanelTitle: "Pending Jobs",
+    staffPanelSubtitle: "Staff only. Mark a job as done once it's finished.",
+    staffEmptyState: "No pending jobs right now.",
+    staffRoleBadge: "Staff",
+    ratingServiceQuestion: "How was the cleaning?",
+    ratingStaffQuestion: "Were you happy with the cleaning staff?",
+    ratingLikeLabel: "Good",
+    ratingDislikeLabel: "Bad",
+    ratingServiceFeedbackPlaceholder: "Tell us what went wrong (optional)",
+    ratingStaffFeedbackPlaceholder: "Tell us about the staff member (optional)",
+    submitRatingBtn: "Submit",
+    skipRatingBtn: "Not now",
+    toastRatingSubmitted: "Thanks for your feedback!",
     profileNameLabel: "Full name / contact person",
     profileCompanyNameLabel: "Company name",
     profileCompanyHint: "Once you're in, you can add your properties one by one from the \"My Properties\" tab.",
@@ -525,6 +553,20 @@ const TRANSLATIONS = {
     authProfileTagline: "Još jedan korak — da te upoznamo.",
     accountIndividual: "Individualni<br/>vlasnik",
     accountCompany: "Menadžment<br/>kompanija",
+    staffRegisterLink: "Da li ste član osoblja? Registrujte se ovdje",
+    staffPanelTitle: "Zadaci na čekanju",
+    staffPanelSubtitle: "Samo za osoblje. Označi zadatak kao završen kada ga obaviš.",
+    staffEmptyState: "Trenutno nema zadataka na čekanju.",
+    staffRoleBadge: "Osoblje",
+    ratingServiceQuestion: "Kako je bilo čišćenje?",
+    ratingStaffQuestion: "Da li ste zadovoljni osobljem za čišćenje?",
+    ratingLikeLabel: "Dobro",
+    ratingDislikeLabel: "Loše",
+    ratingServiceFeedbackPlaceholder: "Napiši šta nije bilo u redu (opciono)",
+    ratingStaffFeedbackPlaceholder: "Napiši nešto o osoblju (opciono)",
+    submitRatingBtn: "Pošalji",
+    skipRatingBtn: "Ne sada",
+    toastRatingSubmitted: "Hvala na povratnoj informaciji!",
     profileNameLabel: "Ime i prezime / kontakt osoba",
     profileCompanyNameLabel: "Naziv kompanije",
     profileCompanyHint: "Kada uđeš u panel, nekretnine možeš dodavati jednu po jednu iz kartice \"Moje nekretnine\".",
@@ -753,12 +795,31 @@ let state = {
   regPropertyAddress: '',
   authError: '',
   modal: null,
+  // Değerlendirme ekranı (müşteri, personel tamamlandı işaretleyince görür)
+  ratingJob: null,
+  ratingServiceChoice: null,
+  ratingServiceFeedback: '',
+  ratingStaffChoice: null,
+  ratingStaffFeedback: '',
+  skippedRatingIds: [],
 };
 
 function render(){
   document.getElementById('html-root').lang = state.lang;
-  document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth();
+  let html;
+  if(!(state.token && state.user)){
+    html = renderAuth();
+  } else if(state.ratingJob){
+    html = renderRatingScreen();
+  } else {
+    html = renderPanel();
+  }
+  document.getElementById('app').innerHTML = html;
   attachHandlers();
+}
+
+function findNextRatingJob(){
+  return state.jobs.find(j => j.status === 'done' && !j.service_rating && !state.skippedRatingIds.includes(j.id)) || null;
 }
 
 function langSwitch(){
@@ -877,7 +938,8 @@ function renderAuth(){
         ${state.accountTypeChoice==='company' ? `
           <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
           <div class="hint" style="margin:0 0 14px;">${t('profileCompanyHint')}</div>
-        ` : `
+        ` : ''}
+        ${state.accountTypeChoice==='individual' ? `
           <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
             <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
               ${t('propertyHeading')}
@@ -892,7 +954,7 @@ function renderAuth(){
             </div>
             <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" /></div>
           </div>
-        `}
+        ` : ''}
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
         <button class="btn ochre" type="submit">${t('enterPanel')}</button>
       </form>
@@ -909,6 +971,44 @@ function renderAuth(){
       ${inner}
     </div>
   </div>`;
+}
+
+function renderRatingScreen(){
+  const job = state.ratingJob;
+  return `
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand" style="margin-bottom:18px;">${BRAND_MARK}<h1>CISTO</h1></div>
+
+      <h2 style="font-size:19px; margin-bottom:14px;">${t('ratingServiceQuestion')}</h2>
+      <div class="option-row">
+        <div class="choice ${state.ratingServiceChoice==='like'?'selected':''}" data-rating-service="like" style="font-size:28px; padding:16px;">👍</div>
+        <div class="choice ${state.ratingServiceChoice==='dislike'?'selected':''}" data-rating-service="dislike" style="font-size:28px; padding:16px;">👎</div>
+      </div>
+      ${state.ratingServiceChoice==='dislike' ? `
+        <div class="field">
+          <textarea id="rating-service-feedback" placeholder="${t('ratingServiceFeedbackPlaceholder')}" rows="2" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;">${state.ratingServiceFeedback}</textarea>
+        </div>
+      ` : ''}
+
+      <h2 style="font-size:19px; margin:22px 0 14px; border-top:1px solid var(--line); padding-top:20px;">${t('ratingStaffQuestion')}</h2>
+      <div class="option-row">
+        <div class="choice ${state.ratingStaffChoice==='like'?'selected':''}" data-rating-staff="like" style="font-size:28px; padding:16px;">👍</div>
+        <div class="choice ${state.ratingStaffChoice==='dislike'?'selected':''}" data-rating-staff="dislike" style="font-size:28px; padding:16px;">👎</div>
+      </div>
+      ${state.ratingStaffChoice==='dislike' ? `
+        <div class="field">
+          <textarea id="rating-staff-feedback" placeholder="${t('ratingStaffFeedbackPlaceholder')}" rows="2" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;">${state.ratingStaffFeedback}</textarea>
+        </div>
+      ` : ''}
+
+      <button class="btn ochre" id="submit-rating" data-job="${job.id}" ${(!state.ratingServiceChoice || !state.ratingStaffChoice) ? 'disabled style="opacity:.5;"' : ''} style="margin-top:8px;">${t('submitRatingBtn')}</button>
+      <div style="text-align:center; margin-top:12px;">
+        <span id="skip-rating" data-job="${job.id}" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('skipRatingBtn')}</span>
+      </div>
+    </div>
+  </div>
+  `;
 }
 
 function renderPanel(){
@@ -1202,7 +1302,7 @@ function renderJobAction(j){
   }
   if(!['done','confirmed'].includes(j.status)){
     return `
-      <button class="btn ghost btn-sm" data-mark-done="${j.id}">${t('markDoneBtn')}</button>
+      <span class="badge ${j.status}" style="font-weight:600;">${statusLabel(j.status)}</span>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? t('cardPaidNote') : t('cashPaidNote')}</div>
     `;
   }
@@ -1283,6 +1383,7 @@ async function loadAll(){
   state.jobs = results[1];
   state.savedCard = results[2];
   if(results[3]){ state.services = results[3].services; state.addons = results[3].addons; }
+  state.ratingJob = findNextRatingJob();
   render();
 }
 
@@ -1595,11 +1696,44 @@ END:VCALENDAR`;
     await loadAll();
   });
 
-  document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
-    await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
-    showToast(t('toastMarkedDone'));
-    await loadAll();
+  document.querySelectorAll('[data-rating-service]').forEach(el => el.onclick = () => {
+    state.ratingServiceChoice = el.dataset.ratingService; render();
   });
+  document.querySelectorAll('[data-rating-staff]').forEach(el => el.onclick = () => {
+    state.ratingStaffChoice = el.dataset.ratingStaff; render();
+  });
+  const ratingServiceFeedback = document.getElementById('rating-service-feedback');
+  if(ratingServiceFeedback) ratingServiceFeedback.oninput = () => { state.ratingServiceFeedback = ratingServiceFeedback.value; };
+  const ratingStaffFeedback = document.getElementById('rating-staff-feedback');
+  if(ratingStaffFeedback) ratingStaffFeedback.oninput = () => { state.ratingStaffFeedback = ratingStaffFeedback.value; };
+
+  const submitRating = document.getElementById('submit-rating');
+  if(submitRating) submitRating.onclick = async () => {
+    if(!state.ratingServiceChoice || !state.ratingStaffChoice) return;
+    const jobId = submitRating.dataset.job;
+    try{
+      await api(`/jobs/${jobId}/rate`, { method:'POST', body: JSON.stringify({
+        serviceRating: state.ratingServiceChoice,
+        serviceFeedback: state.ratingServiceFeedback,
+        staffRating: state.ratingStaffChoice,
+        staffFeedback: state.ratingStaffFeedback,
+      })});
+      showToast(t('toastRatingSubmitted'));
+      state.ratingJob = null;
+      state.ratingServiceChoice = null; state.ratingServiceFeedback = '';
+      state.ratingStaffChoice = null; state.ratingStaffFeedback = '';
+      await loadAll();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const skipRating = document.getElementById('skip-rating');
+  if(skipRating) skipRating.onclick = () => {
+    state.skippedRatingIds.push(skipRating.dataset.job);
+    state.ratingJob = findNextRatingJob();
+    state.ratingServiceChoice = null; state.ratingServiceFeedback = '';
+    state.ratingStaffChoice = null; state.ratingStaffFeedback = '';
+    render();
+  };
 }
 
 (async function init(){
