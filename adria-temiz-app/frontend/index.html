@@ -422,7 +422,7 @@ const TRANSLATIONS = {
     icalLinked: "iCal bağlı",
     icalNotLinked: "iCal bağlı değil (demo verisiyle senkronla)",
     requestServiceBtn: "Hizmet talep et",
-    syncDemoBtn: "Takvimi senkronla (demo)",
+    syncDemoBtn: "Takvimi senkronla",
     statusPending: "Bekliyor", statusAssigned: "Atandı", statusInProgress: "Devam ediyor",
     statusDone: "Tamamlandı", statusConfirmed: "Onaylandı", statusCancelled: "İptal",
     ordersTitle: "Siparişlerim",
@@ -446,6 +446,16 @@ const TRANSLATIONS = {
     saveContinueBtn: "Kaydet ve devam et",
     addPropertyModalTitle: "Yeni mülk ekle",
     icalOptionalLabel: "Airbnb/Booking iCal linki (opsiyonel)",
+    pleaseEnterIcalUrl: "Lütfen bir takvim linki gir, ya da örnek veriyle devam et.",
+    icalRegHint: "Girersen, takvimin kayıt tamamlanır tamamlanmaz otomatik senkronlanır.",
+    icalUrlLabel: "Airbnb/Booking iCal linki",
+    icalUrlPlaceholder: "https://www.airbnb.com/calendar/ical/....ics",
+    syncUrlModalTitle: "Takvim bağlantısı",
+    syncUrlModalHint: "Airbnb ya da Booking ilanının takvim (iCal) linkini buraya yapıştır.",
+    syncUseDemoLink: "Linkim yok, örnek veriyle dene",
+    backBtnShort: "Geri",
+    toastAutoSyncDone: "Takvimin otomatik senkronlandı: {{count}} yeni temizlik işi oluştu.",
+    toastAutoSyncFailed: "Mülk kaydedildi, ama takvim linkine şu an ulaşılamadı — Mülklerim'den tekrar deneyebilirsin.",
     addBtn: "Ekle",
     toastOrderCreated: "Siparişin oluşturuldu.",
     toastCardSaved: "Kartın kaydedildi.",
@@ -559,7 +569,7 @@ const TRANSLATIONS = {
     icalLinked: "iCal linked",
     icalNotLinked: "iCal not linked (sync with demo data)",
     requestServiceBtn: "Request service",
-    syncDemoBtn: "Sync calendar (demo)",
+    syncDemoBtn: "Sync calendar",
     statusPending: "Pending", statusAssigned: "Assigned", statusInProgress: "In progress",
     statusDone: "Done", statusConfirmed: "Confirmed", statusCancelled: "Cancelled",
     ordersTitle: "My Orders",
@@ -583,6 +593,16 @@ const TRANSLATIONS = {
     saveContinueBtn: "Save and continue",
     addPropertyModalTitle: "Add a new property",
     icalOptionalLabel: "Airbnb/Booking iCal link (optional)",
+    pleaseEnterIcalUrl: "Please enter a calendar link, or continue with demo data.",
+    icalRegHint: "If you enter it, your calendar syncs automatically as soon as sign-up is complete.",
+    icalUrlLabel: "Airbnb/Booking iCal link",
+    icalUrlPlaceholder: "https://www.airbnb.com/calendar/ical/....ics",
+    syncUrlModalTitle: "Calendar link",
+    syncUrlModalHint: "Paste the calendar (iCal) link from your Airbnb or Booking listing.",
+    syncUseDemoLink: "I don't have a link, try demo data",
+    backBtnShort: "Back",
+    toastAutoSyncDone: "Your calendar was synced automatically: {{count}} new cleaning job(s) created.",
+    toastAutoSyncFailed: "Property saved, but we couldn't reach the calendar link right now — you can retry from My Properties.",
     addBtn: "Add",
     toastOrderCreated: "Your order has been created.",
     toastCardSaved: "Your card has been saved.",
@@ -696,7 +716,7 @@ const TRANSLATIONS = {
     icalLinked: "iCal povezan",
     icalNotLinked: "iCal nije povezan (sinhronizuj sa demo podacima)",
     requestServiceBtn: "Naruči uslugu",
-    syncDemoBtn: "Sinhronizuj kalendar (demo)",
+    syncDemoBtn: "Sinhronizuj kalendar",
     statusPending: "Na čekanju", statusAssigned: "Dodijeljeno", statusInProgress: "U toku",
     statusDone: "Završeno", statusConfirmed: "Potvrđeno", statusCancelled: "Otkazano",
     ordersTitle: "Moje narudžbe",
@@ -720,6 +740,16 @@ const TRANSLATIONS = {
     saveContinueBtn: "Sačuvaj i nastavi",
     addPropertyModalTitle: "Dodaj novu nekretninu",
     icalOptionalLabel: "Airbnb/Booking iCal link (opciono)",
+    pleaseEnterIcalUrl: "Molimo unesi link kalendara, ili nastavi sa demo podacima.",
+    icalRegHint: "Ako ga uneseš, kalendar se automatski sinhronizuje čim registracija bude gotova.",
+    icalUrlLabel: "Airbnb/Booking iCal link",
+    icalUrlPlaceholder: "https://www.airbnb.com/calendar/ical/....ics",
+    syncUrlModalTitle: "Link kalendara",
+    syncUrlModalHint: "Nalijepi link (iCal) kalendara sa svog Airbnb ili Booking oglasa.",
+    syncUseDemoLink: "Nemam link, probaj sa demo podacima",
+    backBtnShort: "Nazad",
+    toastAutoSyncDone: "Kalendar je automatski sinhronizovan: kreirano {{count}} novih zadataka čišćenja.",
+    toastAutoSyncFailed: "Nekretnina je sačuvana, ali trenutno ne možemo pristupiti linku kalendara — možeš pokušati ponovo iz Moje nekretnine.",
     addBtn: "Dodaj",
     toastOrderCreated: "Tvoja narudžba je kreirana.",
     toastCardSaved: "Kartica je sačuvana.",
@@ -860,6 +890,9 @@ let state = {
   savedCard: null,
   pendingBooking: null,
   syncPropertyId: null,
+  syncStep: 'url', // 'url' -> 'payment'
+  syncIcalUrl: '',
+  syncUseDemo: false,
   syncPaymentMethod: 'cash',
   pendingSyncPropertyId: null,
   chatOpen: false,
@@ -875,6 +908,7 @@ let state = {
   regPropertyName: '',
   regPropertyCity: '',
   regPropertyAddress: '',
+  regPropertyIcalUrl: '',
   authError: '',
   modal: null,
   // Değerlendirme ekranı (müşteri, personel tamamlandı işaretleyince görür)
@@ -1029,6 +1063,11 @@ function renderAuth(){
             <div class="field"><label>${t('propertyNameLabel')}</label><input id="reg-property-name" name="propertyName" required placeholder="${t('propertyNamePlaceholder')}" value="${state.regPropertyName}" /></div>
             <div class="field"><label>${t('propertyCityLabel')}</label><input id="reg-property-city" name="propertyCity" required placeholder="${t('propertyCityPlaceholder')}" value="${state.regPropertyCity}" /></div>
             <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" /></div>
+            <div class="field">
+              <label>${t('icalOptionalLabel')}</label>
+              <input id="reg-property-ical" name="propertyIcalUrl" placeholder="${t('icalUrlPlaceholder')}" value="${state.regPropertyIcalUrl}" />
+            </div>
+            <div class="hint" style="margin:-8px 0 14px;">${t('icalRegHint')}</div>
             <div class="field">
               <label>${t('propertyLocationLabel')}</label>
               <div id="reg-map" class="mini-map"></div>
@@ -1350,7 +1389,7 @@ function renderProperties(){
           <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}</div>
           <div class="row-actions">
             <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
-            ${p.category!=='office' ? `<button class="btn ghost btn-sm" data-sync="${p.id}">${t('syncDemoBtn')}</button>` : ''}
+            ${p.category!=='office' ? `<button class="btn ghost btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
           </div>
         </div>
       `).join('')}
@@ -1425,6 +1464,26 @@ function renderAddonsSummary(addonsJson){
 
 function renderModal(){
   if(state.modal === 'sync-payment'){
+    if(state.syncStep === 'url'){
+      return `
+      <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+          <h3>${t('syncUrlModalTitle')}</h3>
+          <div class="hint" style="margin:-8px 0 16px;">${t('syncUrlModalHint')}</div>
+          <div class="field">
+            <label>${t('icalUrlLabel')}</label>
+            <input id="sync-ical-url-input" placeholder="${t('icalUrlPlaceholder')}" value="${state.syncIcalUrl}" />
+          </div>
+          <div class="actions">
+            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="button" class="btn ochre" id="sync-url-continue">${t('createOrderBtn')}</button>
+          </div>
+          <div style="text-align:center; margin-top:14px;">
+            <span id="sync-use-demo" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('syncUseDemoLink')}</span>
+          </div>
+        </div>
+      </div>`;
+    }
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal">
@@ -1444,7 +1503,7 @@ function renderModal(){
           <div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>
         ` : ''}
         <div class="actions">
-          <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+          <button type="button" class="btn ghost" id="sync-back-to-url">${t('backBtnShort')}</button>
           <button type="button" class="btn ochre" id="confirm-sync-payment">${t('syncContinueBtn')}</button>
         </div>
       </div>
@@ -1548,12 +1607,14 @@ DTEND:20260815T100000Z
 SUMMARY:Reserved
 END:VEVENT
 END:VCALENDAR`;
+  const body = state.syncUseDemo
+    ? { icsText: SAMPLE_ICS, paymentMethod }
+    : { icalUrl: state.syncIcalUrl, paymentMethod };
   try{
-    const result = await api(`/properties/${propertyId}/sync`, {
-      method:'POST', body: JSON.stringify({ icsText: SAMPLE_ICS, paymentMethod }),
-    });
+    const result = await api(`/properties/${propertyId}/sync`, { method:'POST', body: JSON.stringify(body) });
     state.modal = null;
     state.syncPropertyId = null;
+    state.syncIcalUrl = ''; state.syncUseDemo = false; state.syncStep = 'url';
     showToast(t('toastSyncDone', { count: result.created }));
     state.page = 'jobs';
     await loadAll();
@@ -1584,6 +1645,8 @@ function attachHandlers(){
   if(regPropCity) regPropCity.oninput = () => { state.regPropertyCity = regPropCity.value; };
   const regPropAddress = document.getElementById('reg-property-address');
   if(regPropAddress) regPropAddress.oninput = () => { state.regPropertyAddress = regPropAddress.value; };
+  const regPropIcal = document.getElementById('reg-property-ical');
+  if(regPropIcal) regPropIcal.oninput = () => { state.regPropertyIcalUrl = regPropIcal.value; };
 
   initLeafletPickerMap('reg-map', (lat, lng) => {
     state.regLat = lat; state.regLng = lng;
@@ -1655,6 +1718,7 @@ function attachHandlers(){
         sizeSqm: fd.sizeSqm || null,
         latitude: state.regLat,
         longitude: state.regLng,
+        icalUrl: fd.propertyIcalUrl || null,
       };
     }
     try{
@@ -1665,8 +1729,10 @@ function attachHandlers(){
       state.authError = '';
       state.page = 'services';
       state.regLat = null; state.regLng = null;
-      state.regPropertyName = ''; state.regPropertyCity = ''; state.regPropertyAddress = '';
-      if(data.property) showToast(t('toastWelcomeProperty', { name: data.property.name }));
+      state.regPropertyName = ''; state.regPropertyCity = ''; state.regPropertyAddress = ''; state.regPropertyIcalUrl = '';
+      if(data.property && !data.syncResult) showToast(t('toastWelcomeProperty', { name: data.property.name }));
+      if(data.syncResult && !data.syncResult.error) showToast(t('toastAutoSyncDone', { count: data.syncResult.created }));
+      if(data.syncResult && data.syncResult.error) showToast(t('toastAutoSyncFailed'));
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
   };
@@ -1787,7 +1853,12 @@ function attachHandlers(){
   };
 
   const modalCancel = document.getElementById('modal-cancel');
-  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.regLat = null; state.regLng = null; state.pendingBooking = null; state.pendingSyncPropertyId = null; state.authError=''; render(); };
+  if(modalCancel) modalCancel.onclick = () => {
+    state.modal = null; state.regLat = null; state.regLng = null;
+    state.pendingBooking = null; state.pendingSyncPropertyId = null;
+    state.syncPropertyId = null; state.syncStep = 'url'; state.syncIcalUrl = ''; state.syncUseDemo = false;
+    state.authError=''; render();
+  };
 
   const changeCard = document.getElementById('change-card');
   if(changeCard) changeCard.onclick = () => { state.modal = 'card-form'; state.pendingBooking = null; render(); };
@@ -1841,10 +1912,37 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-sync]').forEach(el => el.onclick = () => {
     state.syncPropertyId = el.dataset.sync;
+    state.syncIcalUrl = el.dataset.currentIcal || '';
+    state.syncUseDemo = false;
+    state.syncStep = 'url';
     state.syncPaymentMethod = 'cash';
     state.modal = 'sync-payment';
     render();
   });
+
+  const syncIcalUrlInput = document.getElementById('sync-ical-url-input');
+  if(syncIcalUrlInput) syncIcalUrlInput.oninput = () => { state.syncIcalUrl = syncIcalUrlInput.value; };
+
+  const syncUrlContinue = document.getElementById('sync-url-continue');
+  if(syncUrlContinue) syncUrlContinue.onclick = () => {
+    if(!state.syncIcalUrl.trim()){
+      showToast(t('pleaseEnterIcalUrl')); return;
+    }
+    state.syncUseDemo = false;
+    state.syncStep = 'payment';
+    render();
+  };
+
+  const syncUseDemo = document.getElementById('sync-use-demo');
+  if(syncUseDemo) syncUseDemo.onclick = () => {
+    state.syncUseDemo = true;
+    state.syncIcalUrl = '';
+    state.syncStep = 'payment';
+    render();
+  };
+
+  const syncBackToUrl = document.getElementById('sync-back-to-url');
+  if(syncBackToUrl) syncBackToUrl.onclick = () => { state.syncStep = 'url'; render(); };
 
   document.querySelectorAll('[data-sync-payment-method]').forEach(el => el.onclick = () => {
     state.syncPaymentMethod = el.dataset.syncPaymentMethod; render();
