@@ -1302,7 +1302,7 @@ function renderJobAction(j){
   }
   if(!['done','confirmed'].includes(j.status)){
     return `
-      <span class="badge ${j.status}" style="font-weight:600;">${statusLabel(j.status)}</span>
+      <button class="btn ghost btn-sm" data-mark-done="${j.id}">${t('markDoneBtn')}</button>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? t('cardPaidNote') : t('cashPaidNote')}</div>
     `;
   }
@@ -1701,6 +1701,14 @@ END:VCALENDAR`;
   });
   document.querySelectorAll('[data-rating-staff]').forEach(el => el.onclick = () => {
     state.ratingStaffChoice = el.dataset.ratingStaff; render();
+  });
+  // GEÇİCİ: personel paneli yazılana kadar müşteri kendi siparişini test
+  // amaçlı tamamlandı işaretleyebiliyor.
+  document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
+      await loadAll();
+    }catch(err){ showToast(err.message); }
   });
   const ratingServiceFeedback = document.getElementById('rating-service-feedback');
   if(ratingServiceFeedback) ratingServiceFeedback.oninput = () => { state.ratingServiceFeedback = ratingServiceFeedback.value; };
