@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
     account_type IN ('individual','company','staff','admin')
   ),
   company_name TEXT,
+  tax_number TEXT,
+  billing_address TEXT,
   profile_completed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -91,10 +93,11 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   service_key TEXT NOT NULL DEFAULT 'checkin_checkout',
   quantity INTEGER,
   addons TEXT,
+  service_params TEXT,
   has_equipment INTEGER NOT NULL DEFAULT 1,
   has_chemicals INTEGER NOT NULL DEFAULT 1,
   urgency TEXT NOT NULL DEFAULT 'scheduled' CHECK (urgency IN ('now','urgent','scheduled')),
-  payment_method TEXT CHECK (payment_method IS NULL OR payment_method IN ('cash','card')),
+  payment_method TEXT CHECK (payment_method IS NULL OR payment_method IN ('cash','card','invoice')),
   checkout_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (
     status IN ('pending','assigned','in_progress','done','confirmed','cancelled')
