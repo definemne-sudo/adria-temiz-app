@@ -73,6 +73,14 @@
     text-align:center; font-size:13px; font-weight:600; color:var(--muted);
   }
   .choice.selected{border-color:var(--sage-dark); background:rgba(124,156,130,.12); color:var(--navy);}
+  .rating-icon-btn{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    border:1.5px solid var(--line); border-radius:12px; padding:18px; cursor:pointer;
+    color:var(--muted); background:#fff; transition:background .15s, border-color .15s, color .15s;
+  }
+  .rating-icon-btn svg{ display:block; }
+  .rating-icon-btn.selected-like{ background:var(--ochre); border-color:var(--ochre); color:#fff; }
+  .rating-icon-btn.selected-dislike{ background:var(--ochre); border-color:var(--ochre); color:#E24C4C; }
   .btn{
     width:100%; padding:11px; border:none; border-radius:8px; background:var(--navy); color:#fff;
     font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;
@@ -246,6 +254,13 @@ const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="htt
   <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
   <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
+
+const THUMB_UP_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" width="30" height="30"><path d="M2 21h4V9H2v12zM22 10c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L12.17 1 6.59 6.59C6.22 6.95 6 7.45 6 8v11c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>`;
+const THUMB_DOWN_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" width="30" height="30"><path d="M22 3h-4v12h4V3zM2 14c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L11.83 23l5.58-5.59c.37-.36.59-.86.59-1.41V5c0-1.1-.9-2-2-2H7c-.83 0-1.54.5-1.84 1.22L2.14 11.27c-.09.23-.14.47-.14.73v2z"/></svg>`;
+
+// currentColor kullanıyor - seçili/seçili değil rengi CSS ile kontrol edilebilsin diye (emoji'nin aksine).
+const ICON_LIKE = `<svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M2 21h4V9H2v12zM22 10.5c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L12.83 1 7.41 6.41C7.15 6.68 7 7.03 7 7.41V19c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>`;
+const ICON_DISLIKE = `<svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M22 3h-4v12h4V3zM2 12.5c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L11.17 22l5.42-5.41c.26-.27.41-.62.41-1v-11.6c0-1.1-.9-2-2-2H6c-.83 0-1.54.5-1.84 1.22L1.14 9.24c-.09.23-.14.47-.14.73v2.03l.01.02L1 12.5z"/></svg>`;
 
 // Karadağ varsayılan/ilk sırada; kullanıcı isterse listeden başka ülke seçebilir.
 // Karadağ varsayılan/ilk sırada; kullanıcı isterse listeden başka ülke seçebilir.
@@ -982,8 +997,8 @@ function renderRatingScreen(){
 
       <h2 style="font-size:19px; margin-bottom:14px;">${t('ratingServiceQuestion')}</h2>
       <div class="option-row">
-        <div class="choice ${state.ratingServiceChoice==='like'?'selected':''}" data-rating-service="like" style="font-size:28px; padding:16px;">👍</div>
-        <div class="choice ${state.ratingServiceChoice==='dislike'?'selected':''}" data-rating-service="dislike" style="font-size:28px; padding:16px;">👎</div>
+        <div class="rating-icon-btn ${state.ratingServiceChoice==='like'?'selected-like':''}" data-rating-service="like">${THUMB_UP_SVG}</div>
+        <div class="rating-icon-btn ${state.ratingServiceChoice==='dislike'?'selected-dislike':''}" data-rating-service="dislike">${THUMB_DOWN_SVG}</div>
       </div>
       ${state.ratingServiceChoice==='dislike' ? `
         <div class="field">
@@ -993,8 +1008,8 @@ function renderRatingScreen(){
 
       <h2 style="font-size:19px; margin:22px 0 14px; border-top:1px solid var(--line); padding-top:20px;">${t('ratingStaffQuestion')}</h2>
       <div class="option-row">
-        <div class="choice ${state.ratingStaffChoice==='like'?'selected':''}" data-rating-staff="like" style="font-size:28px; padding:16px;">👍</div>
-        <div class="choice ${state.ratingStaffChoice==='dislike'?'selected':''}" data-rating-staff="dislike" style="font-size:28px; padding:16px;">👎</div>
+        <div class="rating-icon-btn ${state.ratingStaffChoice==='like'?'selected-like':''}" data-rating-staff="like">${THUMB_UP_SVG}</div>
+        <div class="rating-icon-btn ${state.ratingStaffChoice==='dislike'?'selected-dislike':''}" data-rating-staff="dislike">${THUMB_DOWN_SVG}</div>
       </div>
       ${state.ratingStaffChoice==='dislike' ? `
         <div class="field">
