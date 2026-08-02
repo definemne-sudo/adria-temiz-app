@@ -89,7 +89,10 @@ router.post('/:id/sync', async (req, res) => {
     return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
   }
   try {
-    const result = await syncPropertyCalendar(propertyId, { icsText: req.body.icsText });
+    const result = await syncPropertyCalendar(propertyId, {
+      icsText: req.body.icsText,
+      paymentMethod: req.body.paymentMethod,
+    });
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
