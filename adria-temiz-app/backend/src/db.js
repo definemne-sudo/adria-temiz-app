@@ -96,6 +96,11 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   ),
   assigned_staff_id TEXT REFERENCES users(id),
   notes TEXT,
+  service_rating TEXT CHECK (service_rating IS NULL OR service_rating IN ('like','dislike')),
+  service_feedback TEXT,
+  staff_rating TEXT CHECK (staff_rating IS NULL OR staff_rating IN ('like','dislike')),
+  staff_feedback TEXT,
+  rated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(property_id, ical_uid)
 );
