@@ -148,10 +148,16 @@ router.patch('/:id/status', (req, res) => {
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Geçersiz durum.' });
   }
-  // "Tamamlandı" onayını yalnızca personel verebilir - müşteri kendi
-  // siparişini tamamlandı olarak işaretleyemez.
+  // GEÇİCİ: personel paneli henüz yazılmadığı için, test/demo amaçlı mülk
+  // sahibinin de kendi siparişini tamamlandı işaretlemesine izin veriyoruz.
+  // Personel paneli tamamlanınca bu satır kaldırılıp yalnızca staff'a
+  // bırakılacak.
   if (status === 'done' && req.user.accountType !== 'staff') {
-    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+    if (!accessiblePropertyIds(req.user.id).includes(
+      (db.prepare('SELECT property_id FROM cleaning_jobs WHERE id = ?').get(id) || {}).property_id
+    )) {
+      return res.status(403).json({ error: 'Bu işlemi yalnızca personel veya mülk sahibi yapabilir.' });
+    }
   }
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
