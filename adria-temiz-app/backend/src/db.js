@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS otp_requests (
 -- token'ı simüle ediyoruz: yalnızca son 4 hane, marka ve son kullanma
 -- tarihi. Gerçek entegrasyonda bu tablo, sağlayıcının payment_method_id'sini
 -- tutar; kart verisi hiçbir zaman bizim sunucumuza uğramaz.
+-- Acil/destek chat mesajları. Şu an tek yönlü çalışıyor (müşteri yazıyor,
+-- kayıt altına alınıyor) - personel paneli yazıldığında admin buradan
+-- görüp yanıtlayabilecek (sender='admin' ile).
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  sender TEXT NOT NULL CHECK (sender IN ('user','admin')),
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS saved_cards (
   user_id TEXT PRIMARY KEY REFERENCES users(id),
   brand TEXT NOT NULL,
