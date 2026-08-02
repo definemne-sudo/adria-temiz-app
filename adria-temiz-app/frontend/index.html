@@ -897,16 +897,14 @@ function renderPanel(){
   return `
   <div class="sidebar">
     <div class="sidebar-top">
-      <div class="header-row">
-        <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
-        ${langSwitch()}
-      </div>
+      <div class="brand">${BRAND_MARK}<h1>CISTO</h1></div>
       <div class="account-badge">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
     </div>
     ${navItem('services', t('navServices'))}
     ${navItem('properties', t('navProperties'))}
     ${navItem('jobs', t('navOrders'))}
     <div class="spacer"></div>
+    ${langSwitch()}
     <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
     <div class="logout" id="logout">${t('logout')}</div>
   </div>
