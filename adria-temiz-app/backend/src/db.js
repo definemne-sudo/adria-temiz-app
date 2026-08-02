@@ -53,6 +53,7 @@ CREATE TABLE IF NOT EXISTS properties (
   id TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL REFERENCES users(id),
   name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'apartment' CHECK (category IN ('apartment','house','office')),
   address TEXT,
   city TEXT,
   latitude REAL,
