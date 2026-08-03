@@ -374,6 +374,10 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Kat koridorlarının temizliği, alan ve kat sayısına göre fiyatlanır.",
     commonAreaElevatorDesc: "Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır.",
     floorCountLabel: "Kat sayısı",
+    bookingBuildingLabel: "Bina / Site",
+    sqmPerFloorLabel: "Kat başına m²",
+    pleaseSelectSubOption: "Lütfen en az bir hizmet seç.",
+    noBuildingGroupsHint: "Bu hizmeti kullanmak için önce Çoklu Mülk Ekle ile bir bina/site oluşturmalısın (en az 2 mülk).",
     corridorSqmLabel: "Koridor alanı (m²)",
     elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
     invoiceLabel: "🧾 Fatura",
@@ -553,6 +557,10 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Cleaning of floor corridors, priced by area and floor count.",
     commonAreaElevatorDesc: "Elevator cabin cleaning, priced by passenger capacity.",
     floorCountLabel: "Number of floors",
+    bookingBuildingLabel: "Building / Site",
+    sqmPerFloorLabel: "m² per floor",
+    pleaseSelectSubOption: "Please select at least one service.",
+    noBuildingGroupsHint: "To use this service, first create a building/site with Add Multiple Properties (at least 2 units).",
     corridorSqmLabel: "Corridor area (m²)",
     elevatorCapacityLabel: "Elevator capacity (people)",
     invoiceLabel: "🧾 Invoice",
@@ -732,6 +740,10 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Čišćenje hodnika na spratu, cijena po površini i broju spratova.",
     commonAreaElevatorDesc: "Čišćenje kabine lifta, cijena po kapacitetu.",
     floorCountLabel: "Broj spratova",
+    bookingBuildingLabel: "Zgrada / Naselje",
+    sqmPerFloorLabel: "m² po spratu",
+    pleaseSelectSubOption: "Molimo izaberi bar jednu uslugu.",
+    noBuildingGroupsHint: "Da bi koristio ovu uslugu, prvo napravi zgradu/naselje preko Dodaj više nekretnina (najmanje 2 jedinice).",
     corridorSqmLabel: "Površina hodnika (m²)",
     elevatorCapacityLabel: "Kapacitet lifta (osobe)",
     invoiceLabel: "🧾 Faktura",
@@ -893,23 +905,31 @@ const SERVICE_I18N = {
     en: { name: "Office/Shop/Workspace Cleaning", description: "Regular or one-off cleaning for workspaces." },
     me: { name: "Čišćenje poslovnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
   },
-  common_area_staircase: {
+  common_area: {
+    icon: '🏢',
+    tr: { name: "Ortak Alan Temizliği", description: "Merdiven, kat koridoru ve asansör temizliğinden istediklerini seç." },
+    en: { name: "Common Area Cleaning", description: "Choose from staircase, floor corridor and elevator cleaning." },
+    me: { name: "Čišćenje zajedničkih prostorija", description: "Izaberi između čišćenja stepeništa, hodnika i lifta." },
+  },
+};
+const COMMON_AREA_SUB_I18N = {
+  staircase: {
     icon: '🪜',
-    tr: { name: "Merdiven Temizliği", description: "Bina merdivenlerinin düzenli temizliği, kat sayısına göre fiyatlanır." },
-    en: { name: "Staircase Cleaning", description: "Regular cleaning of building staircases, priced by floor count." },
-    me: { name: "Čišćenje stepeništa", description: "Redovno čišćenje stepeništa zgrade, cijena po broju spratova." },
+    tr: { name: "Merdiven Temizliği" },
+    en: { name: "Staircase Cleaning" },
+    me: { name: "Čišćenje stepeništa" },
   },
-  common_area_corridor: {
+  corridor: {
     icon: '🚪',
-    tr: { name: "Kat Koridoru Temizliği", description: "Kat koridorlarının temizliği, alan ve kat sayısına göre fiyatlanır." },
-    en: { name: "Floor Corridor Cleaning", description: "Cleaning of floor corridors, priced by area and floor count." },
-    me: { name: "Čišćenje hodnika", description: "Čišćenje hodnika na spratu, cijena po površini i broju spratova." },
+    tr: { name: "Kat Koridoru Temizliği" },
+    en: { name: "Floor Corridor Cleaning" },
+    me: { name: "Čišćenje hodnika" },
   },
-  common_area_elevator: {
+  elevator: {
     icon: '🛗',
-    tr: { name: "Asansör Temizliği", description: "Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır." },
-    en: { name: "Elevator Cleaning", description: "Elevator cabin cleaning, priced by passenger capacity." },
-    me: { name: "Čišćenje lifta", description: "Čišćenje kabine lifta, cijena po kapacitetu." },
+    tr: { name: "Asansör Temizliği" },
+    en: { name: "Elevator Cleaning" },
+    me: { name: "Čišćenje lifta" },
   },
 };
 const ADDON_I18N = {
@@ -956,6 +976,14 @@ function translateError(msg){
   if(found && found[state.lang]) return found[state.lang];
   return msg;
 }
+function commonAreaSubLabel(key){
+  const s = COMMON_AREA_SUB_I18N[key];
+  return s ? (s[state.lang]?.name || s.tr.name) : key;
+}
+function commonAreaSubIcon(key){
+  return (COMMON_AREA_SUB_I18N[key] && COMMON_AREA_SUB_I18N[key].icon) || '➕';
+}
+
 function serviceLabel(key){
   const s = SERVICE_I18N[key];
   return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
@@ -1006,7 +1034,7 @@ let state = {
   properties: { owned: [], delegated: [] },
   jobs: [],
   services: [],
-  commonAreaServices: [],
+  commonAreaSubOptions: [],
   addons: [],
   regLat: null,
   regLng: null,
@@ -1017,9 +1045,8 @@ let state = {
   bookingScheduledAt: '',
   bookingHasEquipment: true,
   bookingHasChemicals: true,
-  bookingFloorCount: '',
-  bookingCorridorSqm: '',
-  bookingElevatorCapacity: '',
+  bookingCommonAreaSelections: {}, // { staircase: {checked, floorCount}, corridor: {checked, floorCount, sqmPerFloor}, elevator: {checked, elevatorCapacity} }
+  bookingBuildingName: '',
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -1356,21 +1383,47 @@ function bookingAddonsTotal(){
   return total;
 }
 
-function calcCommonAreaPriceClient(service, params = {}){
-  let price = service.base;
-  if(service.paramType === 'floors') price += (Number(params.floorCount)||0) * service.ratePerFloor;
-  else if(service.paramType === 'corridor'){
-    price += (Number(params.corridorSqm)||0) * service.ratePerSqm;
-    price += (Number(params.floorCount)||0) * service.ratePerFloor;
-  } else if(service.paramType === 'elevator') price += (Number(params.elevatorCapacity)||0) * service.ratePerCapacity;
-  return Math.max(service.min, Math.round(price/5)*5);
+function calcCommonAreaSubPriceClient(sub, params = {}){
+  let price = sub.base;
+  if(sub.paramType === 'floors') price += (Number(params.floorCount)||0) * sub.ratePerFloor;
+  else if(sub.paramType === 'corridor'){
+    const floors = Number(params.floorCount)||0;
+    const sqmPerFloor = Number(params.sqmPerFloor)||0;
+    price += floors * sub.ratePerFloor;
+    price += (floors * sqmPerFloor) * sub.ratePerSqm;
+  } else if(sub.paramType === 'elevator') price += (Number(params.elevatorCapacity)||0) * sub.ratePerCapacity;
+  return Math.max(sub.min, Math.round(price/5)*5);
+}
+
+function commonAreaSelectionsTotal(){
+  let total = 0;
+  Object.entries(state.bookingCommonAreaSelections).forEach(([key, val]) => {
+    if(val && val.checked){
+      const sub = state.commonAreaSubOptions.find(s => s.key === key);
+      if(sub) total += calcCommonAreaSubPriceClient(sub, val);
+    }
+  });
+  return total;
+}
+
+// Aynı bina/site adını paylaşan (2+ mülk) gruplar - ortak alan siparişlerinde
+// sadece bu gruplar seçilebilir, tekil daireler seçilemez.
+function buildingGroups(){
+  const props = [...state.properties.owned, ...state.properties.delegated];
+  const groups = {};
+  props.forEach(p => {
+    if(p.building_name && p.building_name.trim()){
+      const key = p.building_name.trim();
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(p);
+    }
+  });
+  return Object.entries(groups).filter(([, list]) => list.length > 1).map(([name, list]) => ({ name, list }));
 }
 
 function visibleServices(){
   const accountType = state.user.accountType;
-  const regular = state.services.filter(s => !s.accountTypes || s.accountTypes.includes(accountType));
-  const commonArea = accountType === 'company' ? state.commonAreaServices : [];
-  return [...regular, ...commonArea];
+  return state.services.filter(s => !s.accountTypes || s.accountTypes.includes(accountType));
 }
 
 function renderServices(){
@@ -1397,17 +1450,15 @@ function renderServices(){
   <div class="grid">
     ${services.map(s => {
       const label = serviceLabel(s.key);
-      const isCommonArea = !!s.paramType;
+      const isGroup = !!s.isGroup;
       const isOpen = state.bookingService === s.key;
-      const preview = isCommonArea
-        ? calcCommonAreaPriceClient(s, { floorCount: state.bookingFloorCount, corridorSqm: state.bookingCorridorSqm, elevatorCapacity: state.bookingElevatorCapacity })
-        : calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm });
+      const preview = !isGroup ? calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm }) : null;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
         <div class="service-icon">${serviceIconHtml(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
-        <div class="price">${preview} €${(!isCommonArea && selectedProperty?.size_sqm) ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
+        ${preview !== null ? `<div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>` : `<div style="height:8px;"></div>`}
         <div class="row-actions">
           <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
@@ -1425,16 +1476,25 @@ function paymentNote(method){
 }
 
 function buildReceiptLines(draft){
-  const service = state.services.find(s => s.key === draft.serviceKey)
-    || state.commonAreaServices.find(s => s.key === draft.serviceKey);
+  const service = state.services.find(s => s.key === draft.serviceKey);
+  const isGroup = !!service.isGroup;
+  const lines = [];
+
+  if(isGroup){
+    (draft.serviceParams?.selections || []).forEach(sel => {
+      const sub = state.commonAreaSubOptions.find(s => s.key === sel.key);
+      if(sub) lines.push({ label: `${commonAreaSubIcon(sel.key)} ${commonAreaSubLabel(sel.key)}`, amount: calcCommonAreaSubPriceClient(sub, sel) });
+    });
+    if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
+    if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
+    const total = lines.reduce((s,l) => s+l.amount, 0);
+    return { lines, total, buildingName: draft.buildingName };
+  }
+
   const label = serviceLabel(draft.serviceKey);
   const props = [...state.properties.owned, ...state.properties.delegated];
   const property = props.find(p => p.id === draft.propertyId);
-  const isCommonArea = !!service.paramType;
-  const lines = [];
-  const basePrice = isCommonArea
-    ? calcCommonAreaPriceClient(service, draft.serviceParams || {})
-    : calcPriceClient(service, { sizeSqm: property?.size_sqm });
+  const basePrice = calcPriceClient(service, { sizeSqm: property?.size_sqm });
   lines.push({ label: label.name, amount: basePrice });
   if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
   if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
@@ -1451,15 +1511,101 @@ function renderBookingPanel(service, props, selectedProperty){
     return renderReceiptPanel(state.pendingBooking);
   }
 
-  const isCommonArea = !!service.paramType;
+  const isGroup = !!service.isGroup;
+  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
+  const isCompany = state.user.accountType === 'company';
+
+  if(isGroup){
+    // Ortak Alan Temizliği: bina/site seçimi + çoklu alt hizmet seçimi.
+    // Halı/koltuk gibi ekstra hizmetler bu grupta yok.
+    const groups = buildingGroups();
+    if(groups.length === 0){
+      return `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);"><div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div></div>`;
+    }
+    const selectedBuilding = state.bookingBuildingName || groups[0].name;
+    const total = commonAreaSelectionsTotal() + suppliesFee;
+    const subChecked = (key) => state.bookingCommonAreaSelections[key]?.checked;
+    const subVal = (key, field) => state.bookingCommonAreaSelections[key]?.[field] || '';
+
+    return `
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+      <div class="field">
+        <label>${t('bookingBuildingLabel')}</label>
+        <select id="booking-building-select">
+          ${groups.map(g => `<option value="${g.name}" ${g.name===selectedBuilding?'selected':''}>${g.name} (${g.list.length})</option>`).join('')}
+        </select>
+      </div>
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('commonAreaCleaning')}</div>
+      ${state.commonAreaSubOptions.map(sub => `
+        <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; margin-bottom:${subChecked(sub.key)?'8px':'0'};">
+            <input type="checkbox" data-common-area-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} />
+            <span style="font-size:16px;">${commonAreaSubIcon(sub.key)}</span> ${commonAreaSubLabel(sub.key)}
+          </label>
+          ${subChecked(sub.key) ? `
+            <div style="display:flex; gap:8px; padding-left:26px;">
+              ${sub.paramType === 'floors' ? `
+                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('floorCountLabel')}</label><input type="number" min="1" data-common-area-param="floorCount" data-common-area-key="${sub.key}" value="${subVal(sub.key,'floorCount')}" /></div>
+              ` : ''}
+              ${sub.paramType === 'corridor' ? `
+                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('floorCountLabel')}</label><input type="number" min="1" data-common-area-param="floorCount" data-common-area-key="${sub.key}" value="${subVal(sub.key,'floorCount')}" /></div>
+                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('sqmPerFloorLabel')}</label><input type="number" min="1" data-common-area-param="sqmPerFloor" data-common-area-key="${sub.key}" value="${subVal(sub.key,'sqmPerFloor')}" /></div>
+              ` : ''}
+              ${sub.paramType === 'elevator' ? `
+                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('elevatorCapacityLabel')}</label><input type="number" min="1" data-common-area-param="elevatorCapacity" data-common-area-key="${sub.key}" value="${subVal(sub.key,'elevatorCapacity')}" /></div>
+              ` : ''}
+            </div>
+          ` : ''}
+        </div>
+      `).join('')}
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('whenLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">${t('urgent')}</div>
+        <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">${t('scheduleOpt')}</div>
+      </div>
+      ${state.bookingUrgency==='scheduled' ? `
+        <div class="field"><label>${t('datetimeLabel')}</label><input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" /></div>
+      ` : ''}
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
+      <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
+        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noEquipment}€)</div>
+      </div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
+        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
+      </div>
+
+      <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
+        <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+        ${isCompany ? `<div class="choice ${state.bookingPaymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
+      </div>
+      ${state.bookingPaymentMethod==='card' && state.savedCard ? `
+        <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
+          <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
+          <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
+        </div>
+      ` : ''}
+      ${state.bookingPaymentMethod==='card' && !state.savedCard ? `<div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>` : ''}
+      <button class="btn ochre btn-sm" style="width:100%;" data-goto-receipt="${service.key}">${t('createOrderBtn')}</button>
+    </div>
+    `;
+  }
+
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
-  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
-  const basePrice = isCommonArea
-    ? calcCommonAreaPriceClient(service, { floorCount: state.bookingFloorCount, corridorSqm: state.bookingCorridorSqm, elevatorCapacity: state.bookingElevatorCapacity })
-    : calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm });
+  const basePrice = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm });
   const total = basePrice + suppliesFee + bookingAddonsTotal();
-  const isCompany = state.user.accountType === 'company';
 
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
@@ -1470,20 +1616,6 @@ function renderBookingPanel(service, props, selectedProperty){
           ${props.map(p => `<option value="${p.id}" ${p.id===selectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
         </select>
       </div>
-    ` : ''}
-
-    ${isCommonArea ? `
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('commonAreaCleaning')}</div>
-      ${service.paramType === 'floors' ? `
-        <div class="field"><label>${t('floorCountLabel')}</label><input type="number" min="1" id="booking-floor-count" value="${state.bookingFloorCount}" /></div>
-      ` : ''}
-      ${service.paramType === 'corridor' ? `
-        <div class="field"><label>${t('corridorSqmLabel')}</label><input type="number" min="1" id="booking-corridor-sqm" value="${state.bookingCorridorSqm}" /></div>
-        <div class="field"><label>${t('floorCountLabel')}</label><input type="number" min="1" id="booking-floor-count" value="${state.bookingFloorCount}" /></div>
-      ` : ''}
-      ${service.paramType === 'elevator' ? `
-        <div class="field"><label>${t('elevatorCapacityLabel')}</label><input type="number" min="1" id="booking-elevator-capacity" value="${state.bookingElevatorCapacity}" /></div>
-      ` : ''}
     ` : ''}
 
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('whenLabel')}</div>
@@ -1676,8 +1808,8 @@ function renderJobs(){
       <tbody>
         ${state.jobs.map(j => `
           <tr>
-            <td><strong>${j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
-            <td>${serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
+            <td><strong>${j.building_name || j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
+            <td>${j.service_key==='common_area' ? renderCommonAreaJobSummary(j) : serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
             <td>${j.urgency==='urgent' ? t('urgent') : j.urgency==='now' ? t('now') : new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</td>
             <td><span class="badge ${j.status}">${statusLabel(j.status)}</span></td>
             <td>${j.price} €</td>
@@ -1702,6 +1834,13 @@ function renderJobAction(j){
     `;
   }
   return `<span class="pay-badge held">${t('settlingBadge')}</span>`;
+}
+
+function renderCommonAreaJobSummary(j){
+  try{
+    const selections = JSON.parse(j.service_params || '{}').selections || [];
+    return selections.map(sel => `<span>${commonAreaSubIcon(sel.key)} ${commonAreaSubLabel(sel.key)}</span>`).join('<br/>');
+  }catch(e){ return serviceName(j.service_key); }
 }
 
 function renderAddonsSummary(addonsJson){
@@ -1905,7 +2044,7 @@ async function loadAll(){
   state.savedCard = results[2];
   if(results[3]){
     state.services = results[3].services;
-    state.commonAreaServices = results[3].commonAreaServices || [];
+    state.commonAreaSubOptions = results[3].commonAreaSubOptions || [];
     state.addons = results[3].addons;
   }
   state.ratingJob = findNextRatingJob();
@@ -2165,12 +2304,14 @@ function attachHandlers(){
     state.bookingScheduledAt = '';
     state.bookingHasEquipment = true;
     state.bookingHasChemicals = true;
-    state.bookingFloorCount = '';
-    state.bookingCorridorSqm = '';
-    state.bookingElevatorCapacity = '';
+    state.bookingCommonAreaSelections = {};
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
+    if(!state.bookingBuildingName){
+      const groups = buildingGroups();
+      state.bookingBuildingName = groups[0]?.name || '';
+    }
     if(!state.bookingPropertyId){
       const props = [...state.properties.owned, ...state.properties.delegated];
       state.bookingPropertyId = props[0]?.id || null;
@@ -2187,12 +2328,24 @@ function attachHandlers(){
     state.bookingUrgency = el.dataset.urgency; render();
   });
 
-  const bookingFloorCount = document.getElementById('booking-floor-count');
-  if(bookingFloorCount) bookingFloorCount.oninput = () => { state.bookingFloorCount = bookingFloorCount.value; render(); };
-  const bookingCorridorSqm = document.getElementById('booking-corridor-sqm');
-  if(bookingCorridorSqm) bookingCorridorSqm.oninput = () => { state.bookingCorridorSqm = bookingCorridorSqm.value; render(); };
-  const bookingElevatorCapacity = document.getElementById('booking-elevator-capacity');
-  if(bookingElevatorCapacity) bookingElevatorCapacity.oninput = () => { state.bookingElevatorCapacity = bookingElevatorCapacity.value; render(); };
+  const bookingBuildingSelect = document.getElementById('booking-building-select');
+  if(bookingBuildingSelect) bookingBuildingSelect.onchange = () => {
+    state.bookingBuildingName = bookingBuildingSelect.value; render();
+  };
+
+  document.querySelectorAll('[data-common-area-toggle]').forEach(el => el.onchange = () => {
+    const key = el.dataset.commonAreaToggle;
+    const current = state.bookingCommonAreaSelections[key] || {};
+    state.bookingCommonAreaSelections = { ...state.bookingCommonAreaSelections, [key]: { ...current, checked: el.checked } };
+    render();
+  });
+  document.querySelectorAll('[data-common-area-param]').forEach(el => el.oninput = () => {
+    const key = el.dataset.commonAreaKey;
+    const field = el.dataset.commonAreaParam;
+    const current = state.bookingCommonAreaSelections[key] || { checked: true };
+    state.bookingCommonAreaSelections = { ...state.bookingCommonAreaSelections, [key]: { ...current, [field]: el.value } };
+    render();
+  });
 
   document.querySelectorAll('[data-equipment]').forEach(el => el.onclick = () => {
     state.bookingHasEquipment = el.dataset.equipment === 'true'; render();
@@ -2225,31 +2378,48 @@ function attachHandlers(){
 
   document.querySelectorAll('[data-goto-receipt]').forEach(el => el.onclick = async () => {
     const serviceKey = el.dataset.gotoReceipt;
-    const props = [...state.properties.owned, ...state.properties.delegated];
-    const propertyId = state.bookingPropertyId || props[0]?.id;
-    if(!propertyId) return;
+    const isGroup = serviceKey === 'common_area';
+
     if(state.bookingUrgency === 'scheduled' && !state.bookingScheduledAt){
       showToast(t('pleaseSelectDatetime')); return;
     }
-    const addons = Object.entries(state.bookingAddons)
-      .filter(([, v]) => v && v.checked)
-      .map(([key, v]) => ({ key, quantity: v.quantity || 1 }));
-    const commonAreaService = state.commonAreaServices.find(s => s.key === serviceKey);
-    const serviceParams = commonAreaService ? {
-      floorCount: state.bookingFloorCount || undefined,
-      corridorSqm: state.bookingCorridorSqm || undefined,
-      elevatorCapacity: state.bookingElevatorCapacity || undefined,
-    } : undefined;
-    const draft = {
-      propertyId, serviceKey,
-      urgency: state.bookingUrgency,
-      scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
-      hasEquipment: state.bookingHasEquipment,
-      hasChemicals: state.bookingHasChemicals,
-      addons,
-      serviceParams,
-      paymentMethod: state.bookingPaymentMethod,
-    };
+
+    let draft;
+    if(isGroup){
+      const selections = Object.entries(state.bookingCommonAreaSelections)
+        .filter(([, v]) => v && v.checked)
+        .map(([key, v]) => ({ key, ...v }));
+      if(selections.length === 0){ showToast(t('pleaseSelectSubOption')); return; }
+      const groups = buildingGroups();
+      const buildingName = state.bookingBuildingName || groups[0]?.name;
+      if(!buildingName) return;
+      draft = {
+        buildingName, serviceKey,
+        urgency: state.bookingUrgency,
+        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+        hasEquipment: state.bookingHasEquipment,
+        hasChemicals: state.bookingHasChemicals,
+        addons: [],
+        serviceParams: { selections },
+        paymentMethod: state.bookingPaymentMethod,
+      };
+    } else {
+      const props = [...state.properties.owned, ...state.properties.delegated];
+      const propertyId = state.bookingPropertyId || props[0]?.id;
+      if(!propertyId) return;
+      const addons = Object.entries(state.bookingAddons)
+        .filter(([, v]) => v && v.checked)
+        .map(([key, v]) => ({ key, quantity: v.quantity || 1 }));
+      draft = {
+        propertyId, serviceKey,
+        urgency: state.bookingUrgency,
+        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+        hasEquipment: state.bookingHasEquipment,
+        hasChemicals: state.bookingHasChemicals,
+        addons,
+        paymentMethod: state.bookingPaymentMethod,
+      };
+    }
 
     if(state.bookingPaymentMethod === 'card' && !state.savedCard){
       state.pendingBooking = draft;
