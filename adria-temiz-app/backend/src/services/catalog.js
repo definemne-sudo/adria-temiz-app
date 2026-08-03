@@ -33,42 +33,47 @@ const SERVICES = [
     min: 40,
     accountTypes: ['individual', 'company'],
   },
+  {
+    key: 'common_area',
+    name: 'Ortak Alan Temizliği',
+    description: 'Merdiven, kat koridoru ve asansör temizliğinden istediklerini seç.',
+    isGroup: true, // fiyat sabit değil, alt seçimlere göre hesaplanır
+    accountTypes: ['company'],
+  },
 ];
 
 // Ortak Alan Temizliği - yalnızca yönetim şirketi hesaplarında görünür.
-// Her alt seçeneğin kendi parametresi ve fiyat mantığı var (m²/kat sayısı
-// yerine kat sayısı, m²+kat sayısı, veya asansör kapasitesi kullanılıyor).
-const COMMON_AREA_SERVICES = [
+// Hizmetler ekranında TEK kart olarak görünür ("common_area"), müşteri
+// bunun altında istediği kadar alt seçeneği (checkbox) işaretleyip tek
+// siparişte birleştirebilir. Her alt seçeneğin kendi parametresi var.
+const COMMON_AREA_SUB_OPTIONS = [
   {
-    key: 'common_area_staircase',
+    key: 'staircase',
     name: 'Merdiven Temizliği',
     description: 'Bina merdivenlerinin düzenli temizliği, kat sayısına göre fiyatlanır.',
     base: 15,
     ratePerFloor: 4,
     min: 25,
     paramType: 'floors', // { floorCount }
-    accountTypes: ['company'],
   },
   {
-    key: 'common_area_corridor',
+    key: 'corridor',
     name: 'Kat Koridoru Temizliği',
-    description: 'Kat koridorlarının temizliği, alan (m²) ve kat sayısına göre fiyatlanır.',
+    description: 'Kat koridorlarının temizliği, kat sayısı ve kat başına m²ye göre fiyatlanır.',
     base: 12,
     ratePerSqm: 0.3,
     ratePerFloor: 3,
     min: 30,
-    paramType: 'corridor', // { corridorSqm, floorCount }
-    accountTypes: ['company'],
+    paramType: 'corridor', // { floorCount, sqmPerFloor }
   },
   {
-    key: 'common_area_elevator',
+    key: 'elevator',
     name: 'Asansör Temizliği',
     description: 'Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır.',
     base: 12,
     ratePerCapacity: 1.4,
     min: 20,
     paramType: 'elevator', // { elevatorCapacity }
-    accountTypes: ['company'],
   },
 ];
 
@@ -88,13 +93,13 @@ const SUPPLIES_FEES = {
 function getService(key) {
   const service = SERVICES.find((s) => s.key === key);
   if (service) return service;
-  const commonArea = COMMON_AREA_SERVICES.find((s) => s.key === key);
-  if (commonArea) return commonArea;
   throw new Error('Geçersiz hizmet türü.');
 }
 
-function isCommonAreaService(key) {
-  return COMMON_AREA_SERVICES.some((s) => s.key === key);
+function getCommonAreaSubOption(key) {
+  const sub = COMMON_AREA_SUB_OPTIONS.find((s) => s.key === key);
+  if (!sub) throw new Error('Geçersiz ortak alan alt seçeneği.');
+  return sub;
 }
 
 function getAddon(key) {
@@ -109,22 +114,30 @@ function calcPrice(serviceKey, { sizeSqm } = {}) {
   return Math.max(service.min, Math.round(price / 5) * 5);
 }
 
-// Ortak alan hizmetleri için parametre bazlı fiyat hesaplama.
-// params: { floorCount, corridorSqm, elevatorCapacity } (hizmete göre kullanılanlar değişir)
-function calcCommonAreaPrice(serviceKey, params = {}) {
-  const service = COMMON_AREA_SERVICES.find((s) => s.key === serviceKey);
-  if (!service) throw new Error('Geçersiz ortak alan hizmeti.');
-
-  let price = service.base;
-  if (service.paramType === 'floors') {
-    price += (Number(params.floorCount) || 0) * service.ratePerFloor;
-  } else if (service.paramType === 'corridor') {
-    price += (Number(params.corridorSqm) || 0) * service.ratePerSqm;
-    price += (Number(params.floorCount) || 0) * service.ratePerFloor;
-  } else if (service.paramType === 'elevator') {
-    price += (Number(params.elevatorCapacity) || 0) * service.ratePerCapacity;
+// Tek bir ortak alan alt seçeneğinin fiyatı.
+function calcCommonAreaSubPrice(key, params = {}) {
+  const sub = getCommonAreaSubOption(key);
+  let price = sub.base;
+  if (sub.paramType === 'floors') {
+    price += (Number(params.floorCount) || 0) * sub.ratePerFloor;
+  } else if (sub.paramType === 'corridor') {
+    const floors = Number(params.floorCount) || 0;
+    const sqmPerFloor = Number(params.sqmPerFloor) || 0;
+    price += floors * sub.ratePerFloor;
+    price += (floors * sqmPerFloor) * sub.ratePerSqm;
+  } else if (sub.paramType === 'elevator') {
+    price += (Number(params.elevatorCapacity) || 0) * sub.ratePerCapacity;
   }
-  return Math.max(service.min, Math.round(price / 5) * 5);
+  return Math.max(sub.min, Math.round(price / 5) * 5);
+}
+
+// selections: [{ key, floorCount?, sqmPerFloor?, elevatorCapacity? }]
+// En az bir seçim zorunlu - hepsinin fiyatı toplanır.
+function calcCommonAreaGroupTotal(selections) {
+  if (!Array.isArray(selections) || selections.length === 0) {
+    throw new Error('En az bir ortak alan hizmeti seçilmeli.');
+  }
+  return selections.reduce((sum, sel) => sum + calcCommonAreaSubPrice(sel.key, sel), 0);
 }
 
 // addons: [{ key, quantity }]
@@ -145,7 +158,7 @@ function calcSuppliesFee({ hasEquipment, hasChemicals }) {
 }
 
 module.exports = {
-  SERVICES, COMMON_AREA_SERVICES, ADDONS, SUPPLIES_FEES,
-  getService, getAddon, isCommonAreaService,
-  calcPrice, calcCommonAreaPrice, calcAddonsTotal, calcSuppliesFee,
+  SERVICES, COMMON_AREA_SUB_OPTIONS, ADDONS, SUPPLIES_FEES,
+  getService, getAddon, getCommonAreaSubOption,
+  calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
 };
