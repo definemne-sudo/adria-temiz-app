@@ -43,6 +43,45 @@ router.post('/', (req, res) => {
   res.status(201).json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
 });
 
+// Toplu mülk ekleme - yönetim şirketlerinin aynı lokasyonda (bina/site) veya
+// farklı lokasyonlarda sahip olduğu birden fazla mülkü tek istekte, hızlıca
+// eklemesi için. Her satır kendi tip+m²+konumunu taşıyor, ortak alanları
+// (adres/şehir) her satırda ayrı ayrı da verebilir - liste esnek.
+router.post('/bulk', (req, res) => {
+  const { properties } = req.body;
+  if (!Array.isArray(properties) || properties.length === 0) {
+    return res.status(400).json({ error: 'En az bir mülk satırı gerekli.' });
+  }
+
+  const insert = db.prepare(
+    `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
+  const created = [];
+  const insertMany = db.transaction((rows) => {
+    for (const row of rows) {
+      if (!row || !row.name) continue;
+      const finalCategory = ['apartment', 'house', 'office'].includes(row.category) ? row.category : 'apartment';
+      const id = uuid();
+      insert.run(
+        id, req.user.id, row.name, finalCategory,
+        row.address || null, row.city || null,
+        row.latitude ? Number(row.latitude) : null, row.longitude ? Number(row.longitude) : null,
+        row.sizeSqm ? Number(row.sizeSqm) : null, row.icalUrl || null
+      );
+      created.push(id);
+    }
+  });
+  insertMany(properties);
+
+  const placeholders = created.map(() => '?').join(',');
+  const rows = created.length
+    ? db.prepare(`SELECT * FROM properties WHERE id IN (${placeholders})`).all(...created)
+    : [];
+  res.status(201).json(rows);
+});
+
 function canAccessProperty(userId, propertyId) {
   const owned = db
     .prepare('SELECT id FROM properties WHERE id = ? AND owner_id = ?')
