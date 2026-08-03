@@ -1,7 +1,7 @@
-const CACHE = 'cisto-v3';
+const CACHE = 'cisto-v4';
 const ASSETS = [
   '/index.html', '/manifest.json',
-  '/icon-service-checkin.png', '/icon-service-deep.png', '/icon-service-office.png',
+  '/icon-service-checkin.png', '/icon-service-deep.png', '/icon-service-office.png', '/icon-service-common-area.png',
   '/icon-property-apartment.png', '/icon-property-house.png', '/icon-property-office.png',
 ];
 
