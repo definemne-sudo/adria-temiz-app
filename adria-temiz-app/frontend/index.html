@@ -73,6 +73,8 @@
     text-align:center; font-size:13px; font-weight:600; color:var(--muted);
   }
   .choice.selected{border-color:var(--sage-dark); background:rgba(124,156,130,.12); color:var(--navy);}
+  .btn.light-sage{ background:rgba(29,158,115,.14); color:var(--sage-dark); }
+  .btn.light-sage:hover{ background:rgba(29,158,115,.24); }
   .rating-icon-btn{
     flex:1; display:flex; align-items:center; justify-content:center;
     border:1.5px solid var(--line); border-radius:12px; padding:18px; cursor:pointer;
@@ -373,9 +375,13 @@ const TRANSLATIONS = {
     invoiceLabel: "🧾 Fatura",
     invoiceSub: "aylık faturaya eklenir",
     invoicePaidNote: "🧾 Fatura · aylık faturaya eklendi",
-    bulkAddBtn: "+ Toplu Mülk Ekle",
-    bulkAddModalTitle: "Toplu Mülk Ekle",
-    bulkAddModalHint: "Aynı bina/sitede ya da farklı lokasyonlardaki mülklerini tek seferde ekle — her satır için tip ve m² yeterli.",
+    bulkAddBtn: "+ Çoklu Mülk Ekle",
+    bulkAddModalTitle: "Çoklu Mülk Ekle",
+    bulkAddModalHint: "Aynı bina/sitede ya da farklı lokasyonlardaki mülklerini tek seferde ekle — her satır için tip, m² ve konum (harita pini) gerekli, böylece personel doğru adrese gidebilir.",
+    pickLocationBtn: "📍 Haritadan seç",
+    locationSetBtn: "📍 Konum seçildi",
+    pickLocationTitle: "Konum seç",
+    confirmLocationBtn: "Konumu Onayla",
     bulkRowNamePlaceholder: "örn. Daire 3",
     bulkAddRowBtn: "+ Satır ekle",
     bulkRemoveRowBtn: "Kaldır",
@@ -542,9 +548,13 @@ const TRANSLATIONS = {
     invoiceLabel: "🧾 Invoice",
     invoiceSub: "added to monthly invoice",
     invoicePaidNote: "🧾 Invoice · added to your monthly invoice",
-    bulkAddBtn: "+ Bulk Add Properties",
-    bulkAddModalTitle: "Bulk Add Properties",
-    bulkAddModalHint: "Add properties from the same building/site or different locations at once — type and size are enough per row.",
+    bulkAddBtn: "+ Add Multiple Properties",
+    bulkAddModalTitle: "Add Multiple Properties",
+    bulkAddModalHint: "Add properties from the same building/site or different locations at once — type, size and a map pin are needed per row, so staff can find the right address.",
+    pickLocationBtn: "📍 Pick on map",
+    locationSetBtn: "📍 Location set",
+    pickLocationTitle: "Pick location",
+    confirmLocationBtn: "Confirm Location",
     bulkRowNamePlaceholder: "e.g. Apartment 3",
     bulkAddRowBtn: "+ Add row",
     bulkRemoveRowBtn: "Remove",
@@ -711,9 +721,13 @@ const TRANSLATIONS = {
     invoiceLabel: "🧾 Faktura",
     invoiceSub: "dodaje se na mjesečnu fakturu",
     invoicePaidNote: "🧾 Faktura · dodato na mjesečnu fakturu",
-    bulkAddBtn: "+ Grupno dodaj nekretnine",
-    bulkAddModalTitle: "Grupno dodaj nekretnine",
-    bulkAddModalHint: "Dodaj nekretnine iz iste zgrade/naselja ili različitih lokacija odjednom — tip i površina su dovoljni po redu.",
+    bulkAddBtn: "+ Dodaj više nekretnina",
+    bulkAddModalTitle: "Dodaj više nekretnina",
+    bulkAddModalHint: "Dodaj nekretnine iz iste zgrade/naselja ili različitih lokacija odjednom — potrebni su tip, površina i pin na mapi po redu, da bi osoblje znalo tačnu adresu.",
+    pickLocationBtn: "📍 Izaberi na mapi",
+    locationSetBtn: "📍 Lokacija izabrana",
+    pickLocationTitle: "Izaberi lokaciju",
+    confirmLocationBtn: "Potvrdi lokaciju",
     bulkRowNamePlaceholder: "npr. Stan 3",
     bulkAddRowBtn: "+ Dodaj red",
     bulkRemoveRowBtn: "Ukloni",
@@ -995,6 +1009,7 @@ let state = {
   syncPaymentMethod: 'cash',
   pendingSyncPropertyId: null,
   bulkRows: [],
+  bulkPickingRow: null,
   chatOpen: false,
   chatMessages: [],
   chatInput: '',
@@ -1698,35 +1713,62 @@ function renderModal(){
     </div>`;
   }
   if(state.modal === 'bulk-add'){
+    if(state.bulkPickingRow !== null){
+      const row = state.bulkRows[state.bulkPickingRow] || {};
+      return `
+      <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal">
+          <h3>${t('pickLocationTitle')}</h3>
+          <div class="hint" style="margin:-8px 0 16px;">${row.name || t('bulkRowNamePlaceholder')}</div>
+          <div id="bulk-map" class="mini-map"></div>
+          <div class="map-hint">${row.latitude ? t('mapHintSelected', { lat: Number(row.latitude).toFixed(5), lng: Number(row.longitude).toFixed(5) }) : t('mapHintDefault')}</div>
+          <div class="actions">
+            <button type="button" class="btn ghost" id="bulk-location-back">${t('backBtnShort')}</button>
+            <button type="button" class="btn ochre" id="bulk-location-confirm">${t('confirmLocationBtn')}</button>
+          </div>
+        </div>
+      </div>`;
+    }
     return `
     <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal" style="max-width:640px;">
+      <div class="modal" style="max-width:680px;">
         <h3>${t('bulkAddModalTitle')}</h3>
         <div class="hint" style="margin:-8px 0 16px;">${t('bulkAddModalHint')}</div>
-        <div style="max-height:50vh; overflow-y:auto; margin-bottom:14px;">
+        <div style="max-height:52vh; overflow-y:auto; margin-bottom:14px;">
           ${state.bulkRows.map((row, i) => `
-            <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
-              <div class="field" style="flex:2; margin-bottom:0;">
-                <label>${t('propertyNameLabel')}</label>
-                <input data-bulk-field="name" data-bulk-row="${i}" placeholder="${t('bulkRowNamePlaceholder')}" value="${row.name}" />
+            <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line);">
+              <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:8px;">
+                <div class="field" style="flex:2; margin-bottom:0;">
+                  <label>${t('propertyNameLabel')}</label>
+                  <input data-bulk-field="name" data-bulk-row="${i}" placeholder="${t('bulkRowNamePlaceholder')}" value="${row.name}" />
+                </div>
+                <div class="field" style="flex:1.4; margin-bottom:0;">
+                  <label>${t('propertyCategoryLabel')}</label>
+                  <select data-bulk-field="category" data-bulk-row="${i}">
+                    <option value="apartment" ${row.category==='apartment'?'selected':''}>${t('categoryApartment')}</option>
+                    <option value="house" ${row.category==='house'?'selected':''}>${t('categoryHouse')}</option>
+                    <option value="office" ${row.category==='office'?'selected':''}>${t('categoryOffice')}</option>
+                  </select>
+                </div>
+                <div class="field" style="flex:1.2; margin-bottom:0;">
+                  <label>${t('propertyCityLabel')}</label>
+                  <input data-bulk-field="city" data-bulk-row="${i}" placeholder="${t('propertyCityPlaceholder')}" value="${row.city}" />
+                </div>
+                <div class="field" style="flex:0.8; margin-bottom:0;">
+                  <label>m²</label>
+                  <input type="number" min="1" data-bulk-field="sizeSqm" data-bulk-row="${i}" value="${row.sizeSqm}" />
+                </div>
+                <button type="button" class="btn ghost btn-sm" style="width:auto; flex-shrink:0; padding:9px 10px;" data-bulk-remove="${i}">✕</button>
               </div>
-              <div class="field" style="flex:1.4; margin-bottom:0;">
-                <label>${t('propertyCategoryLabel')}</label>
-                <select data-bulk-field="category" data-bulk-row="${i}">
-                  <option value="apartment" ${row.category==='apartment'?'selected':''}>${t('categoryApartment')}</option>
-                  <option value="house" ${row.category==='house'?'selected':''}>${t('categoryHouse')}</option>
-                  <option value="office" ${row.category==='office'?'selected':''}>${t('categoryOffice')}</option>
-                </select>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="field" style="flex:1; margin-bottom:0;">
+                  <label>${t('propertyAddressLabel')}</label>
+                  <input data-bulk-field="address" data-bulk-row="${i}" placeholder="${t('propertyAddressPlaceholder')}" value="${row.address}" />
+                </div>
+                <button type="button" class="btn ${row.latitude ? 'light-sage' : 'ghost'} btn-sm" style="width:auto; flex-shrink:0; white-space:nowrap;" data-bulk-pick-location="${i}">
+                  ${row.latitude ? t('locationSetBtn') : t('pickLocationBtn')}
+                </button>
               </div>
-              <div class="field" style="flex:1.2; margin-bottom:0;">
-                <label>${t('propertyCityLabel')}</label>
-                <input data-bulk-field="city" data-bulk-row="${i}" placeholder="${t('propertyCityPlaceholder')}" value="${row.city}" />
-              </div>
-              <div class="field" style="flex:0.8; margin-bottom:0;">
-                <label>m²</label>
-                <input type="number" min="1" data-bulk-field="sizeSqm" data-bulk-row="${i}" value="${row.sizeSqm}" />
-              </div>
-              <button type="button" class="btn ghost btn-sm" style="width:auto; flex-shrink:0; padding:9px 10px;" data-bulk-remove="${i}">✕</button>
             </div>
           `).join('')}
         </div>
@@ -1869,6 +1911,16 @@ function attachHandlers(){
     if(hint) hint.textContent = t('mapHintSelected', { lat: lat.toFixed(5), lng: lng.toFixed(5) });
   }, state.regLat, state.regLng);
 
+  if(state.bulkPickingRow !== null){
+    const pickedRow = state.bulkRows[state.bulkPickingRow];
+    initLeafletPickerMap('bulk-map', (lat, lng) => {
+      state.bulkRows[state.bulkPickingRow].latitude = lat;
+      state.bulkRows[state.bulkPickingRow].longitude = lng;
+      const hint = document.querySelector('#bulk-map ~ .map-hint');
+      if(hint) hint.textContent = t('mapHintSelected', { lat: lat.toFixed(5), lng: lng.toFixed(5) });
+    }, pickedRow?.latitude, pickedRow?.longitude);
+  }
+
   const countryCodeSelect = document.getElementById('country-code-select');
   if(countryCodeSelect) countryCodeSelect.onchange = () => {
     state.countryCode = COUNTRY_CODES[Number(countryCodeSelect.value)].code;
@@ -1964,21 +2016,21 @@ function attachHandlers(){
 
   const bulkAddOpen = document.getElementById('bulk-add-open');
   if(bulkAddOpen) bulkAddOpen.onclick = () => {
-    state.bulkRows = [{ name:'', category:'apartment', city:'', sizeSqm:'' }];
+    state.bulkRows = [{ name:'', category:'apartment', city:'', sizeSqm:'', address:'', latitude:null, longitude:null }];
     state.modal = 'bulk-add';
     render();
   };
 
   const bulkAddRow = document.getElementById('bulk-add-row');
   if(bulkAddRow) bulkAddRow.onclick = () => {
-    state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'' });
+    state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'', address:'', latitude:null, longitude:null });
     render();
   };
 
   document.querySelectorAll('[data-bulk-remove]').forEach(el => el.onclick = () => {
     const idx = Number(el.dataset.bulkRemove);
     state.bulkRows.splice(idx, 1);
-    if(state.bulkRows.length === 0) state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'' });
+    if(state.bulkRows.length === 0) state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'', address:'', latitude:null, longitude:null });
     render();
   });
 
@@ -1988,6 +2040,16 @@ function attachHandlers(){
     el.oninput = () => { state.bulkRows[idx][field] = el.value; };
     el.onchange = () => { state.bulkRows[idx][field] = el.value; };
   });
+
+  document.querySelectorAll('[data-bulk-pick-location]').forEach(el => el.onclick = () => {
+    state.bulkPickingRow = Number(el.dataset.bulkPickLocation);
+    render();
+  });
+
+  const bulkLocationBack = document.getElementById('bulk-location-back');
+  if(bulkLocationBack) bulkLocationBack.onclick = () => { state.bulkPickingRow = null; render(); };
+  const bulkLocationConfirm = document.getElementById('bulk-location-confirm');
+  if(bulkLocationConfirm) bulkLocationConfirm.onclick = () => { state.bulkPickingRow = null; render(); };
 
   const bulkSave = document.getElementById('bulk-save');
   if(bulkSave) bulkSave.onclick = async () => {
