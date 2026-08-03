@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaPrice, calcAddonsTotal, calcSuppliesFee, getService, isCommonAreaService } = require('../services/catalog');
+const { calcPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee, getService } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -32,19 +32,31 @@ function resolveScheduledAt(urgency, scheduledAt) {
 // personel gelince elden tahsil edilir. Her iki durumda da müşteri burada
 // bir daha işlem yapmaz — tamamlanma anında sistem otomatik sonuçlandırır
 // (bkz. PATCH /:id/status).
+// Bir kullanıcının, belirli bir bina/site adını paylaşan (2+ mülk) grubundan
+// erişebildiği bir mülkü bulur - ortak alan siparişleri buna bağlanır.
+function findAccessiblePropertyInBuilding(userId, buildingName) {
+  const ids = accessiblePropertyIds(userId);
+  if (ids.length === 0) return null;
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db
+    .prepare(`SELECT * FROM properties WHERE id IN (${placeholders}) AND building_name = ?`)
+    .all(...ids, buildingName);
+  return rows.length >= 2 ? rows[0] : null;
+}
+
+// Ana akış: kullanıcı bir mülk (ya da ortak alan siparişlerinde bir bina) +
+// hizmet + zamanlama + (opsiyonel) ekstra hizmetler + ödeme yöntemini TEK
+// adımda seçip siparişini tamamlar. Kart seçilirse ödeme hemen alınır
+// (escrow'da tutulur); nakit/fatura seçilirse tamamlanınca sonuçlanır.
 router.post('/', (req, res) => {
   const {
-    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    propertyId, buildingName, serviceKey, urgency, scheduledAt, addons, paymentMethod,
     hasEquipment, hasChemicals, serviceParams,
   } = req.body;
 
-  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
-    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
-  }
   if (!['cash', 'card', 'invoice'].includes(paymentMethod)) {
     return res.status(400).json({ error: "paymentMethod 'cash', 'card' veya 'invoice' olmalı." });
   }
-  // Aylık fatura seçeneği yalnızca yönetim şirketi hesaplarına açık.
   if (paymentMethod === 'invoice' && req.user.accountType !== 'company') {
     return res.status(403).json({ error: 'Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.' });
   }
@@ -57,14 +69,36 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
-  const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
-  const addonsList = Array.isArray(addons) ? addons.filter((a) => a && a.key) : [];
+  const isCommonArea = serviceKey === 'common_area';
+  let property;
+  let resolvedBuildingName = null;
+
+  if (isCommonArea) {
+    if (!buildingName) return res.status(400).json({ error: 'buildingName zorunlu.' });
+    property = findAccessiblePropertyInBuilding(req.user.id, buildingName);
+    if (!property) {
+      return res.status(403).json({ error: 'Bu bina/siteye erişim yetkiniz yok ya da bina en az 2 mülk içermiyor.' });
+    }
+    resolvedBuildingName = buildingName;
+  } else {
+    if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
+      return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+    }
+    property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  }
+
+  // Ortak alan siparişlerinde halı/koltuk gibi ekstra hizmetler yok -
+  // gönderilse bile yok sayılır.
+  const addonsList = isCommonArea
+    ? []
+    : (Array.isArray(addons) ? addons.filter((a) => a && a.key) : []);
+
   let addonsTotal = 0;
   let basePrice = 0;
   try {
     addonsTotal = calcAddonsTotal(addonsList);
-    basePrice = isCommonAreaService(serviceKey)
-      ? calcCommonAreaPrice(serviceKey, serviceParams || {})
+    basePrice = isCommonArea
+      ? calcCommonAreaGroupTotal((serviceParams && serviceParams.selections) || [])
       : calcPrice(serviceKey, { sizeSqm: property.size_sqm });
   } catch (err) {
     return res.status(400).json({ error: err.message });
@@ -73,21 +107,21 @@ router.post('/', (req, res) => {
   const chemicalsOk = hasChemicals !== false;
   const suppliesFee = calcSuppliesFee({ hasEquipment: equipmentOk, hasChemicals: chemicalsOk });
   const price = basePrice + addonsTotal + suppliesFee;
-  // Kart -> hemen emanete alınır. Nakit/Fatura -> tamamlanınca sonuçlanır.
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
-       (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
+       (id, property_id, service_key, addons, service_params, building_name, has_equipment, has_chemicals,
         urgency, payment_method, checkout_at, status, source, price, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
   ).run(
     id,
-    propertyId,
+    property.id,
     serviceKey,
     addonsList.length ? JSON.stringify(addonsList) : null,
     serviceParams ? JSON.stringify(serviceParams) : null,
+    resolvedBuildingName,
     equipmentOk ? 1 : 0,
     chemicalsOk ? 1 : 0,
     urgency || 'scheduled',
