@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   quantity INTEGER,
   addons TEXT,
   service_params TEXT,
+  building_name TEXT,
   has_equipment INTEGER NOT NULL DEFAULT 1,
   has_chemicals INTEGER NOT NULL DEFAULT 1,
   urgency TEXT NOT NULL DEFAULT 'scheduled' CHECK (urgency IN ('now','urgent','scheduled')),
