@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee, getService } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -28,29 +28,16 @@ function resolveScheduledAt(urgency, scheduledAt) {
 
 // Ana akış: kullanıcı bir mülk + hizmet + zamanlama + (opsiyonel) ekstra
 // hizmetler + ödeme yöntemini TEK adımda seçip siparişini tamamlar.
-// Kart seçilirse ödeme hemen alınır (escrow'da tutulur); nakit seçilirse
-// personel gelince elden tahsil edilir. Her iki durumda da müşteri burada
-// bir daha işlem yapmaz — tamamlanma anında sistem otomatik sonuçlandırır
-// (bkz. PATCH /:id/status).
-// Bir kullanıcının, belirli bir bina/site adını paylaşan (2+ mülk) grubundan
-// erişebildiği bir mülkü bulur - ortak alan siparişleri buna bağlanır.
-function findAccessiblePropertyInBuilding(userId, buildingName) {
-  const ids = accessiblePropertyIds(userId);
-  if (ids.length === 0) return null;
-  const placeholders = ids.map(() => '?').join(',');
-  const rows = db
-    .prepare(`SELECT * FROM properties WHERE id IN (${placeholders}) AND building_name = ?`)
-    .all(...ids, buildingName);
-  return rows.length >= 2 ? rows[0] : null;
-}
-
-// Ana akış: kullanıcı bir mülk (ya da ortak alan siparişlerinde bir bina) +
-// hizmet + zamanlama + (opsiyonel) ekstra hizmetler + ödeme yöntemini TEK
-// adımda seçip siparişini tamamlar. Kart seçilirse ödeme hemen alınır
-// (escrow'da tutulur); nakit/fatura seçilirse tamamlanınca sonuçlanır.
+// Kart seçilirse ödeme hemen alınır (escrow'da tutulur); nakit/fatura
+// seçilirse tamamlanınca sonuçlanır.
+//
+// Ortak Alan Temizliği için kat sayısı/kat başına m²/asansör kapasitesi gibi
+// bina parametreleri artık sipariş anında değil, mülk eklenirken bir kez
+// girilip properties tablosunda saklanıyor - müşteri her siparişte bunları
+// tekrar girmek zorunda kalmıyor, sadece hangi alt hizmeti istediğini seçiyor.
 router.post('/', (req, res) => {
   const {
-    propertyId, buildingName, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
     hasEquipment, hasChemicals, serviceParams,
   } = req.body;
 
@@ -59,6 +46,9 @@ router.post('/', (req, res) => {
   }
   if (paymentMethod === 'invoice' && req.user.accountType !== 'company') {
     return res.status(403).json({ error: 'Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.' });
+  }
+  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
+    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
   }
 
   let checkoutAt;
@@ -69,36 +59,11 @@ router.post('/', (req, res) => {
     return res.status(400).json({ error: err.message });
   }
 
+  const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
   const isCommonArea = serviceKey === 'common_area';
-  let property;
-  let resolvedBuildingName = null;
 
-  if (isCommonArea) {
-    if (propertyId && accessiblePropertyIds(req.user.id).includes(propertyId)) {
-      // Kategorisi "Ortak Alan" olan bir mülk doğrudan seçildiyse (hiç
-      // dairesi olmayan, sadece ortak alanı yönetilen bir bina) onu kullan.
-      property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
-      resolvedBuildingName = property.building_name || null;
-    } else if (buildingName) {
-      property = findAccessiblePropertyInBuilding(req.user.id, buildingName);
-      if (!property) {
-        return res.status(403).json({ error: 'Bu bina/siteye erişim yetkiniz yok ya da bina en az 2 mülk içermiyor.' });
-      }
-      resolvedBuildingName = buildingName;
-    } else {
-      // Bina/mülk seçilmedi - herhangi bir erişilebilir mülkü çapa olarak kullan.
-      const ids = accessiblePropertyIds(req.user.id);
-      if (ids.length === 0) {
-        return res.status(400).json({ error: 'Sipariş oluşturmadan önce en az bir mülk eklemelisin.' });
-      }
-      property = db.prepare('SELECT * FROM properties WHERE id = ?').get(ids[0]);
-      resolvedBuildingName = null;
-    }
-  } else {
-    if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
-      return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
-    }
-    property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  if (isCommonArea && property.category !== 'common_area') {
+    return res.status(400).json({ error: 'Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.' });
   }
 
   // Ortak alan siparişlerinde halı/koltuk gibi ekstra hizmetler yok -
@@ -111,9 +76,28 @@ router.post('/', (req, res) => {
   let basePrice = 0;
   try {
     addonsTotal = calcAddonsTotal(addonsList);
-    basePrice = isCommonArea
-      ? calcCommonAreaGroupTotal((serviceParams && serviceParams.selections) || [])
-      : calcPrice(serviceKey, { sizeSqm: property.size_sqm });
+    if (isCommonArea) {
+      const selections = (serviceParams && serviceParams.selections) || [];
+      if (selections.length === 0) throw new Error('En az bir ortak alan hizmeti seçilmeli.');
+      basePrice = selections.reduce((sum, sel) => {
+        if (sel.key === 'staircase' || sel.key === 'corridor') {
+          if (!property.floor_count) throw new Error('Bu mülk için kat sayısı tanımlanmamış.');
+        }
+        if (sel.key === 'corridor' && !property.sqm_per_floor) {
+          throw new Error('Bu mülk için kat başına m² tanımlanmamış.');
+        }
+        if (sel.key === 'elevator' && !property.elevator_capacity) {
+          throw new Error('Bu mülk için asansör kapasitesi tanımlanmamış.');
+        }
+        return sum + calcCommonAreaSubPrice(sel.key, {
+          floorCount: property.floor_count,
+          sqmPerFloor: property.sqm_per_floor,
+          elevatorCapacity: property.elevator_capacity,
+        });
+      }, 0);
+    } else {
+      basePrice = calcPrice(serviceKey, { sizeSqm: property.size_sqm });
+    }
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
@@ -126,16 +110,15 @@ router.post('/', (req, res) => {
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
-       (id, property_id, service_key, addons, service_params, building_name, has_equipment, has_chemicals,
+       (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
         urgency, payment_method, checkout_at, status, source, price, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
   ).run(
     id,
     property.id,
     serviceKey,
     addonsList.length ? JSON.stringify(addonsList) : null,
     serviceParams ? JSON.stringify(serviceParams) : null,
-    resolvedBuildingName,
     equipmentOk ? 1 : 0,
     chemicalsOk ? 1 : 0,
     urgency || 'scheduled',
