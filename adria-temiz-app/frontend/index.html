@@ -164,14 +164,17 @@
   .empty-state{
     border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px; text-align:center; color:var(--muted);
   }
-  .toolbar{display:flex; gap:10px; margin-bottom:20px;}
+  .toolbar{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;}
+  .toolbar .btn{width:auto; white-space:nowrap;}
   .toolbar .btn{width:auto; padding:9px 16px;}
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex; align-items:center; justify-content:center; z-index:50;
   }
-  .modal{background:#fff; border-radius:14px; padding:26px; width:100%; max-width:420px;}
+  .modal{background:#fff; border-radius:14px; padding:26px; width:100%; max-width:420px; max-height:88vh; overflow-y:auto;}
   .modal h3{margin-bottom:16px; color:var(--navy);}
   .modal .actions{display:flex; gap:10px; margin-top:18px;}
+  .modal .actions .btn{flex:1; width:auto;}
+  .two-col{display:grid; grid-template-columns:1fr 1fr; gap:0 20px;}
   .toast{
     position:fixed; bottom:24px; right:24px; background:var(--navy); color:#fff; padding:12px 18px;
     border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60;
@@ -205,6 +208,7 @@
   .table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
 
   @media (max-width: 760px){
+    .two-col{ grid-template-columns:1fr; }
     .app{ flex-direction:column; }
 
     .sidebar{
@@ -1855,7 +1859,7 @@ function renderModal(){
   if(state.modal === 'add-property'){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal">
+      <div class="modal" style="max-width:700px;">
         <h3>${t('addPropertyModalTitle')}</h3>
         <form id="property-form">
           <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
@@ -1864,17 +1868,23 @@ function renderModal(){
             <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
             <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
           </div>
-          <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
-          ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
-          <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
-          <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
-          <div class="field">
-            <label>${t('propertyLocationLabel')}</label>
-            <div id="modal-map" class="mini-map"></div>
-            <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
+          <div class="two-col">
+            <div>
+              <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
+              ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
+              <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+              <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
+              <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
+              ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
+            </div>
+            <div>
+              <div class="field">
+                <label>${t('propertyLocationLabel')}</label>
+                <div id="modal-map" class="mini-map" style="height:220px;"></div>
+                <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
+              </div>
+            </div>
           </div>
-          <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
-          ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
           <div class="actions">
             <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
             <button type="submit" class="btn ochre">${t('addBtn')}</button>
