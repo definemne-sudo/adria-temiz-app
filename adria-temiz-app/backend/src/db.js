@@ -73,6 +73,9 @@ CREATE TABLE IF NOT EXISTS properties (
   latitude REAL,
   longitude REAL,
   size_sqm REAL,
+  floor_count INTEGER,
+  sqm_per_floor REAL,
+  elevator_capacity INTEGER,
   ical_url TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
