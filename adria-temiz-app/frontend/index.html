@@ -375,10 +375,13 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Kat koridorlarının temizliği, alan ve kat sayısına göre fiyatlanır.",
     commonAreaElevatorDesc: "Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır.",
     floorCountLabel: "Kat sayısı",
+    commonAreaPropertyHint: "Bu bilgiler bir kez girilir, her sipariş için tekrar sorulmaz.",
+    elevatorCapacityMissingHint: "Bu mülk için asansör kapasitesi girilmemiş.",
+    floorCountMissingHint: "Bu mülk için kat sayısı girilmemiş.",
     bookingBuildingLabel: "Bina / Site",
     sqmPerFloorLabel: "Kat başına m²",
     pleaseSelectSubOption: "Lütfen en az bir hizmet seç.",
-    noBuildingGroupsHint: "Bu hizmeti kullanmak için önce Çoklu Mülk Ekle ile bir bina/site oluşturmalısın (en az 2 mülk).",
+    noBuildingGroupsHint: "Ortak Alan Temizliği talep edebilmen için önce \"Ortak Alan\" kategorisiyle bir mülk eklemelisin.",
     corridorSqmLabel: "Koridor alanı (m²)",
     elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
     invoiceLabel: "🧾 Fatura",
@@ -559,10 +562,13 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Cleaning of floor corridors, priced by area and floor count.",
     commonAreaElevatorDesc: "Elevator cabin cleaning, priced by passenger capacity.",
     floorCountLabel: "Number of floors",
+    commonAreaPropertyHint: "This is entered once and won't be asked again for each order.",
+    elevatorCapacityMissingHint: "Elevator capacity hasn't been set for this property.",
+    floorCountMissingHint: "Floor count hasn't been set for this property.",
     bookingBuildingLabel: "Building / Site",
     sqmPerFloorLabel: "m² per floor",
     pleaseSelectSubOption: "Please select at least one service.",
-    noBuildingGroupsHint: "To use this service, first create a building/site with Add Multiple Properties (at least 2 units).",
+    noBuildingGroupsHint: "To request Common Area Cleaning, first add a property with the \"Common Area\" category.",
     corridorSqmLabel: "Corridor area (m²)",
     elevatorCapacityLabel: "Elevator capacity (people)",
     invoiceLabel: "🧾 Invoice",
@@ -743,10 +749,13 @@ const TRANSLATIONS = {
     commonAreaCorridorDesc: "Čišćenje hodnika na spratu, cijena po površini i broju spratova.",
     commonAreaElevatorDesc: "Čišćenje kabine lifta, cijena po kapacitetu.",
     floorCountLabel: "Broj spratova",
+    commonAreaPropertyHint: "Ovo se unosi jednom, nećemo pitati ponovo za svaku narudžbu.",
+    elevatorCapacityMissingHint: "Kapacitet lifta nije unijet za ovu nekretninu.",
+    floorCountMissingHint: "Broj spratova nije unijet za ovu nekretninu.",
     bookingBuildingLabel: "Zgrada / Naselje",
     sqmPerFloorLabel: "m² po spratu",
     pleaseSelectSubOption: "Molimo izaberi bar jednu uslugu.",
-    noBuildingGroupsHint: "Da bi koristio ovu uslugu, prvo napravi zgradu/naselje preko Dodaj više nekretnina (najmanje 2 jedinice).",
+    noBuildingGroupsHint: "Da bi naručio/la Čišćenje zajedničkih prostorija, prvo dodaj nekretninu sa kategorijom \"Zajednički prostor\".",
     corridorSqmLabel: "Površina hodnika (m²)",
     elevatorCapacityLabel: "Kapacitet lifta (osobe)",
     invoiceLabel: "🧾 Faktura",
@@ -1049,8 +1058,7 @@ let state = {
   bookingScheduledAt: '',
   bookingHasEquipment: true,
   bookingHasChemicals: true,
-  bookingCommonAreaSelections: {}, // { staircase: {checked, floorCount}, corridor: {checked, floorCount, sqmPerFloor}, elevator: {checked, elevatorCapacity} }
-  bookingCommonAreaTarget: '', // 'building:İSİM' ya da 'property:ID'
+  bookingCommonAreaSelections: {}, // { staircase: {checked}, corridor: {checked}, elevator: {checked} }
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -1399,44 +1407,20 @@ function calcCommonAreaSubPriceClient(sub, params = {}){
   return Math.max(sub.min, Math.round(price/5)*5);
 }
 
-function commonAreaSelectionsTotal(){
+function commonAreaSelectionsTotal(property){
   let total = 0;
   Object.entries(state.bookingCommonAreaSelections).forEach(([key, val]) => {
     if(val && val.checked){
       const sub = state.commonAreaSubOptions.find(s => s.key === key);
-      if(sub) total += calcCommonAreaSubPriceClient(sub, val);
+      if(sub) total += calcCommonAreaSubPriceClient(sub, {
+        floorCount: property?.floor_count, sqmPerFloor: property?.sqm_per_floor, elevatorCapacity: property?.elevator_capacity,
+      });
     }
   });
   return total;
 }
 
 // Aynı bina/site adını paylaşan (2+ mülk) gruplar - ortak alan siparişlerinde
-// sadece bu gruplar seçilebilir, tekil daireler seçilemez.
-// Ortak Alan Temizliği için seçilebilecek hedefler: aynı bina adını
-// paylaşan gruplar (2+ mülk) VE kategorisi "Ortak Alan" olan tekil mülkler
-// (hiç dairesi olmayan, sadece ortak alanı yönetilen binalar).
-function commonAreaTargets(){
-  const groups = buildingGroups().map(g => ({ value: 'building:' + g.name, label: `${g.name} (${g.list.length})` }));
-  const props = [...state.properties.owned, ...state.properties.delegated];
-  const standalone = props
-    .filter(p => p.category === 'common_area')
-    .map(p => ({ value: 'property:' + p.id, label: p.name }));
-  return [...groups, ...standalone];
-}
-
-function buildingGroups(){
-  const props = [...state.properties.owned, ...state.properties.delegated];
-  const groups = {};
-  props.forEach(p => {
-    if(p.building_name && p.building_name.trim()){
-      const key = p.building_name.trim();
-      if(!groups[key]) groups[key] = [];
-      groups[key].push(p);
-    }
-  });
-  return Object.entries(groups).filter(([, list]) => list.length > 1).map(([name, list]) => ({ name, list }));
-}
-
 function visibleServices(){
   const accountType = state.user.accountType;
   return state.services.filter(s => !s.accountTypes || s.accountTypes.includes(accountType));
@@ -1497,14 +1481,18 @@ function buildReceiptLines(draft){
   const lines = [];
 
   if(isGroup){
+    const props = [...state.properties.owned, ...state.properties.delegated];
+    const property = props.find(p => p.id === draft.propertyId);
     (draft.serviceParams?.selections || []).forEach(sel => {
       const sub = state.commonAreaSubOptions.find(s => s.key === sel.key);
-      if(sub) lines.push({ label: `${commonAreaSubIcon(sel.key)} ${commonAreaSubLabel(sel.key)}`, amount: calcCommonAreaSubPriceClient(sub, sel) });
+      if(sub) lines.push({ label: `${commonAreaSubIcon(sel.key)} ${commonAreaSubLabel(sel.key)}`, amount: calcCommonAreaSubPriceClient(sub, {
+        floorCount: property?.floor_count, sqmPerFloor: property?.sqm_per_floor, elevatorCapacity: property?.elevator_capacity,
+      }) });
     });
     if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
     if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
     const total = lines.reduce((s,l) => s+l.amount, 0);
-    return { lines, total, buildingName: draft.buildingName };
+    return { lines, total, property };
   }
 
   const label = serviceLabel(draft.serviceKey);
@@ -1532,49 +1520,50 @@ function renderBookingPanel(service, props, selectedProperty){
   const isCompany = state.user.accountType === 'company';
 
   if(isGroup){
-    // Ortak Alan Temizliği: bina/site seçimi OPSİYONEL - varsa gösterilir,
-    // yoksa hiç sorulmadan doğrudan parametrelerle sipariş oluşturulabilir.
-    // Halı/koltuk gibi ekstra hizmetler bu grupta yok.
-    const targets = commonAreaTargets();
-    const selectedTarget = state.bookingCommonAreaTarget || targets[0]?.value || '';
-    const total = commonAreaSelectionsTotal() + suppliesFee;
+    // Ortak Alan Temizliği: sadece kategorisi "Ortak Alan" olan mülkler
+    // seçilebilir. Kat sayısı/kat başına m²/asansör kapasitesi mülk
+    // eklenirken bir kez girildiği için burada tekrar sorulmuyor - sadece
+    // hangi alt hizmetin isteneceği işaretleniyor.
+    const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
+    if(commonAreaProps.length === 0){
+      return `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);"><div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div></div>`;
+    }
+    const selectedCaProperty = commonAreaProps.find(p => p.id === state.bookingPropertyId) || commonAreaProps[0];
+    const total = commonAreaSelectionsTotal(selectedCaProperty) + suppliesFee;
     const subChecked = (key) => state.bookingCommonAreaSelections[key]?.checked;
-    const subVal = (key, field) => state.bookingCommonAreaSelections[key]?.[field] || '';
 
     return `
     <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
-      ${targets.length > 0 ? `
+      ${commonAreaProps.length > 1 ? `
       <div class="field">
         <label>${t('bookingBuildingLabel')}</label>
-        <select id="booking-building-select">
-          ${targets.map(tgt => `<option value="${tgt.value}" ${tgt.value===selectedTarget?'selected':''}>${tgt.label}</option>`).join('')}
+        <select id="booking-ca-property-select">
+          ${commonAreaProps.map(p => `<option value="${p.id}" ${p.id===selectedCaProperty.id?'selected':''}>${p.name}</option>`).join('')}
         </select>
       </div>
       ` : ''}
 
       <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('commonAreaCleaning')}</div>
-      ${state.commonAreaSubOptions.map(sub => `
-        <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; margin-bottom:${subChecked(sub.key)?'8px':'0'};">
-            <input type="checkbox" data-common-area-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} />
-            <span style="font-size:16px;">${commonAreaSubIcon(sub.key)}</span> ${commonAreaSubLabel(sub.key)}
+      ${state.commonAreaSubOptions.map(sub => {
+        const missingFloor = (sub.paramType === 'floors' || sub.paramType === 'corridor') && !selectedCaProperty.floor_count;
+        const missingSqm = sub.paramType === 'corridor' && !selectedCaProperty.sqm_per_floor;
+        const missingElevator = sub.paramType === 'elevator' && !selectedCaProperty.elevator_capacity;
+        const disabled = missingFloor || missingSqm || missingElevator;
+        const preview = !disabled ? calcCommonAreaSubPriceClient(sub, {
+          floorCount: selectedCaProperty.floor_count, sqmPerFloor: selectedCaProperty.sqm_per_floor, elevatorCapacity: selectedCaProperty.elevator_capacity,
+        }) : null;
+        return `
+        <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px; ${disabled?'opacity:.55;':''}">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:${disabled?'not-allowed':'pointer'};">
+            <input type="checkbox" data-common-area-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} ${disabled?'disabled':''} />
+            <span style="font-size:16px;">${commonAreaSubIcon(sub.key)}</span>
+            <span style="flex:1;">${commonAreaSubLabel(sub.key)}</span>
+            ${preview !== null ? `<span style="color:var(--muted); font-size:12px;">${preview}€</span>` : ''}
           </label>
-          ${subChecked(sub.key) ? `
-            <div style="display:flex; gap:8px; padding-left:26px;">
-              ${sub.paramType === 'floors' ? `
-                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('floorCountLabel')}</label><input type="number" min="1" data-common-area-param="floorCount" data-common-area-key="${sub.key}" value="${subVal(sub.key,'floorCount')}" /></div>
-              ` : ''}
-              ${sub.paramType === 'corridor' ? `
-                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('floorCountLabel')}</label><input type="number" min="1" data-common-area-param="floorCount" data-common-area-key="${sub.key}" value="${subVal(sub.key,'floorCount')}" /></div>
-                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('sqmPerFloorLabel')}</label><input type="number" min="1" data-common-area-param="sqmPerFloor" data-common-area-key="${sub.key}" value="${subVal(sub.key,'sqmPerFloor')}" /></div>
-              ` : ''}
-              ${sub.paramType === 'elevator' ? `
-                <div class="field" style="margin-bottom:0; flex:1;"><label>${t('elevatorCapacityLabel')}</label><input type="number" min="1" data-common-area-param="elevatorCapacity" data-common-area-key="${sub.key}" value="${subVal(sub.key,'elevatorCapacity')}" /></div>
-              ` : ''}
-            </div>
-          ` : ''}
+          ${missingElevator ? `<div class="hint" style="margin:6px 0 0 26px;">${t('elevatorCapacityMissingHint')}</div>` : ''}
+          ${(missingFloor || missingSqm) && !missingElevator ? `<div class="hint" style="margin:6px 0 0 26px;">${t('floorCountMissingHint')}</div>` : ''}
         </div>
-      `).join('')}
+      `}).join('')}
 
       <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('whenLabel')}</div>
       <div class="option-row">
@@ -1986,13 +1975,13 @@ function renderModal(){
                   <label>${t('propertyCityLabel')}</label>
                   <input data-bulk-field="city" data-bulk-row="${i}" placeholder="${t('propertyCityPlaceholder')}" value="${row.city}" />
                 </div>
-                <div class="field" style="flex:0.8; margin-bottom:0;">
+                <div class="field" style="flex:0.8; margin-bottom:0; ${row.category==='common_area'?'visibility:hidden;':''}">
                   <label>m²</label>
-                  <input type="number" min="1" data-bulk-field="sizeSqm" data-bulk-row="${i}" value="${row.sizeSqm}" />
+                  <input type="number" min="1" data-bulk-field="sizeSqm" data-bulk-row="${i}" value="${row.sizeSqm}" ${row.category==='common_area'?'disabled':''} />
                 </div>
                 <button type="button" class="btn ghost btn-sm" style="width:auto; flex-shrink:0; padding:9px 10px;" data-bulk-remove="${i}">✕</button>
               </div>
-              <div style="display:flex; gap:8px; align-items:center;">
+              <div style="display:flex; gap:8px; align-items:center; ${row.category==='common_area'?'margin-bottom:8px;':''}">
                 <div class="field" style="flex:1; margin-bottom:0;">
                   <label>${t('propertyAddressLabel')}</label>
                   <input data-bulk-field="address" data-bulk-row="${i}" placeholder="${t('propertyAddressPlaceholder')}" value="${row.address}" />
@@ -2001,6 +1990,22 @@ function renderModal(){
                   ${row.latitude ? t('locationSetBtn') : t('pickLocationBtn')}
                 </button>
               </div>
+              ${row.category==='common_area' ? `
+              <div style="display:flex; gap:8px;">
+                <div class="field" style="flex:1; margin-bottom:0;">
+                  <label>${t('floorCountLabel')}</label>
+                  <input type="number" min="1" data-bulk-field="floorCount" data-bulk-row="${i}" value="${row.floorCount||''}" />
+                </div>
+                <div class="field" style="flex:1; margin-bottom:0;">
+                  <label>${t('sqmPerFloorLabel')}</label>
+                  <input type="number" min="1" data-bulk-field="sqmPerFloor" data-bulk-row="${i}" value="${row.sqmPerFloor||''}" />
+                </div>
+                <div class="field" style="flex:1; margin-bottom:0;">
+                  <label>${t('elevatorCapacityLabel')}</label>
+                  <input type="number" min="1" data-bulk-field="elevatorCapacity" data-bulk-row="${i}" value="${row.elevatorCapacity||''}" />
+                </div>
+              </div>
+              ` : ''}
             </div>
           `).join('')}
         </div>
@@ -2027,12 +2032,22 @@ function renderModal(){
           </div>
           <div class="two-col">
             <div>
-              <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
-              ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
-              <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
-              <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
-              <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
-              ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
+              ${state.propertyCategory==='common_area' ? `
+                <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
+                <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+                <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
+                <div class="hint" style="margin:14px 0 10px;">${t('commonAreaPropertyHint')}</div>
+                <div class="field"><label>${t('floorCountLabel')}</label><input name="floorCount" type="number" min="1" placeholder="5" /></div>
+                <div class="field"><label>${t('sqmPerFloorLabel')}</label><input name="sqmPerFloor" type="number" min="1" placeholder="18" /></div>
+                <div class="field"><label>${t('elevatorCapacityLabel')}</label><input name="elevatorCapacity" type="number" min="1" placeholder="8" /></div>
+              ` : `
+                <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
+                ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
+                <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+                <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
+                <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
+                ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
+              `}
             </div>
             <div>
               <div class="field">
@@ -2282,7 +2297,10 @@ function attachHandlers(){
     const idx = Number(el.dataset.bulkRow);
     const field = el.dataset.bulkField;
     el.oninput = () => { state.bulkRows[idx][field] = el.value; };
-    el.onchange = () => { state.bulkRows[idx][field] = el.value; };
+    el.onchange = () => {
+      state.bulkRows[idx][field] = el.value;
+      if(field === 'category') render();
+    };
   });
 
   document.querySelectorAll('[data-bulk-pick-location]').forEach(el => el.onclick = () => {
@@ -2326,11 +2344,11 @@ function attachHandlers(){
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
-    if(!state.bookingCommonAreaTarget){
-      const targets = commonAreaTargets();
-      state.bookingCommonAreaTarget = targets[0]?.value || '';
-    }
-    if(!state.bookingPropertyId){
+    state.bookingPropertyId = null;
+    if(key === 'common_area'){
+      const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
+      state.bookingPropertyId = commonAreaProps[0]?.id || null;
+    } else {
       const props = [...state.properties.owned, ...state.properties.delegated];
       state.bookingPropertyId = props[0]?.id || null;
     }
@@ -2342,26 +2360,21 @@ function attachHandlers(){
     state.bookingPropertyId = bookingPropertySelect.value; render();
   };
 
+  const bookingCaPropertySelect = document.getElementById('booking-ca-property-select');
+  if(bookingCaPropertySelect) bookingCaPropertySelect.onchange = () => {
+    state.bookingPropertyId = bookingCaPropertySelect.value;
+    state.bookingCommonAreaSelections = {};
+    render();
+  };
+
   document.querySelectorAll('[data-urgency]').forEach(el => el.onclick = () => {
     state.bookingUrgency = el.dataset.urgency; render();
   });
-
-  const bookingBuildingSelect = document.getElementById('booking-building-select');
-  if(bookingBuildingSelect) bookingBuildingSelect.onchange = () => {
-    state.bookingCommonAreaTarget = bookingBuildingSelect.value; render();
-  };
 
   document.querySelectorAll('[data-common-area-toggle]').forEach(el => el.onchange = () => {
     const key = el.dataset.commonAreaToggle;
     const current = state.bookingCommonAreaSelections[key] || {};
     state.bookingCommonAreaSelections = { ...state.bookingCommonAreaSelections, [key]: { ...current, checked: el.checked } };
-    render();
-  });
-  document.querySelectorAll('[data-common-area-param]').forEach(el => el.oninput = () => {
-    const key = el.dataset.commonAreaKey;
-    const field = el.dataset.commonAreaParam;
-    const current = state.bookingCommonAreaSelections[key] || { checked: true };
-    state.bookingCommonAreaSelections = { ...state.bookingCommonAreaSelections, [key]: { ...current, [field]: el.value } };
     render();
   });
 
@@ -2406,15 +2419,13 @@ function attachHandlers(){
     if(isGroup){
       const selections = Object.entries(state.bookingCommonAreaSelections)
         .filter(([, v]) => v && v.checked)
-        .map(([key, v]) => ({ key, ...v }));
+        .map(([key]) => ({ key }));
       if(selections.length === 0){ showToast(t('pleaseSelectSubOption')); return; }
-      const targets = commonAreaTargets();
-      const targetValue = state.bookingCommonAreaTarget || targets[0]?.value || '';
-      const [targetType, targetId] = targetValue ? targetValue.split(/:(.+)/) : [null, null];
+      const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
+      const propertyId = state.bookingPropertyId || commonAreaProps[0]?.id;
+      if(!propertyId) return;
       draft = {
-        buildingName: targetType === 'building' ? targetId : undefined,
-        propertyId: targetType === 'property' ? targetId : undefined,
-        serviceKey,
+        propertyId, serviceKey,
         urgency: state.bookingUrgency,
         scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
         hasEquipment: state.bookingHasEquipment,
@@ -2504,11 +2515,18 @@ function attachHandlers(){
   if(propForm) propForm.onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(propForm));
+    const isCommonArea = state.propertyCategory === 'common_area';
     await api('/properties', { method:'POST', body: JSON.stringify({
-      name: fd.name, city: fd.city, address: fd.address || null,
-      category: state.propertyCategory, buildingName: fd.buildingName || null,
+      name: fd.name,
+      city: fd.city || null, address: fd.address || null,
+      category: state.propertyCategory,
+      buildingName: isCommonArea ? null : (fd.buildingName || null),
       latitude: state.regLat, longitude: state.regLng,
-      sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
+      sizeSqm: isCommonArea ? null : (fd.sizeSqm || null),
+      icalUrl: isCommonArea ? null : (fd.icalUrl || null),
+      floorCount: isCommonArea ? (fd.floorCount || null) : null,
+      sqmPerFloor: isCommonArea ? (fd.sqmPerFloor || null) : null,
+      elevatorCapacity: isCommonArea ? (fd.elevatorCapacity || null) : null,
     })});
     state.modal = null;
     state.regLat = null; state.regLng = null;
