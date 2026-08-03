@@ -26,16 +26,16 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, city, icalUrl, sizeSqm, latitude, longitude, category } = req.body;
+  const { name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
   const finalCategory = ['apartment', 'house', 'office'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
-    `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO properties (id, owner_id, name, category, building_name, address, city, latitude, longitude, size_sqm, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    id, req.user.id, name, finalCategory, address || null, city || null,
+    id, req.user.id, name, finalCategory, buildingName || null, address || null, city || null,
     latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
     sizeSqm ? Number(sizeSqm) : null, icalUrl || null
   );
@@ -54,8 +54,8 @@ router.post('/bulk', (req, res) => {
   }
 
   const insert = db.prepare(
-    `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO properties (id, owner_id, name, category, building_name, address, city, latitude, longitude, size_sqm, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const created = [];
@@ -65,7 +65,7 @@ router.post('/bulk', (req, res) => {
       const finalCategory = ['apartment', 'house', 'office'].includes(row.category) ? row.category : 'apartment';
       const id = uuid();
       insert.run(
-        id, req.user.id, row.name, finalCategory,
+        id, req.user.id, row.name, finalCategory, row.buildingName || null,
         row.address || null, row.city || null,
         row.latitude ? Number(row.latitude) : null, row.longitude ? Number(row.longitude) : null,
         row.sizeSqm ? Number(row.sizeSqm) : null, row.icalUrl || null
