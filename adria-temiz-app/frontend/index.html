@@ -133,6 +133,7 @@
   .service-icon{
     width:92px; height:92px; border-radius:22px; overflow:hidden; margin-bottom:14px;
     box-shadow:0 4px 14px rgba(15,61,46,.18);
+    display:flex; align-items:center; justify-content:center; background:var(--bg);
   }
   .service-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
   .property-avatar{
@@ -358,6 +359,28 @@ const TRANSLATIONS = {
     profileNameLabel: "Ad soyad / yetkili adı",
     profileCompanyNameLabel: "Şirket adı",
     profileCompanyHint: "Mülklerini panele girdikten sonra, \"Mülklerim\" sekmesinden tek tek ekleyebilirsin.",
+    taxNumberLabel: "Vergi numarası (PIB)",
+    billingAddressLabel: "Fatura adresi",
+    billingSectionHeading: "Fatura bilgileri",
+    billingSectionHint: "Aylık faturalı ödeme seçeneğini sunabilmemiz için gerekli.",
+    commonAreaCleaning: "Ortak Alan Temizliği",
+    commonAreaStaircaseDesc: "Bina merdivenlerinin düzenli temizliği, kat sayısına göre fiyatlanır.",
+    commonAreaCorridorDesc: "Kat koridorlarının temizliği, alan ve kat sayısına göre fiyatlanır.",
+    commonAreaElevatorDesc: "Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır.",
+    floorCountLabel: "Kat sayısı",
+    corridorSqmLabel: "Koridor alanı (m²)",
+    elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
+    invoiceLabel: "🧾 Fatura",
+    invoiceSub: "aylık faturaya eklenir",
+    invoicePaidNote: "🧾 Fatura · aylık faturaya eklendi",
+    bulkAddBtn: "+ Toplu Mülk Ekle",
+    bulkAddModalTitle: "Toplu Mülk Ekle",
+    bulkAddModalHint: "Aynı bina/sitede ya da farklı lokasyonlardaki mülklerini tek seferde ekle — her satır için tip ve m² yeterli.",
+    bulkRowNamePlaceholder: "örn. Daire 3",
+    bulkAddRowBtn: "+ Satır ekle",
+    bulkRemoveRowBtn: "Kaldır",
+    bulkSaveBtn: "Tümünü Kaydet",
+    toastBulkSaved: "{{count}} mülk eklendi.",
     propertyHeading: "Mülkün",
     propertyCategoryLabel: "Mülk Türü",
     categoryApartment: "Apartman Dairesi",
@@ -505,6 +528,28 @@ const TRANSLATIONS = {
     profileNameLabel: "Full name / contact person",
     profileCompanyNameLabel: "Company name",
     profileCompanyHint: "Once you're in, you can add your properties one by one from the \"My Properties\" tab.",
+    taxNumberLabel: "Tax number",
+    billingAddressLabel: "Billing address",
+    billingSectionHeading: "Billing details",
+    billingSectionHint: "Required so we can offer monthly invoice payment.",
+    commonAreaCleaning: "Common Area Cleaning",
+    commonAreaStaircaseDesc: "Regular cleaning of building staircases, priced by floor count.",
+    commonAreaCorridorDesc: "Cleaning of floor corridors, priced by area and floor count.",
+    commonAreaElevatorDesc: "Elevator cabin cleaning, priced by passenger capacity.",
+    floorCountLabel: "Number of floors",
+    corridorSqmLabel: "Corridor area (m²)",
+    elevatorCapacityLabel: "Elevator capacity (people)",
+    invoiceLabel: "🧾 Invoice",
+    invoiceSub: "added to monthly invoice",
+    invoicePaidNote: "🧾 Invoice · added to your monthly invoice",
+    bulkAddBtn: "+ Bulk Add Properties",
+    bulkAddModalTitle: "Bulk Add Properties",
+    bulkAddModalHint: "Add properties from the same building/site or different locations at once — type and size are enough per row.",
+    bulkRowNamePlaceholder: "e.g. Apartment 3",
+    bulkAddRowBtn: "+ Add row",
+    bulkRemoveRowBtn: "Remove",
+    bulkSaveBtn: "Save All",
+    toastBulkSaved: "{{count}} properties added.",
     propertyHeading: "Your property",
     propertyCategoryLabel: "Property Type",
     categoryApartment: "Apartment",
@@ -652,6 +697,28 @@ const TRANSLATIONS = {
     profileNameLabel: "Ime i prezime / kontakt osoba",
     profileCompanyNameLabel: "Naziv kompanije",
     profileCompanyHint: "Kada uđeš u panel, nekretnine možeš dodavati jednu po jednu iz kartice \"Moje nekretnine\".",
+    taxNumberLabel: "PIB",
+    billingAddressLabel: "Adresa za fakturisanje",
+    billingSectionHeading: "Podaci za fakturisanje",
+    billingSectionHint: "Potrebno da bismo ponudili mjesečno fakturisanje.",
+    commonAreaCleaning: "Čišćenje zajedničkih prostorija",
+    commonAreaStaircaseDesc: "Redovno čišćenje stepeništa zgrade, cijena po broju spratova.",
+    commonAreaCorridorDesc: "Čišćenje hodnika na spratu, cijena po površini i broju spratova.",
+    commonAreaElevatorDesc: "Čišćenje kabine lifta, cijena po kapacitetu.",
+    floorCountLabel: "Broj spratova",
+    corridorSqmLabel: "Površina hodnika (m²)",
+    elevatorCapacityLabel: "Kapacitet lifta (osobe)",
+    invoiceLabel: "🧾 Faktura",
+    invoiceSub: "dodaje se na mjesečnu fakturu",
+    invoicePaidNote: "🧾 Faktura · dodato na mjesečnu fakturu",
+    bulkAddBtn: "+ Grupno dodaj nekretnine",
+    bulkAddModalTitle: "Grupno dodaj nekretnine",
+    bulkAddModalHint: "Dodaj nekretnine iz iste zgrade/naselja ili različitih lokacija odjednom — tip i površina su dovoljni po redu.",
+    bulkRowNamePlaceholder: "npr. Stan 3",
+    bulkAddRowBtn: "+ Dodaj red",
+    bulkRemoveRowBtn: "Ukloni",
+    bulkSaveBtn: "Sačuvaj sve",
+    toastBulkSaved: "Dodato {{count}} nekretnina.",
     propertyHeading: "Tvoja nekretnina",
     propertyCategoryLabel: "Tip nekretnine",
     categoryApartment: "Stan",
@@ -790,6 +857,24 @@ const SERVICE_I18N = {
     en: { name: "Office/Shop/Workspace Cleaning", description: "Regular or one-off cleaning for workspaces." },
     me: { name: "Čišćenje poslovnog prostora", description: "Redovno ili jednokratno čišćenje radnih prostora." },
   },
+  common_area_staircase: {
+    icon: '🪜',
+    tr: { name: "Merdiven Temizliği", description: "Bina merdivenlerinin düzenli temizliği, kat sayısına göre fiyatlanır." },
+    en: { name: "Staircase Cleaning", description: "Regular cleaning of building staircases, priced by floor count." },
+    me: { name: "Čišćenje stepeništa", description: "Redovno čišćenje stepeništa zgrade, cijena po broju spratova." },
+  },
+  common_area_corridor: {
+    icon: '🚪',
+    tr: { name: "Kat Koridoru Temizliği", description: "Kat koridorlarının temizliği, alan ve kat sayısına göre fiyatlanır." },
+    en: { name: "Floor Corridor Cleaning", description: "Cleaning of floor corridors, priced by area and floor count." },
+    me: { name: "Čišćenje hodnika", description: "Čišćenje hodnika na spratu, cijena po površini i broju spratova." },
+  },
+  common_area_elevator: {
+    icon: '🛗',
+    tr: { name: "Asansör Temizliği", description: "Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır." },
+    en: { name: "Elevator Cleaning", description: "Elevator cabin cleaning, priced by passenger capacity." },
+    me: { name: "Čišćenje lifta", description: "Čišćenje kabine lifta, cijena po kapacitetu." },
+  },
 };
 const ADDON_I18N = {
   carpet: { icon: '🧶', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
@@ -840,7 +925,16 @@ function serviceLabel(key){
   return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
 }
 function serviceIcon(key){
-  return (SERVICE_I18N[key] && SERVICE_I18N[key].iconImg) || null;
+  const entry = SERVICE_I18N[key];
+  if(!entry) return { type:'emoji', value:'🧹' };
+  if(entry.iconImg) return { type:'img', value: entry.iconImg };
+  return { type:'emoji', value: entry.icon || '🧹' };
+}
+function serviceIconHtml(key){
+  const icon = serviceIcon(key);
+  return icon.type === 'img'
+    ? `<img src="${icon.value}" alt="" />`
+    : `<span style="font-size:40px; line-height:1;">${icon.value}</span>`;
 }
 function addonLabel(key){
   const a = ADDON_I18N[key];
@@ -876,6 +970,7 @@ let state = {
   properties: { owned: [], delegated: [] },
   jobs: [],
   services: [],
+  commonAreaServices: [],
   addons: [],
   regLat: null,
   regLng: null,
@@ -886,6 +981,9 @@ let state = {
   bookingScheduledAt: '',
   bookingHasEquipment: true,
   bookingHasChemicals: true,
+  bookingFloorCount: '',
+  bookingCorridorSqm: '',
+  bookingElevatorCapacity: '',
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -896,6 +994,7 @@ let state = {
   syncUseDemo: false,
   syncPaymentMethod: 'cash',
   pendingSyncPropertyId: null,
+  bulkRows: [],
   chatOpen: false,
   chatMessages: [],
   chatInput: '',
@@ -1054,6 +1153,12 @@ function renderAuth(){
         <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
         ${state.accountTypeChoice==='company' ? `
           <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
+          <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
+            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;">${t('billingSectionHeading')}</div>
+            <div class="hint" style="margin:0 0 12px;">${t('billingSectionHint')}</div>
+            <div class="field"><label>${t('taxNumberLabel')}</label><input name="taxNumber" required /></div>
+            <div class="field"><label>${t('billingAddressLabel')}</label><input name="billingAddress" required /></div>
+          </div>
           <div class="hint" style="margin:0 0 14px;">${t('profileCompanyHint')}</div>
         ` : ''}
         ${state.accountTypeChoice==='individual' ? `
@@ -1212,9 +1317,27 @@ function bookingAddonsTotal(){
   return total;
 }
 
+function calcCommonAreaPriceClient(service, params = {}){
+  let price = service.base;
+  if(service.paramType === 'floors') price += (Number(params.floorCount)||0) * service.ratePerFloor;
+  else if(service.paramType === 'corridor'){
+    price += (Number(params.corridorSqm)||0) * service.ratePerSqm;
+    price += (Number(params.floorCount)||0) * service.ratePerFloor;
+  } else if(service.paramType === 'elevator') price += (Number(params.elevatorCapacity)||0) * service.ratePerCapacity;
+  return Math.max(service.min, Math.round(price/5)*5);
+}
+
+function visibleServices(){
+  const accountType = state.user.accountType;
+  const regular = state.services.filter(s => !s.accountTypes || s.accountTypes.includes(accountType));
+  const commonArea = accountType === 'company' ? state.commonAreaServices : [];
+  return [...regular, ...commonArea];
+}
+
 function renderServices(){
   const props = [...state.properties.owned, ...state.properties.delegated];
   const selectedProperty = props.find(p => p.id === state.bookingPropertyId) || props[0];
+  const services = visibleServices();
 
   if(props.length === 0){
     return `
@@ -1233,16 +1356,19 @@ function renderServices(){
     </div>
   </div>
   <div class="grid">
-    ${state.services.map(s => {
+    ${services.map(s => {
       const label = serviceLabel(s.key);
-      const preview = calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm });
+      const isCommonArea = !!s.paramType;
       const isOpen = state.bookingService === s.key;
+      const preview = isCommonArea
+        ? calcCommonAreaPriceClient(s, { floorCount: state.bookingFloorCount, corridorSqm: state.bookingCorridorSqm, elevatorCapacity: state.bookingElevatorCapacity })
+        : calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm });
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
-        <div class="service-icon"><img src="${serviceIcon(s.key)}" alt="" /></div>
+        <div class="service-icon">${serviceIconHtml(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
-        <div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
+        <div class="price">${preview} €${(!isCommonArea && selectedProperty?.size_sqm) ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>
         <div class="row-actions">
           <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
@@ -1253,13 +1379,24 @@ function renderServices(){
   `;
 }
 
+function paymentNote(method){
+  if(method === 'card') return t('cardPaidNote');
+  if(method === 'invoice') return t('invoicePaidNote');
+  return t('cashPaidNote');
+}
+
 function buildReceiptLines(draft){
-  const service = state.services.find(s => s.key === draft.serviceKey);
+  const service = state.services.find(s => s.key === draft.serviceKey)
+    || state.commonAreaServices.find(s => s.key === draft.serviceKey);
   const label = serviceLabel(draft.serviceKey);
   const props = [...state.properties.owned, ...state.properties.delegated];
   const property = props.find(p => p.id === draft.propertyId);
+  const isCommonArea = !!service.paramType;
   const lines = [];
-  lines.push({ label: label.name, amount: calcPriceClient(service, { sizeSqm: property?.size_sqm }) });
+  const basePrice = isCommonArea
+    ? calcCommonAreaPriceClient(service, draft.serviceParams || {})
+    : calcPriceClient(service, { sizeSqm: property?.size_sqm });
+  lines.push({ label: label.name, amount: basePrice });
   if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
   if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
   (draft.addons||[]).forEach(a => {
@@ -1275,10 +1412,15 @@ function renderBookingPanel(service, props, selectedProperty){
     return renderReceiptPanel(state.pendingBooking);
   }
 
+  const isCommonArea = !!service.paramType;
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
   const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
-  const total = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm }) + suppliesFee + bookingAddonsTotal();
+  const basePrice = isCommonArea
+    ? calcCommonAreaPriceClient(service, { floorCount: state.bookingFloorCount, corridorSqm: state.bookingCorridorSqm, elevatorCapacity: state.bookingElevatorCapacity })
+    : calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm });
+  const total = basePrice + suppliesFee + bookingAddonsTotal();
+  const isCompany = state.user.accountType === 'company';
 
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
@@ -1289,6 +1431,20 @@ function renderBookingPanel(service, props, selectedProperty){
           ${props.map(p => `<option value="${p.id}" ${p.id===selectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
         </select>
       </div>
+    ` : ''}
+
+    ${isCommonArea ? `
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('commonAreaCleaning')}</div>
+      ${service.paramType === 'floors' ? `
+        <div class="field"><label>${t('floorCountLabel')}</label><input type="number" min="1" id="booking-floor-count" value="${state.bookingFloorCount}" /></div>
+      ` : ''}
+      ${service.paramType === 'corridor' ? `
+        <div class="field"><label>${t('corridorSqmLabel')}</label><input type="number" min="1" id="booking-corridor-sqm" value="${state.bookingCorridorSqm}" /></div>
+        <div class="field"><label>${t('floorCountLabel')}</label><input type="number" min="1" id="booking-floor-count" value="${state.bookingFloorCount}" /></div>
+      ` : ''}
+      ${service.paramType === 'elevator' ? `
+        <div class="field"><label>${t('elevatorCapacityLabel')}</label><input type="number" min="1" id="booking-elevator-capacity" value="${state.bookingElevatorCapacity}" /></div>
+      ` : ''}
     ` : ''}
 
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('whenLabel')}</div>
@@ -1333,6 +1489,7 @@ function renderBookingPanel(service, props, selectedProperty){
     <div class="option-row">
       <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
       <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+      ${isCompany ? `<div class="choice ${state.bookingPaymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
     </div>
     ${state.bookingPaymentMethod==='card' && state.savedCard ? `
       <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
@@ -1364,7 +1521,7 @@ function renderReceiptPanel(draft){
       </div>
     </div>
     <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-      ${draft.paymentMethod==='card' ? t('cardPaidNote') : t('cashPaidNote')}
+      ${paymentNote(draft.paymentMethod)}
     </div>
     <button class="btn ochre btn-sm" style="width:100%; margin-bottom:8px;" data-confirm-booking="true">${t('confirmPaymentBtn')}</button>
     <button class="btn ghost btn-sm" style="width:100%;" data-back-to-config="true">${t('backBtn')}</button>
@@ -1383,6 +1540,7 @@ function renderProperties(){
   </div>
   <div class="toolbar">
     <button class="btn ochre" id="add-property">${t('addPropertyCta')}</button>
+    ${state.user.accountType==='company' ? `<button class="btn ghost" id="bulk-add-open">${t('bulkAddBtn')}</button>` : ''}
   </div>
   ${props.length === 0 ? `
     <div class="empty-state">${t('propertiesEmptyState')}</div>
@@ -1454,7 +1612,7 @@ function renderJobAction(j){
   if(!['done','confirmed'].includes(j.status)){
     return `
       <button class="btn ghost btn-sm" data-mark-done="${j.id}">${t('markDoneBtn')}</button>
-      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${j.payment_method==='card' ? t('cardPaidNote') : t('cashPaidNote')}</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${paymentNote(j.payment_method)}</div>
     `;
   }
   return `<span class="pay-badge held">${t('settlingBadge')}</span>`;
@@ -1539,6 +1697,47 @@ function renderModal(){
       </div>
     </div>`;
   }
+  if(state.modal === 'bulk-add'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" style="max-width:640px;">
+        <h3>${t('bulkAddModalTitle')}</h3>
+        <div class="hint" style="margin:-8px 0 16px;">${t('bulkAddModalHint')}</div>
+        <div style="max-height:50vh; overflow-y:auto; margin-bottom:14px;">
+          ${state.bulkRows.map((row, i) => `
+            <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--line);">
+              <div class="field" style="flex:2; margin-bottom:0;">
+                <label>${t('propertyNameLabel')}</label>
+                <input data-bulk-field="name" data-bulk-row="${i}" placeholder="${t('bulkRowNamePlaceholder')}" value="${row.name}" />
+              </div>
+              <div class="field" style="flex:1.4; margin-bottom:0;">
+                <label>${t('propertyCategoryLabel')}</label>
+                <select data-bulk-field="category" data-bulk-row="${i}">
+                  <option value="apartment" ${row.category==='apartment'?'selected':''}>${t('categoryApartment')}</option>
+                  <option value="house" ${row.category==='house'?'selected':''}>${t('categoryHouse')}</option>
+                  <option value="office" ${row.category==='office'?'selected':''}>${t('categoryOffice')}</option>
+                </select>
+              </div>
+              <div class="field" style="flex:1.2; margin-bottom:0;">
+                <label>${t('propertyCityLabel')}</label>
+                <input data-bulk-field="city" data-bulk-row="${i}" placeholder="${t('propertyCityPlaceholder')}" value="${row.city}" />
+              </div>
+              <div class="field" style="flex:0.8; margin-bottom:0;">
+                <label>m²</label>
+                <input type="number" min="1" data-bulk-field="sizeSqm" data-bulk-row="${i}" value="${row.sizeSqm}" />
+              </div>
+              <button type="button" class="btn ghost btn-sm" style="width:auto; flex-shrink:0; padding:9px 10px;" data-bulk-remove="${i}">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <button type="button" class="btn ghost btn-sm" id="bulk-add-row" style="width:auto; margin-bottom:16px;">${t('bulkAddRowBtn')}</button>
+        <div class="actions">
+          <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+          <button type="button" class="btn ochre" id="bulk-save">${t('bulkSaveBtn')}</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'add-property'){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -1579,7 +1778,11 @@ async function loadAll(){
   state.properties = results[0];
   state.jobs = results[1];
   state.savedCard = results[2];
-  if(results[3]){ state.services = results[3].services; state.addons = results[3].addons; }
+  if(results[3]){
+    state.services = results[3].services;
+    state.commonAreaServices = results[3].commonAreaServices || [];
+    state.addons = results[3].addons;
+  }
   state.ratingJob = findNextRatingJob();
   render();
 }
@@ -1714,7 +1917,10 @@ function attachHandlers(){
   if(profileForm) profileForm.onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(profileForm));
-    const body = { name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName };
+    const body = {
+      name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName,
+      taxNumber: fd.taxNumber, billingAddress: fd.billingAddress,
+    };
     if(state.accountTypeChoice === 'individual' && (fd.propertyCity || fd.sizeSqm || fd.propertyName)){
       body.property = {
         name: fd.propertyName || 'Evim',
@@ -1756,6 +1962,46 @@ function attachHandlers(){
   const addPropBtn = document.getElementById('add-property');
   if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; state.propertyCategory = 'apartment'; render(); };
 
+  const bulkAddOpen = document.getElementById('bulk-add-open');
+  if(bulkAddOpen) bulkAddOpen.onclick = () => {
+    state.bulkRows = [{ name:'', category:'apartment', city:'', sizeSqm:'' }];
+    state.modal = 'bulk-add';
+    render();
+  };
+
+  const bulkAddRow = document.getElementById('bulk-add-row');
+  if(bulkAddRow) bulkAddRow.onclick = () => {
+    state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'' });
+    render();
+  };
+
+  document.querySelectorAll('[data-bulk-remove]').forEach(el => el.onclick = () => {
+    const idx = Number(el.dataset.bulkRemove);
+    state.bulkRows.splice(idx, 1);
+    if(state.bulkRows.length === 0) state.bulkRows.push({ name:'', category:'apartment', city:'', sizeSqm:'' });
+    render();
+  });
+
+  document.querySelectorAll('[data-bulk-field]').forEach(el => {
+    const idx = Number(el.dataset.bulkRow);
+    const field = el.dataset.bulkField;
+    el.oninput = () => { state.bulkRows[idx][field] = el.value; };
+    el.onchange = () => { state.bulkRows[idx][field] = el.value; };
+  });
+
+  const bulkSave = document.getElementById('bulk-save');
+  if(bulkSave) bulkSave.onclick = async () => {
+    const rows = state.bulkRows.filter(r => r.name && r.name.trim());
+    if(rows.length === 0){ showToast(t('propertyNameLabel')); return; }
+    try{
+      const created = await api('/properties/bulk', { method:'POST', body: JSON.stringify({ properties: rows }) });
+      state.modal = null;
+      state.bulkRows = [];
+      showToast(t('toastBulkSaved', { count: created.length }));
+      await loadAll();
+    }catch(err){ showToast(err.message); }
+  };
+
   const gotoAddProperty = document.getElementById('goto-add-property');
   if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
 
@@ -1767,6 +2013,9 @@ function attachHandlers(){
     state.bookingScheduledAt = '';
     state.bookingHasEquipment = true;
     state.bookingHasChemicals = true;
+    state.bookingFloorCount = '';
+    state.bookingCorridorSqm = '';
+    state.bookingElevatorCapacity = '';
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
@@ -1785,6 +2034,13 @@ function attachHandlers(){
   document.querySelectorAll('[data-urgency]').forEach(el => el.onclick = () => {
     state.bookingUrgency = el.dataset.urgency; render();
   });
+
+  const bookingFloorCount = document.getElementById('booking-floor-count');
+  if(bookingFloorCount) bookingFloorCount.oninput = () => { state.bookingFloorCount = bookingFloorCount.value; render(); };
+  const bookingCorridorSqm = document.getElementById('booking-corridor-sqm');
+  if(bookingCorridorSqm) bookingCorridorSqm.oninput = () => { state.bookingCorridorSqm = bookingCorridorSqm.value; render(); };
+  const bookingElevatorCapacity = document.getElementById('booking-elevator-capacity');
+  if(bookingElevatorCapacity) bookingElevatorCapacity.oninput = () => { state.bookingElevatorCapacity = bookingElevatorCapacity.value; render(); };
 
   document.querySelectorAll('[data-equipment]').forEach(el => el.onclick = () => {
     state.bookingHasEquipment = el.dataset.equipment === 'true'; render();
@@ -1826,6 +2082,12 @@ function attachHandlers(){
     const addons = Object.entries(state.bookingAddons)
       .filter(([, v]) => v && v.checked)
       .map(([key, v]) => ({ key, quantity: v.quantity || 1 }));
+    const commonAreaService = state.commonAreaServices.find(s => s.key === serviceKey);
+    const serviceParams = commonAreaService ? {
+      floorCount: state.bookingFloorCount || undefined,
+      corridorSqm: state.bookingCorridorSqm || undefined,
+      elevatorCapacity: state.bookingElevatorCapacity || undefined,
+    } : undefined;
     const draft = {
       propertyId, serviceKey,
       urgency: state.bookingUrgency,
@@ -1833,6 +2095,7 @@ function attachHandlers(){
       hasEquipment: state.bookingHasEquipment,
       hasChemicals: state.bookingHasChemicals,
       addons,
+      serviceParams,
       paymentMethod: state.bookingPaymentMethod,
     };
 
