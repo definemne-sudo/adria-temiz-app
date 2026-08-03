@@ -29,7 +29,7 @@ router.post('/', (req, res) => {
   const { name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
-  const finalCategory = ['apartment', 'house', 'office'].includes(category) ? category : 'apartment';
+  const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
     `INSERT INTO properties (id, owner_id, name, category, building_name, address, city, latitude, longitude, size_sqm, ical_url)
@@ -62,7 +62,7 @@ router.post('/bulk', (req, res) => {
   const insertMany = db.transaction((rows) => {
     for (const row of rows) {
       if (!row || !row.name) continue;
-      const finalCategory = ['apartment', 'house', 'office'].includes(row.category) ? row.category : 'apartment';
+      const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(row.category) ? row.category : 'apartment';
       const id = uuid();
       insert.run(
         id, req.user.id, row.name, finalCategory, row.buildingName || null,
