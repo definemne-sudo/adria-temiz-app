@@ -26,18 +26,27 @@ router.get('/', (req, res) => {
 });
 
 router.post('/', (req, res) => {
-  const { name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName } = req.body;
+  const {
+    name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName,
+    floorCount, sqmPerFloor, elevatorCapacity,
+  } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
   const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
-    `INSERT INTO properties (id, owner_id, name, category, building_name, address, city, latitude, longitude, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO properties
+       (id, owner_id, name, category, building_name, address, city, latitude, longitude,
+        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id, req.user.id, name, finalCategory, buildingName || null, address || null, city || null,
     latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
-    sizeSqm ? Number(sizeSqm) : null, icalUrl || null
+    sizeSqm ? Number(sizeSqm) : null,
+    floorCount ? Number(floorCount) : null,
+    sqmPerFloor ? Number(sqmPerFloor) : null,
+    elevatorCapacity ? Number(elevatorCapacity) : null,
+    icalUrl || null
   );
 
   res.status(201).json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
@@ -54,8 +63,10 @@ router.post('/bulk', (req, res) => {
   }
 
   const insert = db.prepare(
-    `INSERT INTO properties (id, owner_id, name, category, building_name, address, city, latitude, longitude, size_sqm, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO properties
+       (id, owner_id, name, category, building_name, address, city, latitude, longitude,
+        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   const created = [];
@@ -68,7 +79,11 @@ router.post('/bulk', (req, res) => {
         id, req.user.id, row.name, finalCategory, row.buildingName || null,
         row.address || null, row.city || null,
         row.latitude ? Number(row.latitude) : null, row.longitude ? Number(row.longitude) : null,
-        row.sizeSqm ? Number(row.sizeSqm) : null, row.icalUrl || null
+        row.sizeSqm ? Number(row.sizeSqm) : null,
+        row.floorCount ? Number(row.floorCount) : null,
+        row.sqmPerFloor ? Number(row.sqmPerFloor) : null,
+        row.elevatorCapacity ? Number(row.elevatorCapacity) : null,
+        row.icalUrl || null
       );
       created.push(id);
     }
