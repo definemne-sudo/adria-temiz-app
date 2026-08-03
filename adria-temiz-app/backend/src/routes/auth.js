@@ -96,6 +96,8 @@ router.post('/verify-otp', (req, res) => {
       name: user.name,
       accountType: user.account_type,
       companyName: user.company_name,
+      taxNumber: user.tax_number,
+      billingAddress: user.billing_address,
       profileCompleted: !!user.profile_completed,
     },
   });
@@ -106,7 +108,7 @@ router.post('/verify-otp', (req, res) => {
 // (property alanı gönderilirse). Yönetim şirketi mülk eklemeyi panelden yapar,
 // çünkü genelde çok sayıda mülk portföy olarak eklenir, kayıt formuna sığmaz.
 router.post('/complete-profile', requireAuth, async (req, res) => {
-  const { name, accountType, companyName, property } = req.body;
+  const { name, accountType, companyName, taxNumber, billingAddress, property } = req.body;
   if (!name || !accountType) {
     return res.status(400).json({ error: 'name ve accountType zorunlu.' });
   }
@@ -116,11 +118,21 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
   if (accountType === 'company' && !companyName) {
     return res.status(400).json({ error: 'Yönetim şirketi için companyName zorunlu.' });
   }
+  // Yönetim şirketleri için fatura bilgileri zorunlu - aylık faturalı ödeme
+  // seçeneğini sunabilmemiz için bu bilgilere baştan ihtiyacımız var.
+  if (accountType === 'company' && (!taxNumber || !billingAddress)) {
+    return res.status(400).json({ error: 'Yönetim şirketi için vergi numarası ve fatura adresi zorunlu.' });
+  }
 
   db.prepare(
-    `UPDATE users SET name = ?, account_type = ?, company_name = ?, profile_completed = 1
+    `UPDATE users SET name = ?, account_type = ?, company_name = ?, tax_number = ?, billing_address = ?, profile_completed = 1
      WHERE id = ?`
-  ).run(name, accountType, companyName || null, req.user.id);
+  ).run(
+    name, accountType, companyName || null,
+    accountType === 'company' ? taxNumber : null,
+    accountType === 'company' ? billingAddress : null,
+    req.user.id
+  );
 
   let createdProperty = null;
   let syncResult = null;
@@ -172,6 +184,8 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
       name: user.name,
       accountType: user.account_type,
       companyName: user.company_name,
+      taxNumber: user.tax_number,
+      billingAddress: user.billing_address,
       profileCompleted: true,
     },
     property: createdProperty,
