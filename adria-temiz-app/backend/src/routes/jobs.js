@@ -74,12 +74,26 @@ router.post('/', (req, res) => {
   let resolvedBuildingName = null;
 
   if (isCommonArea) {
-    if (!buildingName) return res.status(400).json({ error: 'buildingName zorunlu.' });
-    property = findAccessiblePropertyInBuilding(req.user.id, buildingName);
-    if (!property) {
-      return res.status(403).json({ error: 'Bu bina/siteye erişim yetkiniz yok ya da bina en az 2 mülk içermiyor.' });
+    if (propertyId && accessiblePropertyIds(req.user.id).includes(propertyId)) {
+      // Kategorisi "Ortak Alan" olan bir mülk doğrudan seçildiyse (hiç
+      // dairesi olmayan, sadece ortak alanı yönetilen bir bina) onu kullan.
+      property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+      resolvedBuildingName = property.building_name || null;
+    } else if (buildingName) {
+      property = findAccessiblePropertyInBuilding(req.user.id, buildingName);
+      if (!property) {
+        return res.status(403).json({ error: 'Bu bina/siteye erişim yetkiniz yok ya da bina en az 2 mülk içermiyor.' });
+      }
+      resolvedBuildingName = buildingName;
+    } else {
+      // Bina/mülk seçilmedi - herhangi bir erişilebilir mülkü çapa olarak kullan.
+      const ids = accessiblePropertyIds(req.user.id);
+      if (ids.length === 0) {
+        return res.status(400).json({ error: 'Sipariş oluşturmadan önce en az bir mülk eklemelisin.' });
+      }
+      property = db.prepare('SELECT * FROM properties WHERE id = ?').get(ids[0]);
+      resolvedBuildingName = null;
     }
-    resolvedBuildingName = buildingName;
   } else {
     if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
       return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
