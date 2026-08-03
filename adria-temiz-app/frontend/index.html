@@ -128,7 +128,8 @@
   .page-head p{color:var(--muted); font-size:13px; margin-top:4px;}
 
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:28px;}
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px;}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column;}
+  .card .row-actions{margin-top:auto; padding-top:10px;}
   .card h3{font-size:15px; color:var(--navy); margin-bottom:4px;}
   .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
   .card .price{font-family:'Fraunces',serif; font-size:20px; color:var(--ochre); margin-bottom:12px;}
@@ -406,6 +407,7 @@ const TRANSLATIONS = {
     categoryApartment: "Apartman Dairesi",
     categoryHouse: "Müstakil Ev / Villa",
     categoryOffice: "Ofis / İşyeri",
+    categoryCommonArea: "Ortak Alan (Bina geneli)",
     propertyNameLabel: "Mülk adı",
     propertyNamePlaceholder: "örn. Budva Sahil Daire",
     propertyCityLabel: "Şehir",
@@ -589,6 +591,7 @@ const TRANSLATIONS = {
     categoryApartment: "Apartment",
     categoryHouse: "House/Villa",
     categoryOffice: "Office/Shop",
+    categoryCommonArea: "Common Area (Whole Building)",
     propertyNameLabel: "Property name",
     propertyNamePlaceholder: "e.g. Budva Seaside Apartment",
     propertyCityLabel: "City",
@@ -772,6 +775,7 @@ const TRANSLATIONS = {
     categoryApartment: "Stan",
     categoryHouse: "Kuća/Villa",
     categoryOffice: "Poslovni prostor",
+    categoryCommonArea: "Zajednički prostor (cijela zgrada)",
     propertyNameLabel: "Naziv nekretnine",
     propertyNamePlaceholder: "npr. Apartman Budva more",
     propertyCityLabel: "Grad",
@@ -1012,7 +1016,7 @@ function addonIcon(key){
 // olmadan da "özel" hissettiren bir dokunuş).
 const AVATAR_PALETTE = ['#1D9E73','#0F3D2E','#2FBE8F','#3D6B57','#5B7A6C','#0C7A5C'];
 function categoryIconSrc(cat){
-  const map = { apartment:'icon-property-apartment.png', house:'icon-property-house.png', office:'icon-property-office.png' };
+  const map = { apartment:'icon-property-apartment.png', house:'icon-property-house.png', office:'icon-property-office.png', common_area:'icon-service-common-area.png' };
   return map[cat] || map.apartment;
 }
 
@@ -1046,7 +1050,7 @@ let state = {
   bookingHasEquipment: true,
   bookingHasChemicals: true,
   bookingCommonAreaSelections: {}, // { staircase: {checked, floorCount}, corridor: {checked, floorCount, sqmPerFloor}, elevator: {checked, elevatorCapacity} }
-  bookingBuildingName: '',
+  bookingCommonAreaTarget: '', // 'building:İSİM' ya da 'property:ID'
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -1408,6 +1412,18 @@ function commonAreaSelectionsTotal(){
 
 // Aynı bina/site adını paylaşan (2+ mülk) gruplar - ortak alan siparişlerinde
 // sadece bu gruplar seçilebilir, tekil daireler seçilemez.
+// Ortak Alan Temizliği için seçilebilecek hedefler: aynı bina adını
+// paylaşan gruplar (2+ mülk) VE kategorisi "Ortak Alan" olan tekil mülkler
+// (hiç dairesi olmayan, sadece ortak alanı yönetilen binalar).
+function commonAreaTargets(){
+  const groups = buildingGroups().map(g => ({ value: 'building:' + g.name, label: `${g.name} (${g.list.length})` }));
+  const props = [...state.properties.owned, ...state.properties.delegated];
+  const standalone = props
+    .filter(p => p.category === 'common_area')
+    .map(p => ({ value: 'property:' + p.id, label: p.name }));
+  return [...groups, ...standalone];
+}
+
 function buildingGroups(){
   const props = [...state.properties.owned, ...state.properties.delegated];
   const groups = {};
@@ -1458,7 +1474,7 @@ function renderServices(){
         <div class="service-icon">${serviceIconHtml(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
-        ${preview !== null ? `<div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>` : `<div style="height:8px;"></div>`}
+        ${preview !== null ? `<div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>` : ''}
         <div class="row-actions">
           <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
@@ -1516,25 +1532,25 @@ function renderBookingPanel(service, props, selectedProperty){
   const isCompany = state.user.accountType === 'company';
 
   if(isGroup){
-    // Ortak Alan Temizliği: bina/site seçimi + çoklu alt hizmet seçimi.
+    // Ortak Alan Temizliği: bina/site seçimi OPSİYONEL - varsa gösterilir,
+    // yoksa hiç sorulmadan doğrudan parametrelerle sipariş oluşturulabilir.
     // Halı/koltuk gibi ekstra hizmetler bu grupta yok.
-    const groups = buildingGroups();
-    if(groups.length === 0){
-      return `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);"><div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div></div>`;
-    }
-    const selectedBuilding = state.bookingBuildingName || groups[0].name;
+    const targets = commonAreaTargets();
+    const selectedTarget = state.bookingCommonAreaTarget || targets[0]?.value || '';
     const total = commonAreaSelectionsTotal() + suppliesFee;
     const subChecked = (key) => state.bookingCommonAreaSelections[key]?.checked;
     const subVal = (key, field) => state.bookingCommonAreaSelections[key]?.[field] || '';
 
     return `
     <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+      ${targets.length > 0 ? `
       <div class="field">
         <label>${t('bookingBuildingLabel')}</label>
         <select id="booking-building-select">
-          ${groups.map(g => `<option value="${g.name}" ${g.name===selectedBuilding?'selected':''}>${g.name} (${g.list.length})</option>`).join('')}
+          ${targets.map(tgt => `<option value="${tgt.value}" ${tgt.value===selectedTarget?'selected':''}>${tgt.label}</option>`).join('')}
         </select>
       </div>
+      ` : ''}
 
       <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('commonAreaCleaning')}</div>
       ${state.commonAreaSubOptions.map(sub => `
@@ -1781,7 +1797,7 @@ function renderProperties(){
 }
 
 function categoryLabel(cat){
-  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice' };
+  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice', common_area:'categoryCommonArea' };
   return t(map[cat] || 'categoryApartment');
 }
 
@@ -1963,6 +1979,7 @@ function renderModal(){
                     <option value="apartment" ${row.category==='apartment'?'selected':''}>${t('categoryApartment')}</option>
                     <option value="house" ${row.category==='house'?'selected':''}>${t('categoryHouse')}</option>
                     <option value="office" ${row.category==='office'?'selected':''}>${t('categoryOffice')}</option>
+                    <option value="common_area" ${row.category==='common_area'?'selected':''}>${t('categoryCommonArea')}</option>
                   </select>
                 </div>
                 <div class="field" style="flex:1.2; margin-bottom:0;">
@@ -2006,6 +2023,7 @@ function renderModal(){
             <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
             <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
             <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
+            ${state.user.accountType==='company' ? `<div class="choice ${state.propertyCategory==='common_area'?'selected':''}" data-property-category="common_area">${t('categoryCommonArea')}</div>` : ''}
           </div>
           <div class="two-col">
             <div>
@@ -2308,9 +2326,9 @@ function attachHandlers(){
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
-    if(!state.bookingBuildingName){
-      const groups = buildingGroups();
-      state.bookingBuildingName = groups[0]?.name || '';
+    if(!state.bookingCommonAreaTarget){
+      const targets = commonAreaTargets();
+      state.bookingCommonAreaTarget = targets[0]?.value || '';
     }
     if(!state.bookingPropertyId){
       const props = [...state.properties.owned, ...state.properties.delegated];
@@ -2330,7 +2348,7 @@ function attachHandlers(){
 
   const bookingBuildingSelect = document.getElementById('booking-building-select');
   if(bookingBuildingSelect) bookingBuildingSelect.onchange = () => {
-    state.bookingBuildingName = bookingBuildingSelect.value; render();
+    state.bookingCommonAreaTarget = bookingBuildingSelect.value; render();
   };
 
   document.querySelectorAll('[data-common-area-toggle]').forEach(el => el.onchange = () => {
@@ -2390,11 +2408,13 @@ function attachHandlers(){
         .filter(([, v]) => v && v.checked)
         .map(([key, v]) => ({ key, ...v }));
       if(selections.length === 0){ showToast(t('pleaseSelectSubOption')); return; }
-      const groups = buildingGroups();
-      const buildingName = state.bookingBuildingName || groups[0]?.name;
-      if(!buildingName) return;
+      const targets = commonAreaTargets();
+      const targetValue = state.bookingCommonAreaTarget || targets[0]?.value || '';
+      const [targetType, targetId] = targetValue ? targetValue.split(/:(.+)/) : [null, null];
       draft = {
-        buildingName, serviceKey,
+        buildingName: targetType === 'building' ? targetId : undefined,
+        propertyId: targetType === 'property' ? targetId : undefined,
+        serviceKey,
         urgency: state.bookingUrgency,
         scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
         hasEquipment: state.bookingHasEquipment,
