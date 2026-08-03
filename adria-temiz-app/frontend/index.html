@@ -378,6 +378,12 @@ const TRANSLATIONS = {
     bulkAddBtn: "+ Çoklu Mülk Ekle",
     bulkAddModalTitle: "Çoklu Mülk Ekle",
     bulkAddModalHint: "Aynı bina/sitede ya da farklı lokasyonlardaki mülklerini tek seferde ekle — her satır için tip, m² ve konum (harita pini) gerekli, böylece personel doğru adrese gidebilir.",
+    buildingNameLabel: "Bina / Site adı (opsiyonel)",
+    buildingNameHint: "Girersen, bu satırların hepsi Mülklerim'de tek bir grup altında gösterilir.",
+    buildingNamePlaceholder: "örn. Kotor Bay Residence",
+    unitsCountLabel: "{{count}} mülk",
+    expandGroupBtn: "Detayları göster",
+    collapseGroupBtn: "Gizle",
     pickLocationBtn: "📍 Haritadan seç",
     locationSetBtn: "📍 Konum seçildi",
     pickLocationTitle: "Konum seç",
@@ -551,6 +557,12 @@ const TRANSLATIONS = {
     bulkAddBtn: "+ Add Multiple Properties",
     bulkAddModalTitle: "Add Multiple Properties",
     bulkAddModalHint: "Add properties from the same building/site or different locations at once — type, size and a map pin are needed per row, so staff can find the right address.",
+    buildingNameLabel: "Building / Site name (optional)",
+    buildingNameHint: "If you enter it, all these rows will be shown grouped together under one card in My Properties.",
+    buildingNamePlaceholder: "e.g. Kotor Bay Residence",
+    unitsCountLabel: "{{count}} properties",
+    expandGroupBtn: "Show details",
+    collapseGroupBtn: "Hide",
     pickLocationBtn: "📍 Pick on map",
     locationSetBtn: "📍 Location set",
     pickLocationTitle: "Pick location",
@@ -724,6 +736,12 @@ const TRANSLATIONS = {
     bulkAddBtn: "+ Dodaj više nekretnina",
     bulkAddModalTitle: "Dodaj više nekretnina",
     bulkAddModalHint: "Dodaj nekretnine iz iste zgrade/naselja ili različitih lokacija odjednom — potrebni su tip, površina i pin na mapi po redu, da bi osoblje znalo tačnu adresu.",
+    buildingNameLabel: "Naziv zgrade / naselja (opciono)",
+    buildingNameHint: "Ako uneseš, svi ovi redovi će biti prikazani grupisano pod jednom karticom u Moje nekretnine.",
+    buildingNamePlaceholder: "npr. Kotor Bay Residence",
+    unitsCountLabel: "{{count}} nekretnina",
+    expandGroupBtn: "Prikaži detalje",
+    collapseGroupBtn: "Sakrij",
     pickLocationBtn: "📍 Izaberi na mapi",
     locationSetBtn: "📍 Lokacija izabrana",
     pickLocationTitle: "Izaberi lokaciju",
@@ -1009,7 +1027,9 @@ let state = {
   syncPaymentMethod: 'cash',
   pendingSyncPropertyId: null,
   bulkRows: [],
+  bulkBuildingName: '',
   bulkPickingRow: null,
+  expandedGroups: {},
   chatOpen: false,
   chatMessages: [],
   chatInput: '',
@@ -1544,8 +1564,41 @@ function renderReceiptPanel(draft){
   `;
 }
 
+function renderPropertyUnitRow(p){
+  return `
+  <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line);">
+    <div style="width:34px; height:34px; border-radius:9px; overflow:hidden; flex-shrink:0;"><img src="${categoryIconSrc(p.category)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:13px; font-weight:600;">${p.name}</div>
+      <div style="font-size:11.5px; color:var(--muted);">${categoryLabel(p.category)}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.address ? ' · ' + p.address : ''}</div>
+    </div>
+    <div style="display:flex; gap:6px; flex-shrink:0;">
+      <button class="btn ochre btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
+      ${p.category!=='office' ? `<button class="btn ghost btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
+    </div>
+  </div>`;
+}
+
 function renderProperties(){
   const props = [...state.properties.owned, ...state.properties.delegated];
+
+  // Aynı bina/site adını paylaşan 2+ mülk tek bir grup kartında toplanır -
+  // 10-20 dairelik yönetim şirketi portföylerinin ekranı doldurmaması için.
+  const groups = {};
+  const ungrouped = [];
+  props.forEach(p => {
+    if(p.building_name && p.building_name.trim()){
+      const key = p.building_name.trim();
+      if(!groups[key]) groups[key] = [];
+      groups[key].push(p);
+    } else {
+      ungrouped.push(p);
+    }
+  });
+  const groupEntries = Object.entries(groups).filter(([, list]) => list.length > 1);
+  const singleBuildingLeftovers = Object.entries(groups).filter(([, list]) => list.length === 1).flatMap(([, list]) => list);
+  const individualProps = [...ungrouped, ...singleBuildingLeftovers];
+
   return `
   <div class="page-head">
     <div>
@@ -1561,7 +1614,21 @@ function renderProperties(){
     <div class="empty-state">${t('propertiesEmptyState')}</div>
   ` : `
     <div class="grid">
-      ${props.map(p => `
+      ${groupEntries.map(([buildingName, list]) => {
+        const isExpanded = !!state.expandedGroups[buildingName];
+        const firstCity = list.find(p => p.city)?.city;
+        return `
+        <div class="card">
+          <div class="property-avatar"><img src="${categoryIconSrc(list[0].category)}" alt="" /></div>
+          <h3>${buildingName}</h3>
+          <div class="meta" style="margin-bottom:14px;">${t('unitsCountLabel', { count: list.length })}${firstCity ? ' · ' + firstCity : ''}</div>
+          <div class="row-actions">
+            <button class="btn ghost btn-sm" data-toggle-group="${buildingName}">${isExpanded ? t('collapseGroupBtn') : t('expandGroupBtn')}</button>
+          </div>
+          ${isExpanded ? `<div>${list.map(p => renderPropertyUnitRow(p)).join('')}</div>` : ''}
+        </div>
+      `}).join('')}
+      ${individualProps.map(p => `
         <div class="card">
           <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
           <h3>${p.name}</h3>
@@ -1734,6 +1801,11 @@ function renderModal(){
       <div class="modal" style="max-width:680px;">
         <h3>${t('bulkAddModalTitle')}</h3>
         <div class="hint" style="margin:-8px 0 16px;">${t('bulkAddModalHint')}</div>
+        <div class="field">
+          <label>${t('buildingNameLabel')}</label>
+          <input id="bulk-building-name" placeholder="${t('buildingNamePlaceholder')}" value="${state.bulkBuildingName}" />
+        </div>
+        <div class="hint" style="margin:-8px 0 16px;">${t('buildingNameHint')}</div>
         <div style="max-height:52vh; overflow-y:auto; margin-bottom:14px;">
           ${state.bulkRows.map((row, i) => `
             <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--line);">
@@ -1793,6 +1865,7 @@ function renderModal(){
             <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
           </div>
           <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
+          ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
           <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
           <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
           <div class="field">
@@ -2017,9 +2090,13 @@ function attachHandlers(){
   const bulkAddOpen = document.getElementById('bulk-add-open');
   if(bulkAddOpen) bulkAddOpen.onclick = () => {
     state.bulkRows = [{ name:'', category:'apartment', city:'', sizeSqm:'', address:'', latitude:null, longitude:null }];
+    state.bulkBuildingName = '';
     state.modal = 'bulk-add';
     render();
   };
+
+  const bulkBuildingNameInput = document.getElementById('bulk-building-name');
+  if(bulkBuildingNameInput) bulkBuildingNameInput.oninput = () => { state.bulkBuildingName = bulkBuildingNameInput.value; };
 
   const bulkAddRow = document.getElementById('bulk-add-row');
   if(bulkAddRow) bulkAddRow.onclick = () => {
@@ -2053,12 +2130,15 @@ function attachHandlers(){
 
   const bulkSave = document.getElementById('bulk-save');
   if(bulkSave) bulkSave.onclick = async () => {
-    const rows = state.bulkRows.filter(r => r.name && r.name.trim());
+    const rows = state.bulkRows
+      .filter(r => r.name && r.name.trim())
+      .map(r => ({ ...r, buildingName: state.bulkBuildingName || null }));
     if(rows.length === 0){ showToast(t('propertyNameLabel')); return; }
     try{
       const created = await api('/properties/bulk', { method:'POST', body: JSON.stringify({ properties: rows }) });
       state.modal = null;
       state.bulkRows = [];
+      state.bulkBuildingName = '';
       showToast(t('toastBulkSaved', { count: created.length }));
       await loadAll();
     }catch(err){ showToast(err.message); }
@@ -2226,7 +2306,7 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(propForm));
     await api('/properties', { method:'POST', body: JSON.stringify({
       name: fd.name, city: fd.city, address: fd.address || null,
-      category: state.propertyCategory,
+      category: state.propertyCategory, buildingName: fd.buildingName || null,
       latitude: state.regLat, longitude: state.regLng,
       sizeSqm: fd.sizeSqm || null, icalUrl: fd.icalUrl || null,
     })});
@@ -2238,6 +2318,12 @@ function attachHandlers(){
   document.querySelectorAll('[data-book]').forEach(el => el.onclick = () => {
     state.bookingPropertyId = el.dataset.book;
     state.page = 'services';
+    render();
+  });
+
+  document.querySelectorAll('[data-toggle-group]').forEach(el => el.onclick = () => {
+    const key = el.dataset.toggleGroup;
+    state.expandedGroups[key] = !state.expandedGroups[key];
     render();
   });
 
