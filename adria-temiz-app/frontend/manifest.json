@@ -1,6 +1,6 @@
 {
-  "name": "CISTO",
-  "short_name": "CISTO",
+  "name": "MICISTO",
+  "short_name": "MICISTO",
   "description": "Jedan klik, čist dom — Karadağ'da ev sahipleri ve yönetim şirketleri için temizlik hizmeti paneli",
   "start_url": "/index.html",
   "scope": "/",
