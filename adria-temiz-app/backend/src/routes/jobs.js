@@ -172,13 +172,41 @@ router.get('/pending', (req, res) => {
   res.json(rows);
 });
 
+// Personel bir işi kendine alır ("İşi Al" - Glovo'daki sipariş kabul etme
+// gibi). Sadece personel hesapları kullanabilir, sadece hâlâ kimse
+// tarafından alınmamış (pending) bir işi alabilirler.
 router.post('/:id/assign', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
   const { id } = req.params;
-  const { staffId } = req.body;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (job.status !== 'pending') {
+    return res.status(409).json({ error: 'Bu iş başka bir personel tarafından zaten alınmış.' });
+  }
   db.prepare(
     `UPDATE cleaning_jobs SET status = 'assigned', assigned_staff_id = ? WHERE id = ?`
-  ).run(staffId, id);
+  ).run(req.user.id, id);
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+});
+
+// Personelin kendine aldığı, henüz tamamlamadığı işler ("İşlerim" listesi).
+router.get('/mine', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const rows = db
+    .prepare(
+      `SELECT j.*, p.name AS property_name, p.address AS property_address, p.city AS property_city,
+              p.latitude AS property_latitude, p.longitude AS property_longitude
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status IN ('assigned','in_progress')
+       ORDER BY j.checkout_at ASC`
+    )
+    .all(req.user.id);
+  res.json(rows);
 });
 
 // Durum güncelleme. 'done' olduğunda ödeme de otomatik sonuçlanır - müşteriye
@@ -201,6 +229,14 @@ router.patch('/:id/status', (req, res) => {
       (db.prepare('SELECT property_id FROM cleaning_jobs WHERE id = ?').get(id) || {}).property_id
     )) {
       return res.status(403).json({ error: 'Bu işlemi yalnızca personel veya mülk sahibi yapabilir.' });
+    }
+  }
+  // Personel yalnızca kendi aldığı (assigned_staff_id kendisi olan) işi
+  // tamamlandı işaretleyebilir - başkasının işini kapatamaz.
+  if (status === 'done' && req.user.accountType === 'staff') {
+    const jobToCheck = db.prepare('SELECT assigned_staff_id FROM cleaning_jobs WHERE id = ?').get(id);
+    if (!jobToCheck || jobToCheck.assigned_staff_id !== req.user.id) {
+      return res.status(403).json({ error: 'Bu iş sana atanmamış.' });
     }
   }
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
