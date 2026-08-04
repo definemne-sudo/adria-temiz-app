@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="me" id="html-root">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>MICISTORad</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F3D2E" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F3D2E;
+    --navy-2:#14503D;
+    --sage:#1D9E73;
+    --sage-dark:#14503D;
+    --ochre:#1D9E73;
+    --bg:#EFF7F2;
+    --panel:#FFFFFF;
+    --line:#D7E7DE;
+    --text:#16241C;
+    --muted:#5B7A6C;
+    --danger:#B5542A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .brand h1{font-family:'Poppins',sans-serif; font-weight:700;}
+  .app{display:flex; min-height:100vh; flex-direction:column;}
+
+  .auth-wrap{
+    display:flex; align-items:center; justify-content:center;
+    width:100%; min-height:100vh; padding:24px;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(124,156,130,.25), transparent 45%),
+      radial-gradient(circle at 85% 80%, rgba(201,138,62,.18), transparent 45%),
+      var(--navy);
+  }
+  .auth-card{
+    width:100%; max-width:420px; background:var(--panel);
+    border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
+  .brand svg{width:40px; height:40px; display:block; flex-shrink:0;}
+  .brand h1{font-size:24px; color:var(--navy); letter-spacing:0.02em;}
+  .header-row{display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:22px;}
+  .header-row .brand{margin-bottom:0;}
+  .header-row .lang-switch{margin-bottom:0;}
+  .tagline{color:var(--muted); font-size:13px; margin-bottom:24px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+  .field input, .field select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
+    font-size:14px; font-family:inherit; background:#fbfcfb;
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--sage); border-color:var(--sage);}
+  .btn{
+    width:100%; padding:11px; border:none; border-radius:8px; background:var(--navy); color:#fff;
+    font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  .btn:hover{background:var(--navy-2);}
+  .btn.ochre{background:var(--ochre);}
+  .btn.ochre:hover{background:#178a63;}
+  .btn.ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
+  .btn-sm{padding:9px 12px; font-size:13px; border-radius:6px; width:auto;}
+  .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
+  .hint{font-size:12px; color:var(--muted); margin-top:16px; line-height:1.5;}
+
+  .lang-switch{display:flex; gap:4px;}
+  .lang-switch button{
+    background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 9px;
+    font-size:11px; font-weight:700; color:var(--muted); cursor:pointer; font-family:inherit;
+  }
+  .lang-switch button.active{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .topbar .lang-switch button{border-color:rgba(255,255,255,.25); color:#C9D6D2;}
+  .topbar .lang-switch button.active{background:var(--ochre); border-color:var(--ochre); color:#fff;}
+
+  .topbar{
+    background:var(--navy); color:#fff; padding:14px 18px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    position:sticky; top:0; z-index:20; flex-wrap:wrap;
+  }
+  .topbar .brand h1{color:#fff; font-size:19px;}
+  .who{font-size:11px; color:#9FB3AE;}
+  .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline; white-space:nowrap;}
+
+  .tabs{display:flex; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:57px; z-index:19;}
+  .tab{
+    flex:1; text-align:center; padding:13px 8px; font-size:13.5px; font-weight:700; color:var(--muted);
+    cursor:pointer; border-bottom:3px solid transparent;
+  }
+  .tab.active{color:var(--navy); border-bottom-color:var(--ochre);}
+  .tab .count{
+    display:inline-block; background:var(--ochre); color:#fff; font-size:10.5px; font-weight:700;
+    border-radius:20px; padding:1px 7px; margin-left:5px;
+  }
+
+  .main{flex:1; padding:18px; max-width:640px; width:100%; margin:0 auto;}
+  .empty-state{
+    border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px 20px; text-align:center; color:var(--muted); font-size:14px;
+  }
+
+  .job-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px; display:flex; flex-direction:column; gap:10px;
+  }
+  .job-card .top-row{display:flex; align-items:center; gap:12px;}
+  .job-icon{
+    width:48px; height:48px; border-radius:12px; overflow:hidden; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; background:var(--bg);
+  }
+  .job-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .job-icon span{ font-size:22px; }
+  .job-title{font-size:15px; font-weight:700; color:var(--navy);}
+  .job-meta{font-size:12.5px; color:var(--muted); line-height:1.5;}
+  .job-price{
+    font-family:'Fraunces',serif; font-size:19px; color:var(--ochre); margin-left:auto; flex-shrink:0; text-align:right;
+  }
+  .job-badge{
+    display:inline-block; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px;
+    text-transform:uppercase; letter-spacing:.02em;
+  }
+  .job-badge.urgent{background:#F2DADA; color:#A13A3A;}
+  .job-badge.scheduled{background:#DCE7F5; color:#2C5C8A;}
+  .job-badge.cash{background:#F1E6D3; color:#8A5A19;}
+  .job-badge.card{background:#DEEFE0; color:#2E7D46;}
+  .job-badge.invoice{background:#E4E0F5; color:#5B3F9E;}
+  .job-actions{display:flex; gap:8px;}
+  .job-actions .btn{flex:1;}
+
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--navy); color:#fff; padding:12px 20px;
+    border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60; white-space:nowrap;
+  }
+
+  @media (max-width: 480px){
+    .auth-wrap{ padding:16px; }
+    .auth-card{ padding:26px 22px; }
+    .header-row{ gap:8px; }
+    .topbar{ padding:12px 14px; }
+    .job-actions{ flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+
+<script>
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:4000/api'
+  : 'https://adria-temiz-app-production.up.railway.app/api';
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+
+const LOCALES = { tr:'tr-TR', en:'en-GB', me:'sr-Latn-ME' };
+
+const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+  <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
+  <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
+  <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
+
+const COUNTRY_CODES = [
+  { flag:'🇲🇪', name:'Crna Gora', code:'+382' },
+  { flag:'🇷🇸', name:'Srbija', code:'+381' },
+  { flag:'🇭🇷', name:'Hrvatska', code:'+385' },
+  { flag:'🇧🇦', name:'Bosna i Hercegovina', code:'+387' },
+  { flag:'🇦🇱', name:'Shqipëria', code:'+355' },
+  { flag:'🇽🇰', name:'Kosova', code:'+383' },
+  { flag:'🇷🇺', name:'Россия', code:'+7' },
+  { flag:'🇹🇷', name:'Türkiye', code:'+90' },
+];
+
+/* ================== ÇEVİRİLER ================== */
+const TRANSLATIONS = {
+  tr: {
+    tagline: "İşini seç, kazanmaya başla.",
+    authPhoneLabel: "Telefon numarası",
+    authSendCode: "Kod gönder",
+    authPhoneHint: "MICISTORad, onaylı personel için hazırlanmıştır. Numaranı gir, sana gönderdiğimiz kodla giriş yap.",
+    authOtpTagline: "{{phone}} numarasına gönderdiğimiz 6 haneli kodu gir.",
+    authOtpLabel: "Doğrulama kodu",
+    authVerify: "Doğrula",
+    authDemoModeHint: "Demo modu — kodun: <strong>{{code}}</strong>",
+    authChangeNumber: "Numarayı değiştir",
+    authProfileTagline: "Son bir adım — adını öğrenelim.",
+    profileNameLabel: "Ad soyad",
+    enterPanel: "Panele gir",
+    navAvailable: "Bekleyen İşler",
+    navMyJobs: "İşlerim",
+    logout: "Çıkış yap",
+    emptyAvailable: "Şu an bekleyen iş yok. Yeni işler geldiğinde burada görünecek.",
+    emptyMyJobs: "Henüz aldığın bir iş yok. \"Bekleyen İşler\"den bir iş al.",
+    claimBtn: "İşi Al",
+    completeBtn: "Tamamlandı",
+    openMapBtn: "📍 Haritada Aç",
+    urgentBadge: "⚡ Acil",
+    scheduledBadge: "Planlı",
+    cashBadge: "💵 Nakit",
+    cardBadge: "💳 Kart (ödendi)",
+    invoiceBadge: "🧾 Fatura",
+    toastClaimed: "İşi aldın! \"İşlerim\" sekmesinden takip edebilirsin.",
+    toastCompleted: "İş tamamlandı, ödeme sonuçlandı.",
+    toastClaimFailed: "Bu iş başka bir personel tarafından zaten alınmış.",
+    genericError: "Bir hata oluştu.",
+  },
+  en: {
+    tagline: "Pick a job, start earning.",
+    authPhoneLabel: "Phone number",
+    authSendCode: "Send code",
+    authPhoneHint: "MICISTORad is for approved staff members. Enter your number and sign in with the code we send you.",
+    authOtpTagline: "Enter the 6-digit code we sent to {{phone}}.",
+    authOtpLabel: "Verification code",
+    authVerify: "Verify",
+    authDemoModeHint: "Demo mode — your code: <strong>{{code}}</strong>",
+    authChangeNumber: "Change number",
+    authProfileTagline: "One last step — what's your name?",
+    profileNameLabel: "Full name",
+    enterPanel: "Enter panel",
+    navAvailable: "Available Jobs",
+    navMyJobs: "My Jobs",
+    logout: "Log out",
+    emptyAvailable: "No available jobs right now. New jobs will appear here.",
+    emptyMyJobs: "You haven't taken a job yet. Grab one from \"Available Jobs\".",
+    claimBtn: "Take Job",
+    completeBtn: "Mark Done",
+    openMapBtn: "📍 Open in Maps",
+    urgentBadge: "⚡ Urgent",
+    scheduledBadge: "Scheduled",
+    cashBadge: "💵 Cash",
+    cardBadge: "💳 Card (paid)",
+    invoiceBadge: "🧾 Invoice",
+    toastClaimed: "Job taken! Track it under \"My Jobs\".",
+    toastCompleted: "Job completed, payment settled.",
+    toastClaimFailed: "This job was already taken by another staff member.",
+    genericError: "Something went wrong.",
+  },
+  me: {
+    tagline: "Izaberi posao, počni da zarađuješ.",
+    authPhoneLabel: "Broj telefona",
+    authSendCode: "Pošalji kod",
+    authPhoneHint: "MICISTORad je za odobreno osoblje. Unesi broj i prijavi se kodom koji ti šaljemo.",
+    authOtpTagline: "Unesi šestocifreni kod koji smo poslali na {{phone}}.",
+    authOtpLabel: "Kod za potvrdu",
+    authVerify: "Potvrdi",
+    authDemoModeHint: "Demo režim — tvoj kod: <strong>{{code}}</strong>",
+    authChangeNumber: "Promijeni broj",
+    authProfileTagline: "Još jedan korak — kako se zoveš?",
+    profileNameLabel: "Ime i prezime",
+    enterPanel: "Uđi u panel",
+    navAvailable: "Poslovi na čekanju",
+    navMyJobs: "Moji poslovi",
+    logout: "Odjavi se",
+    emptyAvailable: "Trenutno nema poslova na čekanju. Novi poslovi će se pojaviti ovdje.",
+    emptyMyJobs: "Još nisi preuzeo/la posao. Uzmi jedan iz \"Poslovi na čekanju\".",
+    claimBtn: "Preuzmi posao",
+    completeBtn: "Označi završeno",
+    openMapBtn: "📍 Otvori na mapi",
+    urgentBadge: "⚡ Hitno",
+    scheduledBadge: "Zakazano",
+    cashBadge: "💵 Keš",
+    cardBadge: "💳 Kartica (plaćeno)",
+    invoiceBadge: "🧾 Faktura",
+    toastClaimed: "Posao preuzet! Prati ga u \"Moji poslovi\".",
+    toastCompleted: "Posao završen, plaćanje obrađeno.",
+    toastClaimFailed: "Ovaj posao je već preuzeo drugi član osoblja.",
+    genericError: "Došlo je do greške.",
+  },
+};
+
+const SERVICE_NAMES = {
+  checkin_checkout: { icon:'icon-service-checkin.png', tr:'Airbnb/Booking Temizliği', en:'Airbnb/Booking Cleaning', me:'Airbnb/Booking čišćenje' },
+  deep_clean: { icon:'icon-service-deep.png', tr:'Detaylı temizlik', en:'Detailed cleaning', me:'Detaljno čišćenje' },
+  office: { icon:'icon-service-office.png', tr:'Ofis / Dükkan Temizliği', en:'Office/Shop Cleaning', me:'Čišćenje poslovnog prostora' },
+  common_area: { icon:'icon-service-common-area.png', tr:'Ortak Alan Temizliği', en:'Common Area Cleaning', me:'Čišćenje zajedničkih prostorija' },
+};
+const COMMON_AREA_SUB_NAMES = {
+  staircase: { tr:'Merdiven', en:'Staircase', me:'Stepenište' },
+  corridor: { tr:'Kat Koridoru', en:'Floor Corridor', me:'Hodnik' },
+  elevator: { tr:'Asansör', en:'Elevator', me:'Lift' },
+};
+
+function t(key, vars){
+  let str = (TRANSLATIONS[state.lang] && TRANSLATIONS[state.lang][key]) || TRANSLATIONS.tr[key] || key;
+  if(vars) Object.keys(vars).forEach(k => { str = str.split('{{'+k+'}}').join(vars[k]); });
+  return str;
+}
+function serviceName(key){
+  const s = SERVICE_NAMES[key];
+  return s ? (s[state.lang] || s.tr) : key;
+}
+function serviceIconSrc(key){
+  return (SERVICE_NAMES[key] && SERVICE_NAMES[key].icon) || null;
+}
+function commonAreaSubName(key){
+  const s = COMMON_AREA_SUB_NAMES[key];
+  return s ? (s[state.lang] || s.tr) : key;
+}
+function jobServiceLabel(j){
+  if(j.service_key === 'common_area'){
+    try{
+      const selections = JSON.parse(j.service_params || '{}').selections || [];
+      return selections.map(s => commonAreaSubName(s.key)).join(', ') || serviceName('common_area');
+    }catch(e){ return serviceName('common_area'); }
+  }
+  return serviceName(j.service_key);
+}
+
+/* ================== STATE ================== */
+let state = {
+  token: localStorage.getItem('staffToken') || null,
+  user: JSON.parse(localStorage.getItem('staffUser') || 'null'),
+  lang: localStorage.getItem('lang') || 'me',
+  page: 'available',
+  availableJobs: [],
+  myJobs: [],
+  authStep: 'phone',
+  phone: '',
+  countryCode: '+382',
+  devCode: '',
+  authError: '',
+};
+
+function render(){
+  document.getElementById('html-root').lang = state.lang;
+  let html;
+  if(!(state.token && state.user)){
+    html = renderAuth();
+  } else {
+    html = renderPanel();
+  }
+
+  const activeEl = document.activeElement;
+  const activeId = activeEl && activeEl.id ? activeEl.id : null;
+  const hasSelection = activeEl && typeof activeEl.selectionStart === 'number';
+  const selStart = hasSelection ? activeEl.selectionStart : null;
+  const selEnd = hasSelection ? activeEl.selectionEnd : null;
+  const pageScrollY = window.scrollY;
+
+  document.getElementById('app').innerHTML = html;
+  attachHandlers();
+
+  if(activeId){
+    const restored = document.getElementById(activeId);
+    if(restored){
+      restored.focus({ preventScroll: true });
+      if(hasSelection && restored.setSelectionRange){
+        try{ restored.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+  window.scrollTo(0, pageScrollY);
+}
+
+function langSwitch(){
+  return `
+  <div class="lang-switch">
+    <button class="${state.lang==='me'?'active':''}" data-lang="me">CG</button>
+    <button class="${state.lang==='en'?'active':''}" data-lang="en">EN</button>
+    <button class="${state.lang==='tr'?'active':''}" data-lang="tr">TR</button>
+  </div>`;
+}
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2800);
+}
+
+async function api(path, opts={}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}),
+      ...(opts.headers||{}),
+    },
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || t('genericError'));
+  return data;
+}
+
+/* ================== AUTH ================== */
+function renderAuth(){
+  let inner = '';
+
+  if(state.authStep === 'phone'){
+    inner = `
+      <div class="tagline">${t('tagline')}</div>
+      <form id="phone-form">
+        <div class="field">
+          <label>${t('authPhoneLabel')}</label>
+          <div style="display:flex; gap:8px;">
+            <select id="country-code-select" style="width:112px; flex-shrink:0; padding:10px 6px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; background:#fbfcfb;">
+              ${COUNTRY_CODES.map((c,i) => `<option value="${i}" ${c.code===state.countryCode?'selected':''}>${c.flag} ${c.code}</option>`).join('')}
+            </select>
+            <input name="phoneLocal" type="tel" placeholder="67 123 456" required autofocus style="flex:1;" />
+          </div>
+        </div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">${t('authSendCode')}</button>
+      </form>
+      <div class="hint">${t('authPhoneHint')}</div>
+    `;
+  }
+
+  if(state.authStep === 'otp'){
+    inner = `
+      <div class="tagline">${t('authOtpTagline', { phone: state.phone })}</div>
+      <form id="otp-form">
+        <div class="field">
+          <label>${t('authOtpLabel')}</label>
+          <input name="code" inputmode="numeric" maxlength="6" placeholder="••••••" required autofocus
+            style="letter-spacing:6px; font-size:20px; text-align:center;" />
+        </div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">${t('authVerify')}</button>
+      </form>
+      <div class="hint">${state.devCode ? t('authDemoModeHint', { code: state.devCode }) : ''}</div>
+      <div style="text-align:center; margin-top:10px;">
+        <span id="change-phone" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('authChangeNumber')}</span>
+      </div>
+    `;
+  }
+
+  if(state.authStep === 'profile'){
+    inner = `
+      <div class="tagline">${t('authProfileTagline')}</div>
+      <form id="profile-form">
+        <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">${t('enterPanel')}</button>
+      </form>
+    `;
+  }
+
+  return `
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="header-row">
+        <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="40" height="40" ')}<h1>MICISTORad</h1></div>
+        ${langSwitch()}
+      </div>
+      ${inner}
+    </div>
+  </div>`;
+}
+
+/* ================== PANEL ================== */
+function renderPanel(){
+  return `
+  <div class="topbar">
+    <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="28" height="28" ')}<h1>MICISTORad</h1></div>
+    ${langSwitch()}
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="who">${state.user.name}</div>
+      <div class="logout" id="logout">${t('logout')}</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
+    <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
+  </div>
+  <div class="main">
+    ${state.page==='available' ? renderAvailable() : renderMine()}
+  </div>
+  `;
+}
+
+function urgencyBadgeHtml(j){
+  if(j.urgency === 'urgent' || j.urgency === 'now'){
+    return `<span class="job-badge urgent">${t('urgentBadge')}</span>`;
+  }
+  return `<span class="job-badge scheduled">${t('scheduledBadge')} · ${new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</span>`;
+}
+function paymentBadgeHtml(j){
+  if(j.payment_method === 'card') return `<span class="job-badge card">${t('cardBadge')}</span>`;
+  if(j.payment_method === 'invoice') return `<span class="job-badge invoice">${t('invoiceBadge')}</span>`;
+  return `<span class="job-badge cash">${t('cashBadge')}</span>`;
+}
+function mapLink(j){
+  if(j.property_latitude && j.property_longitude){
+    return `https://www.google.com/maps?q=${j.property_latitude},${j.property_longitude}`;
+  }
+  const addr = encodeURIComponent(`${j.property_address||''} ${j.property_city||''}`.trim());
+  return `https://www.google.com/maps/search/?api=1&query=${addr}`;
+}
+
+function renderJobCard(j, mode){
+  const icon = serviceIconSrc(j.service_key);
+  return `
+  <div class="job-card">
+    <div class="top-row">
+      <div class="job-icon">${icon ? `<img src="${icon}" alt="" />` : `<span>🧹</span>`}</div>
+      <div style="flex:1; min-width:0;">
+        <div class="job-title">${jobServiceLabel(j)}</div>
+        <div class="job-meta">${j.property_name}${j.property_city ? ' · ' + j.property_city : ''}</div>
+      </div>
+      <div class="job-price">${j.price} €</div>
+    </div>
+    <div class="job-meta">${j.property_address || ''}</div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      ${urgencyBadgeHtml(j)}
+      ${paymentBadgeHtml(j)}
+    </div>
+    <div class="job-actions">
+      <a class="btn ghost btn-sm" style="text-align:center; text-decoration:none;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
+      ${mode==='available' ? `<button class="btn ochre btn-sm" data-claim="${j.id}">${t('claimBtn')}</button>` : ''}
+      ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderAvailable(){
+  if(state.availableJobs.length === 0) return `<div class="empty-state">${t('emptyAvailable')}</div>`;
+  return state.availableJobs.map(j => renderJobCard(j, 'available')).join('');
+}
+function renderMine(){
+  if(state.myJobs.length === 0) return `<div class="empty-state">${t('emptyMyJobs')}</div>`;
+  return state.myJobs.map(j => renderJobCard(j, 'mine')).join('');
+}
+
+/* ================== VERİ YÜKLEME ================== */
+async function loadAll(){
+  const [available, mine] = await Promise.all([ api('/jobs/pending'), api('/jobs/mine') ]);
+  state.availableJobs = available;
+  state.myJobs = mine;
+  render();
+}
+
+/* ================== EVENT HANDLERS ================== */
+function attachHandlers(){
+  document.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => {
+    state.lang = el.dataset.lang;
+    localStorage.setItem('lang', state.lang);
+    render();
+  });
+
+  const countryCodeSelect = document.getElementById('country-code-select');
+  if(countryCodeSelect) countryCodeSelect.onchange = () => {
+    state.countryCode = COUNTRY_CODES[Number(countryCodeSelect.value)].code;
+  };
+
+  const phoneForm = document.getElementById('phone-form');
+  if(phoneForm) phoneForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(phoneForm));
+    const fullPhone = `${state.countryCode} ${fd.phoneLocal}`.trim();
+    try{
+      const data = await api('/auth/request-otp', { method:'POST', body: JSON.stringify({ phone: fullPhone }) });
+      state.phone = fullPhone;
+      state.devCode = data.devCode || '';
+      state.authStep = 'otp';
+      state.authError = '';
+      render();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const otpForm = document.getElementById('otp-form');
+  if(otpForm) otpForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(otpForm));
+    try{
+      const data = await api('/auth/verify-otp', { method:'POST', body: JSON.stringify({ phone: state.phone, code: fd.code }) });
+      state.token = data.token;
+      localStorage.setItem('staffToken', data.token);
+      if(data.isNewUser || data.user.accountType !== 'staff'){
+        state.authStep = 'profile';
+        state.authError = '';
+        render();
+      } else {
+        state.user = data.user;
+        localStorage.setItem('staffUser', JSON.stringify(data.user));
+        state.authError = '';
+        await loadAll();
+      }
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const changePhone = document.getElementById('change-phone');
+  if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
+
+  const profileForm = document.getElementById('profile-form');
+  if(profileForm) profileForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(profileForm));
+    try{
+      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify({ name: fd.name, accountType: 'staff' }) });
+      state.token = data.token; state.user = data.user;
+      localStorage.setItem('staffToken', data.token);
+      localStorage.setItem('staffUser', JSON.stringify(data.user));
+      state.authError = '';
+      await loadAll();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  document.querySelectorAll('[data-page]').forEach(el => el.onclick = () => {
+    state.page = el.dataset.page; render();
+  });
+
+  const logout = document.getElementById('logout');
+  if(logout) logout.onclick = () => {
+    localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser');
+    state.token = null; state.user = null; state.authStep = 'phone'; render();
+  };
+
+  document.querySelectorAll('[data-claim]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/jobs/${el.dataset.claim}/assign`, { method:'POST' });
+      showToast(t('toastClaimed'));
+      await loadAll();
+    }catch(err){ showToast(err.message || t('toastClaimFailed')); await loadAll(); }
+  });
+
+  document.querySelectorAll('[data-complete]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/jobs/${el.dataset.complete}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
+      showToast(t('toastCompleted'));
+      await loadAll();
+    }catch(err){ showToast(err.message); }
+  });
+}
+
+/* ================== INIT ================== */
+(async function init(){
+  if(state.token && !state.user){
+    localStorage.removeItem('staffToken'); state.token = null;
+  }
+  render();
+  if(state.token){
+    try{ await loadAll(); } catch(err){
+      localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser');
+      state.token = null; render();
+    }
+  }
+})();
+</script>
+</body>
+</html>
