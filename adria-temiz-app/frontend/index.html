@@ -341,6 +341,15 @@ const TRANSLATIONS = {
     authPhoneLabel: "Telefon numarası",
     authSendCode: "Kod gönder",
     authPhoneHint: "E-mail veya uzun kayıt işlemlerine gerek kalmadan mobil numaranız ile SMS yoluyla hızlı kayıt!",
+    joinTeamLink: "MICISTO'da çalışmak ister misin? Başvur",
+    joinTeamModalTitle: "Personel Başvurusu",
+    joinTeamModalHint: "Bilgilerini bırak, ekibimiz seninle iletişime geçsin.",
+    joinTeamNameLabel: "Ad Soyad",
+    joinTeamCityLabel: "Şehir",
+    joinTeamMessageLabel: "Mesaj (opsiyonel)",
+    joinTeamMessagePlaceholder: "Deneyimin, uygun olduğun günler vb.",
+    joinTeamSubmitBtn: "Başvuruyu Gönder",
+    toastJoinTeamSent: "Başvurun alındı! Ekibimiz en kısa sürede seninle iletişime geçecek.",
     authOtpTagline: "{{phone}} numarasına gönderdiğimiz 6 haneli kodu gir.",
     authOtpLabel: "Doğrulama kodu",
     authVerify: "Doğrula",
@@ -529,6 +538,15 @@ const TRANSLATIONS = {
     authPhoneLabel: "Phone number",
     authSendCode: "Send code",
     authPhoneHint: "Fast sign-up via SMS with just your mobile number — no e-mail or lengthy registration needed!",
+    joinTeamLink: "Want to work with MICISTO? Apply here",
+    joinTeamModalTitle: "Staff Application",
+    joinTeamModalHint: "Leave your details and our team will get in touch.",
+    joinTeamNameLabel: "Full name",
+    joinTeamCityLabel: "City",
+    joinTeamMessageLabel: "Message (optional)",
+    joinTeamMessagePlaceholder: "Your experience, available days, etc.",
+    joinTeamSubmitBtn: "Submit Application",
+    toastJoinTeamSent: "Your application has been received! Our team will contact you soon.",
     authOtpTagline: "Enter the 6-digit code we sent to {{phone}}.",
     authOtpLabel: "Verification code",
     authVerify: "Verify",
@@ -717,6 +735,15 @@ const TRANSLATIONS = {
     authPhoneLabel: "Broj telefona",
     authSendCode: "Pošalji kod",
     authPhoneHint: "Brza prijava SMS kodom uz broj telefona — bez e-maila i dugih formulara za registraciju!",
+    joinTeamLink: "Želiš da radiš u MICISTO-u? Prijavi se",
+    joinTeamModalTitle: "Prijava za posao",
+    joinTeamModalHint: "Ostavi svoje podatke, naš tim će te kontaktirati.",
+    joinTeamNameLabel: "Ime i prezime",
+    joinTeamCityLabel: "Grad",
+    joinTeamMessageLabel: "Poruka (opciono)",
+    joinTeamMessagePlaceholder: "Tvoje iskustvo, dostupni dani i sl.",
+    joinTeamSubmitBtn: "Pošalji prijavu",
+    toastJoinTeamSent: "Tvoja prijava je primljena! Naš tim će te uskoro kontaktirati.",
     authOtpTagline: "Unesi šestocifreni kod koji smo poslali na {{phone}}.",
     authOtpLabel: "Kod za potvrdu",
     authVerify: "Potvrdi",
@@ -1226,6 +1253,9 @@ function renderAuth(){
         <button class="btn ochre" type="submit">${t('authSendCode')}</button>
       </form>
       <div class="hint">${t('authPhoneHint')}</div>
+      <div style="text-align:center; margin-top:16px;">
+        <span id="join-team-link" style="font-size:12.5px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('joinTeamLink')}</span>
+      </div>
     `;
   }
 
@@ -1313,7 +1343,8 @@ function renderAuth(){
       </div>
       ${inner}
     </div>
-  </div>`;
+  </div>
+  ${state.modal ? renderModal() : ''}`;
 }
 
 function renderRatingScreen(){
@@ -1917,6 +1948,34 @@ function renderAddonsSummary(addonsJson){
 }
 
 function renderModal(){
+  if(state.modal === 'join-team'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${t('joinTeamModalTitle')}</h3>
+        <div class="hint" style="margin:-8px 0 16px;">${t('joinTeamModalHint')}</div>
+        <form id="join-team-form">
+          <div class="field"><label>${t('joinTeamNameLabel')}</label><input name="name" required /></div>
+          <div class="field">
+            <label>${t('authPhoneLabel')}</label>
+            <div style="display:flex; gap:8px;">
+              <select id="join-team-country-code" style="width:112px; flex-shrink:0; padding:10px 6px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; background:#fbfcfb;">
+                ${COUNTRY_CODES.map((c,i) => `<option value="${i}" ${c.code===state.countryCode?'selected':''}>${c.flag} ${c.code}</option>`).join('')}
+              </select>
+              <input name="phoneLocal" type="tel" placeholder="67 123 456" required style="flex:1;" />
+            </div>
+          </div>
+          <div class="field"><label>${t('joinTeamCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+          <div class="field"><label>${t('joinTeamMessageLabel')}</label><textarea name="message" rows="3" placeholder="${t('joinTeamMessagePlaceholder')}" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;"></textarea></div>
+          ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+          <div class="actions">
+            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="submit" class="btn ochre">${t('joinTeamSubmitBtn')}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'sync-payment'){
     if(state.syncStep === 'url'){
       return `
@@ -2274,6 +2333,30 @@ function attachHandlers(){
         state.authError = '';
         await loadAll();
       }
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const joinTeamLink = document.getElementById('join-team-link');
+  if(joinTeamLink) joinTeamLink.onclick = () => { state.modal = 'join-team'; state.authError = ''; render(); };
+
+  const joinTeamCountryCode = document.getElementById('join-team-country-code');
+  if(joinTeamCountryCode) joinTeamCountryCode.onchange = () => {
+    state.countryCode = COUNTRY_CODES[Number(joinTeamCountryCode.value)].code;
+  };
+
+  const joinTeamForm = document.getElementById('join-team-form');
+  if(joinTeamForm) joinTeamForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(joinTeamForm));
+    const phone = `${state.countryCode} ${fd.phoneLocal}`.trim();
+    try{
+      await api('/staff-applications', { method:'POST', body: JSON.stringify({
+        name: fd.name, phone, city: fd.city || null, message: fd.message || null,
+      })});
+      state.modal = null;
+      state.authError = '';
+      showToast(t('toastJoinTeamSent'));
+      render();
     }catch(err){ state.authError = err.message; render(); }
   };
 
