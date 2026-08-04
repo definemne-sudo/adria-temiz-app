@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS users (
   company_name TEXT,
   tax_number TEXT,
   billing_address TEXT,
+  username TEXT UNIQUE,
+  password_hash TEXT,
+  is_online INTEGER NOT NULL DEFAULT 0,
   profile_completed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
