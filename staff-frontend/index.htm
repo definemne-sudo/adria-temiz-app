@@ -141,6 +141,22 @@
     border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60; white-space:nowrap;
   }
 
+  .online-switch{ position:relative; display:inline-block; width:38px; height:22px; flex-shrink:0; }
+  .online-switch input{ opacity:0; width:0; height:0; }
+  .online-slider{
+    position:absolute; cursor:pointer; inset:0; background:#4A6B5C; border-radius:22px; transition:.15s;
+  }
+  .online-slider:before{
+    content:""; position:absolute; height:16px; width:16px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.15s;
+  }
+  .online-switch input:checked + .online-slider{ background:#1D9E73; }
+  .online-switch input:checked + .online-slider:before{ transform:translateX(16px); }
+
+  .offline-banner{
+    background:#F1E6D3; color:#8A5A19; font-size:12.5px; font-weight:600; text-align:center;
+    padding:8px 14px;
+  }
+
   @media (max-width: 480px){
     .auth-wrap{ padding:16px; }
     .auth-card{ padding:26px 22px; }
@@ -187,6 +203,16 @@ const COUNTRY_CODES = [
 const TRANSLATIONS = {
   tr: {
     tagline: "İşini seç, kazanmaya başla.",
+    usernameLabel: "Kullanıcı adı",
+    passwordLabel: "Şifre",
+    keepSignedInLabel: "Beni oturumda tut",
+    loginBtn: "Giriş Yap",
+    firstTimeLink: "İlk kez mi giriş yapıyorsun? Telefonunla aktive et",
+    backToLoginLink: "Kullanıcı adı/şifre ile giriş yap",
+    firstActivationTagline: "Telefon numaranla kimliğini doğrula, sana özel giriş bilgilerini oluşturalım.",
+    credentialsTagline: "Giriş bilgilerin hazır! Bunları not al — bundan sonra hep bunlarla giriş yapacaksın.",
+    credentialsHint: "Bu bilgiler bir daha gösterilmeyecek. Unutursan, telefonunla tekrar doğrulayıp yenilerini oluşturabilirsin.",
+    credentialsContinueBtn: "Devam Et",
     authPhoneLabel: "Telefon numarası",
     authSendCode: "Kod gönder",
     authPhoneHint: "MICISTORad, onaylı personel için hazırlanmıştır. Numaranı gir, sana gönderdiğimiz kodla giriş yap.",
@@ -215,9 +241,22 @@ const TRANSLATIONS = {
     toastCompleted: "İş tamamlandı, ödeme sonuçlandı.",
     toastClaimFailed: "Bu iş başka bir personel tarafından zaten alınmış.",
     genericError: "Bir hata oluştu.",
+    onlineLabel: "Çevrimiçi",
+    offlineLabel: "Çevrimdışı",
+    offlineHint: "Çevrimdışısın — iş almak için çevrimiçi ol.",
   },
   en: {
     tagline: "Pick a job, start earning.",
+    usernameLabel: "Username",
+    passwordLabel: "Password",
+    keepSignedInLabel: "Keep me signed in",
+    loginBtn: "Log In",
+    firstTimeLink: "First time signing in? Activate with your phone",
+    backToLoginLink: "Log in with username/password",
+    firstActivationTagline: "Verify your identity with your phone number, and we'll create your personal login details.",
+    credentialsTagline: "Your login details are ready! Write them down — you'll use these to log in from now on.",
+    credentialsHint: "These won't be shown again. If you forget them, verify with your phone again to generate new ones.",
+    credentialsContinueBtn: "Continue",
     authPhoneLabel: "Phone number",
     authSendCode: "Send code",
     authPhoneHint: "MICISTORad is for approved staff members. Enter your number and sign in with the code we send you.",
@@ -246,9 +285,22 @@ const TRANSLATIONS = {
     toastCompleted: "Job completed, payment settled.",
     toastClaimFailed: "This job was already taken by another staff member.",
     genericError: "Something went wrong.",
+    onlineLabel: "Online",
+    offlineLabel: "Offline",
+    offlineHint: "You're offline — go online to take jobs.",
   },
   me: {
     tagline: "Izaberi posao, počni da zarađuješ.",
+    usernameLabel: "Korisničko ime",
+    passwordLabel: "Šifra",
+    keepSignedInLabel: "Zapamti me",
+    loginBtn: "Prijavi se",
+    firstTimeLink: "Prvi put se prijavljuješ? Aktiviraj se preko telefona",
+    backToLoginLink: "Prijavi se korisničkim imenom/šifrom",
+    firstActivationTagline: "Potvrdi identitet brojem telefona, pa ćemo ti napraviti lične podatke za prijavu.",
+    credentialsTagline: "Tvoji podaci za prijavu su spremni! Zapiši ih — od sada ćeš se prijavljivati sa njima.",
+    credentialsHint: "Ovi podaci se neće ponovo prikazati. Ako ih zaboraviš, ponovo se potvrdi telefonom da napraviš nove.",
+    credentialsContinueBtn: "Nastavi",
     authPhoneLabel: "Broj telefona",
     authSendCode: "Pošalji kod",
     authPhoneHint: "MICISTORad je za odobreno osoblje. Unesi broj i prijavi se kodom koji ti šaljemo.",
@@ -277,6 +329,9 @@ const TRANSLATIONS = {
     toastCompleted: "Posao završen, plaćanje obrađeno.",
     toastClaimFailed: "Ovaj posao je već preuzeo drugi član osoblja.",
     genericError: "Došlo je do greške.",
+    onlineLabel: "Na mreži",
+    offlineLabel: "Van mreže",
+    offlineHint: "Van si mreže — uključi se na mrežu da bi preuzimao/la poslove.",
   },
 };
 
@@ -319,17 +374,38 @@ function jobServiceLabel(j){
 }
 
 /* ================== STATE ================== */
+// "Beni oturumda tut" işaretlenirse localStorage (tarayıcı kapansa da kalıcı),
+// işaretlenmezse sessionStorage (sekme/tarayıcı kapanınca silinir) kullanılır.
+function getStoredToken(){ return localStorage.getItem('staffToken') || sessionStorage.getItem('staffToken') || null; }
+function getStoredUser(){
+  const raw = localStorage.getItem('staffUser') || sessionStorage.getItem('staffUser');
+  return raw ? JSON.parse(raw) : null;
+}
+function storeSession(token, user, keepSignedIn){
+  const store = keepSignedIn ? localStorage : sessionStorage;
+  const other = keepSignedIn ? sessionStorage : localStorage;
+  store.setItem('staffToken', token);
+  store.setItem('staffUser', JSON.stringify(user));
+  other.removeItem('staffToken'); other.removeItem('staffUser');
+}
+function clearSession(){
+  localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser');
+  sessionStorage.removeItem('staffToken'); sessionStorage.removeItem('staffUser');
+}
+
 let state = {
-  token: localStorage.getItem('staffToken') || null,
-  user: JSON.parse(localStorage.getItem('staffUser') || 'null'),
+  token: getStoredToken(),
+  user: getStoredUser(),
   lang: localStorage.getItem('lang') || 'me',
   page: 'available',
   availableJobs: [],
   myJobs: [],
-  authStep: 'phone',
+  authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
+  keepSignedIn: true,
   phone: '',
   countryCode: '+382',
   devCode: '',
+  newStaffCredentials: null,
   authError: '',
 };
 
@@ -398,9 +474,28 @@ async function api(path, opts={}){
 function renderAuth(){
   let inner = '';
 
-  if(state.authStep === 'phone'){
+  if(state.authStep === 'login'){
     inner = `
       <div class="tagline">${t('tagline')}</div>
+      <form id="login-form">
+        <div class="field"><label>${t('usernameLabel')}</label><input name="username" required autofocus autocapitalize="off" /></div>
+        <div class="field"><label>${t('passwordLabel')}</label><input name="password" type="password" required /></div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin:-6px 0 16px; cursor:pointer;">
+          <input type="checkbox" id="keep-signed-in" ${state.keepSignedIn ? 'checked' : ''} />
+          ${t('keepSignedInLabel')}
+        </label>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre" type="submit">${t('loginBtn')}</button>
+      </form>
+      <div style="text-align:center; margin-top:16px;">
+        <span id="goto-first-activation" style="font-size:12.5px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('firstTimeLink')}</span>
+      </div>
+    `;
+  }
+
+  if(state.authStep === 'phone'){
+    inner = `
+      <div class="tagline">${t('firstActivationTagline')}</div>
       <form id="phone-form">
         <div class="field">
           <label>${t('authPhoneLabel')}</label>
@@ -415,6 +510,9 @@ function renderAuth(){
         <button class="btn ochre" type="submit">${t('authSendCode')}</button>
       </form>
       <div class="hint">${t('authPhoneHint')}</div>
+      <div style="text-align:center; margin-top:16px;">
+        <span id="back-to-login" style="font-size:12.5px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('backToLoginLink')}</span>
+      </div>
     `;
   }
 
@@ -448,6 +546,20 @@ function renderAuth(){
     `;
   }
 
+  if(state.authStep === 'credentials' && state.newStaffCredentials){
+    inner = `
+      <div class="tagline">${t('credentialsTagline')}</div>
+      <div style="background:var(--bg); border:1.5px dashed var(--sage); border-radius:10px; padding:16px; margin-bottom:16px;">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${t('usernameLabel')}</div>
+        <div style="font-size:18px; font-weight:700; color:var(--navy); margin-bottom:12px; font-family:monospace;">${state.newStaffCredentials.username}</div>
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${t('passwordLabel')}</div>
+        <div style="font-size:18px; font-weight:700; color:var(--navy); font-family:monospace;">${state.newStaffCredentials.password}</div>
+      </div>
+      <div class="hint" style="margin-top:0;">${t('credentialsHint')}</div>
+      <button class="btn ochre" id="credentials-continue" style="margin-top:16px;">${t('credentialsContinueBtn')}</button>
+    `;
+  }
+
   return `
   <div class="auth-wrap">
     <div class="auth-card">
@@ -462,15 +574,24 @@ function renderAuth(){
 
 /* ================== PANEL ================== */
 function renderPanel(){
+  const isOnline = !!state.user.isOnline;
   return `
   <div class="topbar">
     <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="28" height="28" ')}<h1>MICISTORad</h1></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span style="font-size:11.5px; font-weight:700; color:${isOnline?'#5EE0AE':'#9FB3AE'};">${isOnline ? t('onlineLabel') : t('offlineLabel')}</span>
+      <label class="online-switch">
+        <input type="checkbox" id="online-toggle" ${isOnline ? 'checked' : ''} />
+        <span class="online-slider"></span>
+      </label>
+    </div>
     ${langSwitch()}
     <div style="display:flex; align-items:center; gap:12px;">
       <div class="who">${state.user.name}</div>
       <div class="logout" id="logout">${t('logout')}</div>
     </div>
   </div>
+  ${!isOnline ? `<div class="offline-banner">${t('offlineHint')}</div>` : ''}
   <div class="tabs">
     <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
     <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
@@ -519,7 +640,7 @@ function renderJobCard(j, mode){
     </div>
     <div class="job-actions">
       <a class="btn ghost btn-sm" style="text-align:center; text-decoration:none;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
-      ${mode==='available' ? `<button class="btn ochre btn-sm" data-claim="${j.id}">${t('claimBtn')}</button>` : ''}
+      ${mode==='available' ? `<button class="btn ochre btn-sm" data-claim="${j.id}" ${!state.user.isOnline?'disabled style="opacity:.5; cursor:not-allowed;"':''}>${t('claimBtn')}</button>` : ''}
       ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
@@ -550,6 +671,27 @@ function attachHandlers(){
     render();
   });
 
+  const loginForm = document.getElementById('login-form');
+  if(loginForm) loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(loginForm));
+    const keepSignedIn = document.getElementById('keep-signed-in').checked;
+    try{
+      const data = await api('/auth/staff-login', { method:'POST', body: JSON.stringify({ username: fd.username, password: fd.password }) });
+      state.token = data.token; state.user = data.user;
+      state.keepSignedIn = keepSignedIn;
+      storeSession(data.token, data.user, keepSignedIn);
+      state.authError = '';
+      await loadAll();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const gotoFirstActivation = document.getElementById('goto-first-activation');
+  if(gotoFirstActivation) gotoFirstActivation.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
+
+  const backToLogin = document.getElementById('back-to-login');
+  if(backToLogin) backToLogin.onclick = () => { state.authStep = 'login'; state.authError = ''; render(); };
+
   const countryCodeSelect = document.getElementById('country-code-select');
   if(countryCodeSelect) countryCodeSelect.onchange = () => {
     state.countryCode = COUNTRY_CODES[Number(countryCodeSelect.value)].code;
@@ -576,18 +718,13 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(otpForm));
     try{
       const data = await api('/auth/verify-otp', { method:'POST', body: JSON.stringify({ phone: state.phone, code: fd.code }) });
+      // Bu geçici token sadece kimlik doğrulamak ve giriş bilgilerini
+      // üretmek için kullanılıyor - kalıcı oturum kullanıcı adı/şifre
+      // ile açılacak (complete-profile sonrası).
       state.token = data.token;
-      localStorage.setItem('staffToken', data.token);
-      if(data.isNewUser || data.user.accountType !== 'staff'){
-        state.authStep = 'profile';
-        state.authError = '';
-        render();
-      } else {
-        state.user = data.user;
-        localStorage.setItem('staffUser', JSON.stringify(data.user));
-        state.authError = '';
-        await loadAll();
-      }
+      state.authStep = 'profile';
+      state.authError = '';
+      render();
     }catch(err){ state.authError = err.message; render(); }
   };
 
@@ -600,12 +737,19 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(profileForm));
     try{
       const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify({ name: fd.name, accountType: 'staff' }) });
-      state.token = data.token; state.user = data.user;
-      localStorage.setItem('staffToken', data.token);
-      localStorage.setItem('staffUser', JSON.stringify(data.user));
+      state.newStaffCredentials = data.staffCredentials;
+      state.authStep = 'credentials';
       state.authError = '';
-      await loadAll();
+      state.token = null; // artık kullanıcı adı/şifre ile tekrar giriş yapacak
+      render();
     }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const credentialsContinue = document.getElementById('credentials-continue');
+  if(credentialsContinue) credentialsContinue.onclick = () => {
+    state.authStep = 'login';
+    state.newStaffCredentials = null;
+    render();
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = () => {
@@ -614,8 +758,19 @@ function attachHandlers(){
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
-    localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser');
-    state.token = null; state.user = null; state.authStep = 'phone'; render();
+    clearSession();
+    state.token = null; state.user = null; state.authStep = 'login'; render();
+  };
+
+  const onlineToggle = document.getElementById('online-toggle');
+  if(onlineToggle) onlineToggle.onchange = async () => {
+    const isOnline = onlineToggle.checked;
+    try{
+      await api('/auth/staff-status', { method:'PATCH', body: JSON.stringify({ isOnline }) });
+      state.user.isOnline = isOnline;
+      storeSession(state.token, state.user, state.keepSignedIn);
+      await loadAll();
+    }catch(err){ showToast(err.message); render(); }
   };
 
   document.querySelectorAll('[data-claim]').forEach(el => el.onclick = async () => {
@@ -638,13 +793,13 @@ function attachHandlers(){
 /* ================== INIT ================== */
 (async function init(){
   if(state.token && !state.user){
-    localStorage.removeItem('staffToken'); state.token = null;
+    clearSession(); state.token = null;
   }
   render();
   if(state.token){
     try{ await loadAll(); } catch(err){
-      localStorage.removeItem('staffToken'); localStorage.removeItem('staffUser');
-      state.token = null; render();
+      clearSession();
+      state.token = null; state.user = null; render();
     }
   }
 })();
