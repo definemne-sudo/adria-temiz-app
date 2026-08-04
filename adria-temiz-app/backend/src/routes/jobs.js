@@ -65,6 +65,9 @@ router.post('/', (req, res) => {
   if (isCommonArea && property.category !== 'common_area') {
     return res.status(400).json({ error: 'Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.' });
   }
+  if (serviceKey === 'office' && property.category !== 'office') {
+    return res.status(400).json({ error: 'Bu hizmet yalnızca "Ofis / İşyeri" kategorili bir mülk için sipariş edilebilir.' });
+  }
 
   // Ortak alan siparişlerinde halı/koltuk gibi ekstra hizmetler yok -
   // gönderilse bile yok sayılır.
