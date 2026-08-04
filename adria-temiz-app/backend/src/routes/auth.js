@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
@@ -8,6 +9,38 @@ const { syncPropertyCalendar } = require('../services/icalSync');
 const router = express.Router();
 
 const OTP_TTL_MINUTES = 5;
+
+// Personel hesabı, telefon doğrulamasıyla bir kez "aktive" edildiğinde
+// (bkz. complete-profile) sistem otomatik bir kullanıcı adı + şifre üretir.
+// Bundan sonraki tüm girişler bu bilgilerle yapılır, tekrar SMS gerekmez -
+// hem personel için daha kolay hem bize SMS maliyeti çıkarmaz.
+// NOT: Admin paneli yazıldığında, bu üretim admin tarafından yapılan/
+// görüntülenen bir akışa dönüştürülebilir - şu an otomatik üretiyoruz.
+function slugifyName(name) {
+  return (name || 'personel')
+    .toLowerCase()
+    .replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
+    .replace(/[öÖ]/g, 'o').replace(/[şŞ]/g, 's').replace(/[üÜ]/g, 'u')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 12) || 'personel';
+}
+
+function generateUsername(name) {
+  const base = slugifyName(name);
+  for (let i = 0; i < 20; i++) {
+    const candidate = base + Math.floor(100 + Math.random() * 900);
+    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(candidate);
+    if (!exists) return candidate;
+  }
+  return base + Date.now();
+}
+
+function generatePassword() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
 
 function normalizePhone(raw) {
   // Boşluk/tire gibi karakterleri temizler, rakam ve baştaki '+' kalır.
@@ -134,6 +167,19 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
     req.user.id
   );
 
+  // Personel hesabı aktive ediliyor ya da telefonla kimlik doğrulayıp
+  // giriş bilgilerini sıfırlıyor (şifresini unutan personel için de bu
+  // aynı akış - "şifremi unuttum" yerine geçiyor). Her çağrıda yeni
+  // kullanıcı adı + şifre üretilip eskisinin yerine geçer.
+  let staffCredentials = null;
+  if (accountType === 'staff') {
+    const username = generateUsername(name);
+    const plainPassword = generatePassword();
+    const passwordHash = bcrypt.hashSync(plainPassword, 10);
+    db.prepare('UPDATE users SET username = ?, password_hash = ? WHERE id = ?').run(username, passwordHash, req.user.id);
+    staffCredentials = { username, password: plainPassword };
+  }
+
   let createdProperty = null;
   let syncResult = null;
   if (accountType === 'individual' && property && (property.city || property.sizeSqm || property.name)) {
@@ -186,11 +232,58 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
       companyName: user.company_name,
       taxNumber: user.tax_number,
       billingAddress: user.billing_address,
+      username: user.username,
+      isOnline: !!user.is_online,
       profileCompleted: true,
     },
     property: createdProperty,
     syncResult,
+    staffCredentials,
   });
+});
+
+// Personel girişi - telefon/SMS değil, sabit kullanıcı adı + şifre ile.
+// Kullanıcı adı/şifre complete-profile sırasında bir kez üretilip personele
+// verilir (bkz. yukarısı).
+router.post('/staff-login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Kullanıcı adı ve şifre zorunlu.' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND account_type = ?').get(username.trim(), 'staff');
+  if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Kullanıcı adı veya şifre hatalı.' });
+  }
+
+  const token = jwt.sign(
+    { id: user.id, phone: user.phone, accountType: user.account_type },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      phone: user.phone,
+      name: user.name,
+      accountType: user.account_type,
+      username: user.username,
+      isOnline: !!user.is_online,
+      profileCompleted: !!user.profile_completed,
+    },
+  });
+});
+
+// Personelin çevrimiçi/çevrimdışı durumunu değiştirmesi - çevrimdışıyken
+// yeni iş alamaz (bkz. jobs.js /assign).
+router.patch('/staff-status', requireAuth, (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
+  const { isOnline } = req.body;
+  db.prepare('UPDATE users SET is_online = ? WHERE id = ?').run(isOnline ? 1 : 0, req.user.id);
+  res.json({ isOnline: !!isOnline });
 });
 
 module.exports = router;
