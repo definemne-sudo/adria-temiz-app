@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS otp_requests (
 -- Acil/destek chat mesajları. Şu an tek yönlü çalışıyor (müşteri yazıyor,
 -- kayıt altına alınıyor) - personel paneli yazıldığında admin buradan
 -- görüp yanıtlayabilecek (sender='admin' ile).
+-- Personel başvuruları: MICISTO'da çalışmak isteyenlerin, hesap açmadan
+-- doldurduğu ön başvuru formu. Admin paneli yazıldığında buradan
+-- onaylanıp gerçek 'staff' hesabına dönüştürülecek (personel app'i o zaman verilir).
+CREATE TABLE IF NOT EXISTS staff_applications (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  city TEXT,
+  message TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS chat_messages (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id),
