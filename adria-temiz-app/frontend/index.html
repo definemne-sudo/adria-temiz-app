@@ -382,6 +382,7 @@ const TRANSLATIONS = {
     sqmPerFloorLabel: "Kat başına m²",
     pleaseSelectSubOption: "Lütfen en az bir hizmet seç.",
     noBuildingGroupsHint: "Ortak Alan Temizliği talep edebilmen için önce \"Ortak Alan\" kategorisiyle bir mülk eklemelisin.",
+    noOfficePropertyHint: "Bu hizmeti talep edebilmen için önce \"Ofis / İşyeri\" kategorisiyle bir mülk eklemelisin.",
     corridorSqmLabel: "Koridor alanı (m²)",
     elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
     invoiceLabel: "🧾 Fatura",
@@ -569,6 +570,7 @@ const TRANSLATIONS = {
     sqmPerFloorLabel: "m² per floor",
     pleaseSelectSubOption: "Please select at least one service.",
     noBuildingGroupsHint: "To request Common Area Cleaning, first add a property with the \"Common Area\" category.",
+    noOfficePropertyHint: "To request this service, first add a property with the \"Office/Shop\" category.",
     corridorSqmLabel: "Corridor area (m²)",
     elevatorCapacityLabel: "Elevator capacity (people)",
     invoiceLabel: "🧾 Invoice",
@@ -756,6 +758,7 @@ const TRANSLATIONS = {
     sqmPerFloorLabel: "m² po spratu",
     pleaseSelectSubOption: "Molimo izaberi bar jednu uslugu.",
     noBuildingGroupsHint: "Da bi naručio/la Čišćenje zajedničkih prostorija, prvo dodaj nekretninu sa kategorijom \"Zajednički prostor\".",
+    noOfficePropertyHint: "Da bi naručio/la ovu uslugu, prvo dodaj nekretninu sa kategorijom \"Poslovni prostor\".",
     corridorSqmLabel: "Površina hodnika (m²)",
     elevatorCapacityLabel: "Kapacitet lifta (osobe)",
     invoiceLabel: "🧾 Faktura",
@@ -1487,13 +1490,16 @@ function renderServices(){
       const label = serviceLabel(s.key);
       const isGroup = !!s.isGroup;
       const isOpen = state.bookingService === s.key;
-      const preview = !isGroup ? calcPriceClient(s, { sizeSqm: selectedProperty?.size_sqm }) : null;
+      const previewProperty = s.key === 'office'
+        ? (props.find(p => p.category === 'office' && p.id === state.bookingPropertyId) || props.find(p => p.category === 'office'))
+        : selectedProperty;
+      const preview = !isGroup ? calcPriceClient(s, { sizeSqm: previewProperty?.size_sqm }) : null;
       return `
       <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
         <div class="service-icon">${serviceIconHtml(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
-        ${preview !== null ? `<div class="price">${preview} €${selectedProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${selectedProperty.size_sqm} m²</span>` : ''}</div>` : ''}
+        ${preview !== null ? `<div class="price">${preview} €${previewProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${previewProperty.size_sqm} m²</span>` : ''}</div>` : ''}
         <div class="row-actions">
           <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
@@ -1644,16 +1650,35 @@ function renderBookingPanel(service, props, selectedProperty){
 
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
-  const basePrice = calcPriceClient(service, { sizeSqm: selectedProperty?.size_sqm });
+
+  // Ofis / Dükkan / Çalışma Alanı Temizliği: sadece "Ofis / İşyeri"
+  // kategorili mülkler seçilebilir. Hiç yoksa sipariş oluşturulamaz.
+  let effectiveProps = props;
+  let effectiveSelectedProperty = selectedProperty;
+  if(service.key === 'office'){
+    effectiveProps = props.filter(p => p.category === 'office');
+    if(effectiveProps.length === 0){
+      return `
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); text-align:center;">
+        <div class="property-avatar" style="margin:0 auto 12px;"><img src="${categoryIconSrc('office')}" alt="" /></div>
+        <div class="hint" style="margin:0;">${t('noOfficePropertyHint')}</div>
+        <button type="button" class="btn ochre btn-sm" id="goto-add-property-office" style="width:auto; margin-top:14px;">${t('addPropertyCta')}</button>
+      </div>
+      `;
+    }
+    effectiveSelectedProperty = effectiveProps.find(p => p.id === state.bookingPropertyId) || effectiveProps[0];
+  }
+
+  const basePrice = calcPriceClient(service, { sizeSqm: effectiveSelectedProperty?.size_sqm });
   const total = basePrice + suppliesFee + bookingAddonsTotal();
 
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
-    ${props.length > 1 ? `
+    ${effectiveProps.length > 1 ? `
       <div class="field">
         <label>${t('bookingPropertyLabel')}</label>
         <select id="booking-property-select">
-          ${props.map(p => `<option value="${p.id}" ${p.id===selectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
+          ${effectiveProps.map(p => `<option value="${p.id}" ${p.id===effectiveSelectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
         </select>
       </div>
     ` : ''}
@@ -2367,6 +2392,12 @@ function attachHandlers(){
   const gotoAddProperty = document.getElementById('goto-add-property');
   if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
 
+  const gotoAddPropertyOffice = document.getElementById('goto-add-property-office');
+  if(gotoAddPropertyOffice) gotoAddPropertyOffice.onclick = () => {
+    state.propertyCategory = 'office'; state.regLat = null; state.regLng = null;
+    state.modal = 'add-property'; render();
+  };
+
   document.querySelectorAll('[data-toggle-service]').forEach(el => el.onclick = () => {
     const key = el.dataset.toggleService;
     state.bookingService = state.bookingService === key ? null : key;
@@ -2385,7 +2416,8 @@ function attachHandlers(){
       state.bookingPropertyId = commonAreaProps[0]?.id || null;
     } else {
       const props = [...state.properties.owned, ...state.properties.delegated];
-      state.bookingPropertyId = props[0]?.id || null;
+      const eligibleProps = key === 'office' ? props.filter(p => p.category === 'office') : props;
+      state.bookingPropertyId = eligibleProps[0]?.id || null;
     }
     render();
   });
@@ -2471,7 +2503,8 @@ function attachHandlers(){
       };
     } else {
       const props = [...state.properties.owned, ...state.properties.delegated];
-      const propertyId = state.bookingPropertyId || props[0]?.id;
+      const eligibleProps = serviceKey === 'office' ? props.filter(p => p.category === 'office') : props;
+      const propertyId = state.bookingPropertyId || eligibleProps[0]?.id;
       if(!propertyId) return;
       const addons = Object.entries(state.bookingAddons)
         .filter(([, v]) => v && v.checked)
