@@ -179,6 +179,10 @@ router.post('/:id/assign', (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
   }
+  const staffUser = db.prepare('SELECT is_online FROM users WHERE id = ?').get(req.user.id);
+  if (!staffUser || !staffUser.is_online) {
+    return res.status(403).json({ error: 'Çevrimdışısın - iş alabilmek için önce çevrimiçi olmalısın.' });
+  }
   const { id } = req.params;
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
