@@ -1108,8 +1108,43 @@ function render(){
   } else {
     html = renderPanel();
   }
+
+  // innerHTML degisimi tum DOM'u sifirliyor - bu da kullanici bir alana
+  // yazarken sayfanin odagini ve kaydirma konumunu kaybetmesine, ekranin
+  // yukari zipmasina neden oluyor. Yeniden cizmeden once neye odaklanildigini
+  // ve nerede kaydirildigini kaydedip, sonra geri yukluyoruz.
+  const activeEl = document.activeElement;
+  const activeId = activeEl && activeEl.id ? activeEl.id : null;
+  const hasSelection = activeEl && typeof activeEl.selectionStart === 'number';
+  const selStart = hasSelection ? activeEl.selectionStart : null;
+  const selEnd = hasSelection ? activeEl.selectionEnd : null;
+  const pageScrollY = window.scrollY;
+  const mainScrollEl = document.querySelector('.main');
+  const mainScrollTop = mainScrollEl ? mainScrollEl.scrollTop : null;
+  const chatBodyEl = document.getElementById('chat-panel-body');
+  const chatScrollTop = chatBodyEl ? chatBodyEl.scrollTop : null;
+  const modalEl = document.querySelector('.modal');
+  const modalScrollTop = modalEl ? modalEl.scrollTop : null;
+
   document.getElementById('app').innerHTML = html;
   attachHandlers();
+
+  if(activeId){
+    const restored = document.getElementById(activeId);
+    if(restored){
+      restored.focus({ preventScroll: true });
+      if(hasSelection && restored.setSelectionRange){
+        try{ restored.setSelectionRange(selStart, selEnd); }catch(e){}
+      }
+    }
+  }
+  window.scrollTo(0, pageScrollY);
+  const newMainScrollEl = document.querySelector('.main');
+  if(newMainScrollEl && mainScrollTop !== null) newMainScrollEl.scrollTop = mainScrollTop;
+  const newChatBodyEl = document.getElementById('chat-panel-body');
+  if(newChatBodyEl && chatScrollTop !== null) newChatBodyEl.scrollTop = chatScrollTop;
+  const newModalEl = document.querySelector('.modal');
+  if(newModalEl && modalScrollTop !== null) newModalEl.scrollTop = modalScrollTop;
 }
 
 function findNextRatingJob(){
