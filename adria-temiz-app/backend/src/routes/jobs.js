@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, COMMISSION_RATE } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, COMMISSION_RATE } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -257,6 +257,69 @@ router.get('/home-summary', (req, res) => {
       netTotal: Math.round(netTotal * 100) / 100,
       commissionRate: COMMISSION_RATE,
     },
+  });
+});
+
+// Hafta/ay başlangıcını hesaplar. offset: 0=içinde bulunulan dönem,
+// -1=bir önceki, +1=bir sonraki (dönem gezinme için).
+function getPeriodRange(period, offset) {
+  const now = new Date();
+  if (period === 'month') {
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const start = new Date(target.getFullYear(), target.getMonth(), 1);
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0); // ayın son günü
+    return { start, end, totalDays: end.getDate() };
+  }
+  // hafta - Pazartesi başlangıçlı
+  const day = now.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: monday, end: sunday, totalDays: 7 };
+}
+function toDateKey(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Performans/Kazanç paneli: seçilen dönemde (hafta/ay) tamamlanan işler,
+// net kazanç (komisyon düşülmüş) ve performans bonusu (şimdilik placeholder,
+// bonus formülü netleşince doldurulacak - bkz. catalog.js).
+router.get('/performance', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const period = req.query.period === 'month' ? 'month' : 'week';
+  const offset = parseInt(req.query.offset, 10) || 0;
+  const { start, end, totalDays } = getPeriodRange(period, offset);
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+
+  const jobs = db
+    .prepare(
+      `SELECT j.*, p.name AS property_name, p.city AS property_city
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status = 'done'
+         AND date(j.completed_at) BETWEEN ? AND ?
+       ORDER BY j.completed_at DESC`
+    )
+    .all(req.user.id, startKey, endKey);
+
+  const grossTotal = jobs.reduce((sum, j) => sum + j.price, 0);
+  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0) * 100) / 100;
+  const daysWorked = new Set(jobs.map((j) => (j.completed_at || '').slice(0, 10))).size;
+  const completionRate = totalDays ? daysWorked / totalDays : 0;
+  const bonus = calcPerformanceBonus(completionRate, { period, daysWorked, totalDays });
+
+  res.json({
+    period, offset, startDate: startKey, endDate: endKey,
+    jobs, jobCount: jobs.length, grossTotal, netTotal,
+    daysWorked, totalDays, completionRate, bonus,
+    commissionRate: COMMISSION_RATE,
   });
 });
 
