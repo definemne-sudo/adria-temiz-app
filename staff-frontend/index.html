@@ -281,6 +281,10 @@ const TRANSLATIONS = {
     completionRateLabel: "Bu dönemde {{worked}}/{{total}} gün çalıştın (%{{pct}})",
     jobHistoryTitle: "Tamamlanan İşler",
     emptyHistory: "Bu dönemde tamamlanan iş yok.",
+    navRatings: "Değerlendirme",
+    ratingsSummary: "{{total}} değerlendirmeden {{like}} tanesi olumlu",
+    ratingsListTitle: "İş Bazında Değerlendirmeler",
+    emptyRatings: "Bu dönemde değerlendirme yok.",
     emptyCalendarDay: "Bu gün için onaylanmış bir işin yok.",
     greeting: "Merhaba, {{name}}",
     todaysJobsTitle: "Bugünkü İşlerin",
@@ -359,6 +363,10 @@ const TRANSLATIONS = {
     completionRateLabel: "You worked {{worked}}/{{total}} days this period ({{pct}}%)",
     jobHistoryTitle: "Completed Jobs",
     emptyHistory: "No jobs completed in this period.",
+    navRatings: "Ratings",
+    ratingsSummary: "{{like}} out of {{total}} ratings were positive",
+    ratingsListTitle: "Ratings by Job",
+    emptyRatings: "No ratings in this period.",
     emptyCalendarDay: "You have no confirmed jobs for this day.",
     greeting: "Hi, {{name}}",
     todaysJobsTitle: "Today's Jobs",
@@ -437,6 +445,10 @@ const TRANSLATIONS = {
     completionRateLabel: "Radio/la si {{worked}}/{{total}} dana u ovom periodu ({{pct}}%)",
     jobHistoryTitle: "Završeni poslovi",
     emptyHistory: "Nema završenih poslova u ovom periodu.",
+    navRatings: "Ocjene",
+    ratingsSummary: "{{like}} od {{total}} ocjena je pozitivno",
+    ratingsListTitle: "Ocjene po poslu",
+    emptyRatings: "Nema ocjena u ovom periodu.",
     emptyCalendarDay: "Nemaš potvrđenih poslova za ovaj dan.",
     greeting: "Zdravo, {{name}}",
     todaysJobsTitle: "Tvoji poslovi danas",
@@ -537,6 +549,9 @@ let state = {
   perfPeriod: 'week', // 'week' | 'month'
   perfOffset: 0,
   perfData: null,
+  ratingsPeriod: 'week',
+  ratingsOffset: 0,
+  ratingsData: null,
   availableJobs: [],
   myJobs: [],
   authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
@@ -735,11 +750,12 @@ function renderPanel(){
     <div class="tab ${state.page==='home'?'active':''}" data-page="home">${t('navHome')}</div>
     <div class="tab ${state.page==='calendar'?'active':''}" data-page="calendar">${t('navCalendar')}</div>
     <div class="tab ${state.page==='performance'?'active':''}" data-page="performance">${t('navPerformance')}</div>
+    <div class="tab ${state.page==='ratings'?'active':''}" data-page="ratings">${t('navRatings')}</div>
     <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
     <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
   </div>
   <div class="main">
-    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='available' ? renderAvailable() : renderMine()}
+    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='ratings' ? renderRatings() : state.page==='available' ? renderAvailable() : renderMine()}
   </div>
   ${state.detailJob ? renderJobDetailModal() : ''}
   `;
@@ -787,6 +803,72 @@ function renderJobCard(j, mode){
       ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
+}
+
+/* ================== DEĞERLENDİRME PANELİ ================== */
+// NOT: Müşterinin yazdığı yorum metni (staff_feedback) backend'den zaten
+// hiç gönderilmiyor - burada sadece beğeni/beğenmeme bilgisi var. Bu
+// bilinçli bir tasarım: personelin şikayet detaylarını görüp memnuniyetsiz
+// bir müşteriyle sonradan iletişime geçmeye çalışmasını önlüyoruz.
+async function loadRatings(){
+  const data = await api(`/jobs/ratings?period=${state.ratingsPeriod}&offset=${state.ratingsOffset}`);
+  state.ratingsData = data;
+  render();
+}
+
+function ratingsPeriodLabel(d){
+  if(state.ratingsPeriod === 'week'){
+    const start = new Date(d.startDate+'T00:00:00'), end = new Date(d.endDate+'T00:00:00');
+    const opts = { day:'numeric', month:'short' };
+    return `${start.toLocaleDateString(LOCALES[state.lang],opts)} – ${end.toLocaleDateString(LOCALES[state.lang],opts)}`;
+  }
+  const start = new Date(d.startDate+'T00:00:00');
+  return start.toLocaleDateString(LOCALES[state.lang], { month:'long', year:'numeric' });
+}
+
+function renderRatingRow(r){
+  const icon = serviceIconSrc(r.service_key);
+  const dateLabel = new Date((r.completed_at||'').replace(' ','T')).toLocaleDateString(LOCALES[state.lang], { day:'numeric', month:'short' });
+  const isLike = r.staff_rating === 'like';
+  return `
+  <div class="job-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
+    <div class="job-icon" style="width:38px; height:38px; flex-shrink:0;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:18px;">🧹</span>`}</div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:13px; font-weight:700; color:var(--navy);">${jobServiceLabel(r)}</div>
+      <div style="font-size:11.5px; color:var(--muted);">${r.property_name} · ${dateLabel}</div>
+    </div>
+    <div style="font-size:22px; flex-shrink:0;">${isLike ? '👍' : '👎'}</div>
+  </div>`;
+}
+
+function renderRatings(){
+  const d = state.ratingsData;
+  if(!d){
+    return `<div class="empty-state">…</div>`;
+  }
+  return `
+  <div class="option-row" style="margin-bottom:14px;">
+    <div class="choice ${state.ratingsPeriod==='week'?'selected':''}" data-ratings-period="week">${t('weekLabel')}</div>
+    <div class="choice ${state.ratingsPeriod==='month'?'selected':''}" data-ratings-period="month">${t('monthLabel')}</div>
+  </div>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <button class="btn ghost btn-sm" id="ratings-prev" style="width:auto; padding:6px 12px;">‹</button>
+    <div style="font-size:13.5px; font-weight:700; color:var(--navy);">${ratingsPeriodLabel(d)}</div>
+    <button class="btn ghost btn-sm" id="ratings-next" style="width:auto; padding:6px 12px;">›</button>
+  </div>
+
+  <div class="job-card" style="align-items:center; text-align:center;">
+    ${d.totalRated === 0 ? `
+      <div style="font-size:13px; color:var(--muted); padding:8px 0;">${t('emptyRatings')}</div>
+    ` : `
+      <div style="font-family:'Fraunces',serif; font-size:40px; color:var(--ochre);">%${d.likePercentage}</div>
+      <div style="font-size:12px; color:var(--muted); margin-top:4px;">${t('ratingsSummary', { like: d.likeCount, total: d.totalRated })}</div>
+    `}
+  </div>
+
+  <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:22px 0 10px;">${t('ratingsListTitle')}</div>
+  ${d.ratings.length === 0 ? `<div class="empty-state">${t('emptyRatings')}</div>` : d.ratings.map(r => renderRatingRow(r)).join('')}
+  `;
 }
 
 /* ================== PERFORMANS/KAZANÇ PANELİ ================== */
@@ -1169,6 +1251,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; render();
     if(state.page === 'performance') await loadPerformance();
+    if(state.page === 'ratings') await loadRatings();
   });
 
   document.querySelectorAll('[data-perf-period]').forEach(el => el.onclick = async () => {
@@ -1179,6 +1262,15 @@ function attachHandlers(){
   if(perfPrev) perfPrev.onclick = async () => { state.perfOffset -= 1; await loadPerformance(); };
   const perfNext = document.getElementById('perf-next');
   if(perfNext) perfNext.onclick = async () => { state.perfOffset += 1; await loadPerformance(); };
+
+  document.querySelectorAll('[data-ratings-period]').forEach(el => el.onclick = async () => {
+    state.ratingsPeriod = el.dataset.ratingsPeriod; state.ratingsOffset = 0;
+    await loadRatings();
+  });
+  const ratingsPrev = document.getElementById('ratings-prev');
+  if(ratingsPrev) ratingsPrev.onclick = async () => { state.ratingsOffset -= 1; await loadRatings(); };
+  const ratingsNext = document.getElementById('ratings-next');
+  if(ratingsNext) ratingsNext.onclick = async () => { state.ratingsOffset += 1; await loadRatings(); };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
