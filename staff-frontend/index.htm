@@ -273,6 +273,14 @@ const TRANSLATIONS = {
     offlineHint: "Çevrimdışısın — iş almak için çevrimiçi ol.",
     navHome: "Home",
     navCalendar: "Takvim",
+    navPerformance: "Performans",
+    weekLabel: "Hafta",
+    monthLabel: "Ay",
+    bonusTitle: "Performans Bonusu",
+    bonusComingSoon: "Yakında",
+    completionRateLabel: "Bu dönemde {{worked}}/{{total}} gün çalıştın (%{{pct}})",
+    jobHistoryTitle: "Tamamlanan İşler",
+    emptyHistory: "Bu dönemde tamamlanan iş yok.",
     emptyCalendarDay: "Bu gün için onaylanmış bir işin yok.",
     greeting: "Merhaba, {{name}}",
     todaysJobsTitle: "Bugünkü İşlerin",
@@ -343,6 +351,14 @@ const TRANSLATIONS = {
     offlineHint: "You're offline — go online to take jobs.",
     navHome: "Home",
     navCalendar: "Calendar",
+    navPerformance: "Performance",
+    weekLabel: "Week",
+    monthLabel: "Month",
+    bonusTitle: "Performance Bonus",
+    bonusComingSoon: "Coming soon",
+    completionRateLabel: "You worked {{worked}}/{{total}} days this period ({{pct}}%)",
+    jobHistoryTitle: "Completed Jobs",
+    emptyHistory: "No jobs completed in this period.",
     emptyCalendarDay: "You have no confirmed jobs for this day.",
     greeting: "Hi, {{name}}",
     todaysJobsTitle: "Today's Jobs",
@@ -413,6 +429,14 @@ const TRANSLATIONS = {
     offlineHint: "Van si mreže — uključi se na mrežu da bi preuzimao/la poslove.",
     navHome: "Početna",
     navCalendar: "Kalendar",
+    navPerformance: "Učinak",
+    weekLabel: "Sedmica",
+    monthLabel: "Mjesec",
+    bonusTitle: "Bonus za učinak",
+    bonusComingSoon: "Uskoro",
+    completionRateLabel: "Radio/la si {{worked}}/{{total}} dana u ovom periodu ({{pct}}%)",
+    jobHistoryTitle: "Završeni poslovi",
+    emptyHistory: "Nema završenih poslova u ovom periodu.",
     emptyCalendarDay: "Nemaš potvrđenih poslova za ovaj dan.",
     greeting: "Zdravo, {{name}}",
     todaysJobsTitle: "Tvoji poslovi danas",
@@ -510,6 +534,9 @@ let state = {
   detailJob: null,
   calendarWeekStart: formatDateKey(getMonday(new Date())),
   selectedCalendarDate: formatDateKey(new Date()),
+  perfPeriod: 'week', // 'week' | 'month'
+  perfOffset: 0,
+  perfData: null,
   availableJobs: [],
   myJobs: [],
   authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
@@ -707,11 +734,12 @@ function renderPanel(){
   <div class="tabs">
     <div class="tab ${state.page==='home'?'active':''}" data-page="home">${t('navHome')}</div>
     <div class="tab ${state.page==='calendar'?'active':''}" data-page="calendar">${t('navCalendar')}</div>
+    <div class="tab ${state.page==='performance'?'active':''}" data-page="performance">${t('navPerformance')}</div>
     <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
     <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
   </div>
   <div class="main">
-    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='available' ? renderAvailable() : renderMine()}
+    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='available' ? renderAvailable() : renderMine()}
   </div>
   ${state.detailJob ? renderJobDetailModal() : ''}
   `;
@@ -759,6 +787,83 @@ function renderJobCard(j, mode){
       ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
+}
+
+/* ================== PERFORMANS/KAZANÇ PANELİ ================== */
+async function loadPerformance(){
+  const data = await api(`/jobs/performance?period=${state.perfPeriod}&offset=${state.perfOffset}`);
+  state.perfData = data;
+  render();
+}
+
+function perfPeriodLabel(d){
+  if(state.perfPeriod === 'week'){
+    const start = new Date(d.startDate+'T00:00:00'), end = new Date(d.endDate+'T00:00:00');
+    const opts = { day:'numeric', month:'short' };
+    return `${start.toLocaleDateString(LOCALES[state.lang],opts)} – ${end.toLocaleDateString(LOCALES[state.lang],opts)}`;
+  }
+  const start = new Date(d.startDate+'T00:00:00');
+  return start.toLocaleDateString(LOCALES[state.lang], { month:'long', year:'numeric' });
+}
+
+function renderHistoryRow(j){
+  const icon = serviceIconSrc(j.service_key);
+  const net = Math.round(j.price * (1 - state.perfData.commissionRate) * 100) / 100;
+  const dateLabel = new Date((j.completed_at||'').replace(' ','T')).toLocaleDateString(LOCALES[state.lang], { day:'numeric', month:'short' });
+  return `
+  <div class="job-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
+    <div class="job-icon" style="width:38px; height:38px; flex-shrink:0;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:18px;">🧹</span>`}</div>
+    <div style="flex:1; min-width:0;">
+      <div style="font-size:13px; font-weight:700; color:var(--navy);">${jobServiceLabel(j)}</div>
+      <div style="font-size:11.5px; color:var(--muted);">${j.property_name} · ${dateLabel}</div>
+    </div>
+    <div style="font-family:'Fraunces',serif; font-size:15px; color:var(--ochre); flex-shrink:0;">+${net.toFixed(2)} €</div>
+  </div>`;
+}
+
+function renderPerformance(){
+  const d = state.perfData;
+  if(!d){
+    return `<div class="empty-state">…</div>`;
+  }
+  const ratePct = Math.round(d.commissionRate * 100);
+  const commission = Math.round((d.grossTotal - d.netTotal) * 100) / 100;
+  const completionPct = Math.round(d.completionRate * 100);
+
+  return `
+  <div class="option-row" style="margin-bottom:14px;">
+    <div class="choice ${state.perfPeriod==='week'?'selected':''}" data-perf-period="week">${t('weekLabel')}</div>
+    <div class="choice ${state.perfPeriod==='month'?'selected':''}" data-perf-period="month">${t('monthLabel')}</div>
+  </div>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <button class="btn ghost btn-sm" id="perf-prev" style="width:auto; padding:6px 12px;">‹</button>
+    <div style="font-size:13.5px; font-weight:700; color:var(--navy);">${perfPeriodLabel(d)}</div>
+    <button class="btn ghost btn-sm" id="perf-next" style="width:auto; padding:6px 12px;">›</button>
+  </div>
+
+  <div class="job-card">
+    <div style="font-size:12px; color:var(--muted);">${t('earningsSubtitle')} · ${t('earningsJobsCount', { count: d.jobCount })}</div>
+    <div style="font-family:'Fraunces',serif; font-size:34px; color:var(--ochre); margin:4px 0 10px;">${d.netTotal.toFixed(2)} €</div>
+    <div style="font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; padding-top:10px; border-top:1px solid var(--line);">
+      <span>${t('earningsGrossLabel')}</span><span>${d.grossTotal.toFixed(2)} €</span>
+    </div>
+    <div style="font-size:12.5px; color:var(--muted); display:flex; justify-content:space-between; margin-top:5px;">
+      <span>${t('earningsCommissionLabel', { rate: ratePct })}</span><span>-${commission.toFixed(2)} €</span>
+    </div>
+  </div>
+
+  <div class="job-card" style="margin-top:14px; border-color:var(--sage); border-width:1.5px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em;">${t('bonusTitle')}</div>
+      <span style="font-size:10.5px; background:rgba(29,158,115,.14); color:var(--sage-dark); padding:2px 8px; border-radius:20px; font-weight:700;">${t('bonusComingSoon')}</span>
+    </div>
+    <div style="font-family:'Fraunces',serif; font-size:26px; color:var(--navy);">${d.bonus.toFixed(2)} €</div>
+    <div style="font-size:12px; color:var(--muted); margin-top:8px;">${t('completionRateLabel', { worked: d.daysWorked, total: d.totalDays, pct: completionPct })}</div>
+  </div>
+
+  <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:22px 0 10px;">${t('jobHistoryTitle')}</div>
+  ${d.jobs.length === 0 ? `<div class="empty-state">${t('emptyHistory')}</div>` : d.jobs.map(j => renderHistoryRow(j)).join('')}
+  `;
 }
 
 /* ================== TAKVİM PANELİ ================== */
@@ -1061,9 +1166,19 @@ function attachHandlers(){
     render();
   };
 
-  document.querySelectorAll('[data-page]').forEach(el => el.onclick = () => {
+  document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; render();
+    if(state.page === 'performance') await loadPerformance();
   });
+
+  document.querySelectorAll('[data-perf-period]').forEach(el => el.onclick = async () => {
+    state.perfPeriod = el.dataset.perfPeriod; state.perfOffset = 0;
+    await loadPerformance();
+  });
+  const perfPrev = document.getElementById('perf-prev');
+  if(perfPrev) perfPrev.onclick = async () => { state.perfOffset -= 1; await loadPerformance(); };
+  const perfNext = document.getElementById('perf-next');
+  if(perfNext) perfNext.onclick = async () => { state.perfOffset += 1; await loadPerformance(); };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
