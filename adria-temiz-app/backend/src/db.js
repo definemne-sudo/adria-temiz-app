@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   staff_rating TEXT CHECK (staff_rating IS NULL OR staff_rating IN ('like','dislike')),
   staff_feedback TEXT,
   rated_at TEXT,
+  completed_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(property_id, ical_uid)
 );
