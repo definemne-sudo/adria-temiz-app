@@ -13,6 +13,7 @@ const SERVICES = [
     base: 20,
     rate: 0.28,
     min: 30,
+    estimatedMinutes: 60,
     accountTypes: ['individual', 'company'],
   },
   {
@@ -22,6 +23,7 @@ const SERVICES = [
     base: 30,
     rate: 0.48,
     min: 45,
+    estimatedMinutes: 150,
     accountTypes: ['individual'],
   },
   {
@@ -31,6 +33,7 @@ const SERVICES = [
     base: 25,
     rate: 0.22,
     min: 40,
+    estimatedMinutes: 90,
     accountTypes: ['individual', 'company'],
   },
   {
@@ -54,6 +57,7 @@ const COMMON_AREA_SUB_OPTIONS = [
     base: 15,
     ratePerFloor: 4,
     min: 25,
+    estimatedMinutes: 40,
     paramType: 'floors', // { floorCount }
   },
   {
@@ -64,6 +68,7 @@ const COMMON_AREA_SUB_OPTIONS = [
     ratePerSqm: 0.3,
     ratePerFloor: 3,
     min: 30,
+    estimatedMinutes: 35,
     paramType: 'corridor', // { floorCount, sqmPerFloor }
   },
   {
@@ -73,6 +78,7 @@ const COMMON_AREA_SUB_OPTIONS = [
     base: 12,
     ratePerCapacity: 1.4,
     min: 20,
+    estimatedMinutes: 20,
     paramType: 'elevator', // { elevatorCapacity }
   },
 ];
@@ -89,6 +95,11 @@ const SUPPLIES_FEES = {
   noEquipment: 15,
   noChemicals: 10,
 };
+
+// MICISTO'nun her tamamlanan işten aldığı komisyon oranı - personel
+// kazancı hesaplanırken bu düşülür. NOT: Başlangıç varsayımı (%20),
+// gerçek iş modeli netleşince birlikte ayarlanacak.
+const COMMISSION_RATE = 0.20;
 
 function getService(key) {
   const service = SERVICES.find((s) => s.key === key);
@@ -157,8 +168,29 @@ function calcSuppliesFee({ hasEquipment, hasChemicals }) {
   return fee;
 }
 
+// Bir işin fiyatından MICISTO komisyonu düşüldükten sonra personele
+// kalan net kazanç.
+function calcNetEarning(price) {
+  return Math.round(price * (1 - COMMISSION_RATE) * 100) / 100;
+}
+
+// Bir işin toplam tahmini süresi (dakika). Ortak alan siparişlerinde
+// seçilen tüm alt hizmetlerin süreleri toplanır.
+function estimateJobMinutes(serviceKey, serviceParams) {
+  if (serviceKey === 'common_area') {
+    const selections = (serviceParams && serviceParams.selections) || [];
+    return selections.reduce((sum, sel) => {
+      try { return sum + (getCommonAreaSubOption(sel.key).estimatedMinutes || 0); }
+      catch (e) { return sum; }
+    }, 0);
+  }
+  try { return getService(serviceKey).estimatedMinutes || 0; }
+  catch (e) { return 0; }
+}
+
 module.exports = {
-  SERVICES, COMMON_AREA_SUB_OPTIONS, ADDONS, SUPPLIES_FEES,
+  SERVICES, COMMON_AREA_SUB_OPTIONS, ADDONS, SUPPLIES_FEES, COMMISSION_RATE,
   getService, getAddon, getCommonAreaSubOption,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
+  calcNetEarning, estimateJobMinutes,
 };
