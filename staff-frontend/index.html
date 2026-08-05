@@ -552,7 +552,6 @@ let state = {
   ratingsPeriod: 'week',
   ratingsOffset: 0,
   ratingsData: null,
-  availableJobs: [],
   myJobs: [],
   authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
   keepSignedIn: true,
@@ -751,11 +750,10 @@ function renderPanel(){
     <div class="tab ${state.page==='calendar'?'active':''}" data-page="calendar">${t('navCalendar')}</div>
     <div class="tab ${state.page==='performance'?'active':''}" data-page="performance">${t('navPerformance')}</div>
     <div class="tab ${state.page==='ratings'?'active':''}" data-page="ratings">${t('navRatings')}</div>
-    <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
     <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
   </div>
   <div class="main">
-    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='ratings' ? renderRatings() : state.page==='available' ? renderAvailable() : renderMine()}
+    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='ratings' ? renderRatings() : renderMine()}
   </div>
   ${state.detailJob ? renderJobDetailModal() : ''}
   `;
@@ -799,7 +797,6 @@ function renderJobCard(j, mode){
     </div>
     <div class="job-actions">
       <a class="btn ghost btn-sm" style="text-align:center; text-decoration:none;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
-      ${mode==='available' ? `<button class="btn ochre btn-sm" data-claim="${j.id}" ${!state.user.isOnline?'disabled style="opacity:.5; cursor:not-allowed;"':''}>${t('claimBtn')}</button>` : ''}
       ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
@@ -981,7 +978,6 @@ function weekRangeLabel(weekDates){
 function findJobById(id){
   return state.homeJobs.find(j => j.id === id)
     || state.myJobs.find(j => j.id === id)
-    || state.availableJobs.find(j => j.id === id)
     || null;
 }
 function estimateJobMinutesClient(job){
@@ -1134,10 +1130,6 @@ function renderJobDetailModal(){
   </div>`;
 }
 
-function renderAvailable(){
-  if(state.availableJobs.length === 0) return `<div class="empty-state">${t('emptyAvailable')}</div>`;
-  return state.availableJobs.map(j => renderJobCard(j, 'available')).join('');
-}
 function renderMine(){
   if(state.myJobs.length === 0) return `<div class="empty-state">${t('emptyMyJobs')}</div>`;
   return state.myJobs.map(j => renderJobCard(j, 'mine')).join('');
@@ -1145,8 +1137,7 @@ function renderMine(){
 
 /* ================== VERİ YÜKLEME ================== */
 async function loadAll(){
-  const [available, mine, home] = await Promise.all([ api('/jobs/pending'), api('/jobs/mine'), api('/jobs/home-summary') ]);
-  state.availableJobs = available;
+  const [mine, home] = await Promise.all([ api('/jobs/mine'), api('/jobs/home-summary') ]);
   state.myJobs = mine;
   state.homeJobs = home.todaysJobs;
   state.earningsToday = home.earningsToday;
@@ -1323,13 +1314,6 @@ function attachHandlers(){
   const detailBackdrop = document.getElementById('detail-backdrop');
   if(detailBackdrop) detailBackdrop.onclick = (e) => { if(e.target === detailBackdrop){ state.detailJob = null; render(); } };
 
-  document.querySelectorAll('[data-claim]').forEach(el => el.onclick = async () => {
-    try{
-      await api(`/jobs/${el.dataset.claim}/assign`, { method:'POST' });
-      showToast(t('toastClaimed'));
-      await loadAll();
-    }catch(err){ showToast(err.message || t('toastClaimFailed')); await loadAll(); }
-  });
 
   document.querySelectorAll('[data-complete]').forEach(el => el.onclick = async () => {
     try{
