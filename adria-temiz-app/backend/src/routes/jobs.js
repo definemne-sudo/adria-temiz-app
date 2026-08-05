@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, COMMISSION_RATE } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -213,6 +213,53 @@ router.get('/mine', (req, res) => {
   res.json(rows);
 });
 
+// Home paneli için: bugün yapılacak (onaylanmış/devam eden) işler +
+// bugün tamamlanan işlerden oluşan kazanç özeti (MICISTO komisyonu
+// düşülmüş hali). "Bugün" karşılaştırması sunucu saatine göre yapılır.
+router.get('/home-summary', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const propertyFields = `p.name AS property_name, p.address AS property_address, p.city AS property_city,
+                           p.latitude AS property_latitude, p.longitude AS property_longitude`;
+
+  const todaysJobs = db
+    .prepare(
+      `SELECT j.*, ${propertyFields}
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status IN ('assigned','in_progress')
+         AND date(j.checkout_at) = date('now')
+       ORDER BY j.checkout_at ASC`
+    )
+    .all(req.user.id)
+    .map((j) => ({ ...j, estimatedMinutes: estimateJobMinutes(j.service_key, JSON.parse(j.service_params || 'null')) }));
+
+  const completedToday = db
+    .prepare(
+      `SELECT j.*, ${propertyFields}
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status = 'done'
+         AND date(j.completed_at) = date('now')
+       ORDER BY j.completed_at DESC`
+    )
+    .all(req.user.id);
+
+  const grossTotal = completedToday.reduce((sum, j) => sum + j.price, 0);
+  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.price), 0);
+
+  res.json({
+    todaysJobs,
+    earningsToday: {
+      jobCount: completedToday.length,
+      grossTotal,
+      netTotal: Math.round(netTotal * 100) / 100,
+      commissionRate: COMMISSION_RATE,
+    },
+  });
+});
+
 // Durum güncelleme. 'done' olduğunda ödeme de otomatik sonuçlanır - müşteriye
 // ikinci bir "öde" adımı çıkarmıyoruz: kart zaten sipariş anında emanete
 // alınmıştı (held), burada personelin/sistemin tamamlama onayıyla serbest
@@ -249,8 +296,10 @@ router.patch('/:id/status', (req, res) => {
   const shouldFinalizePayment = status === 'done' && job.payment_method && job.payment_status !== 'released';
   if (shouldFinalizePayment) {
     db.prepare(
-      "UPDATE cleaning_jobs SET status = ?, payment_status = 'released' WHERE id = ?"
+      "UPDATE cleaning_jobs SET status = ?, payment_status = 'released', completed_at = datetime('now') WHERE id = ?"
     ).run(status, id);
+  } else if (status === 'done') {
+    db.prepare("UPDATE cleaning_jobs SET status = ?, completed_at = datetime('now') WHERE id = ?").run(status, id);
   } else {
     db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
   }
