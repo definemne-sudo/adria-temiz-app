@@ -174,6 +174,15 @@ function calcNetEarning(price) {
   return Math.round(price * (1 - COMMISSION_RATE) * 100) / 100;
 }
 
+// Personel performans bonusu - o dönemde (hafta/ay) çalıştığı gün sayısının
+// toplam gün sayısına oranına (ya da benzer bir metriğe) göre hesaplanacak.
+// NOT: Gerçek formül/eşik değerleri henüz belirlenmedi - kullanıcıyla
+// birlikte netleşince doldurulacak. Şimdilik her zaman 0 dönüyor, arayüzde
+// bonus alanı hazır bekliyor.
+function calcPerformanceBonus(completionRate, context) {
+  return 0;
+}
+
 // Bir işin toplam tahmini süresi (dakika). Ortak alan siparişlerinde
 // seçilen tüm alt hizmetlerin süreleri toplanır.
 function estimateJobMinutes(serviceKey, serviceParams) {
@@ -192,5 +201,5 @@ module.exports = {
   SERVICES, COMMON_AREA_SUB_OPTIONS, ADDONS, SUPPLIES_FEES, COMMISSION_RATE,
   getService, getAddon, getCommonAreaSubOption,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
-  calcNetEarning, estimateJobMinutes,
+  calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
 };
