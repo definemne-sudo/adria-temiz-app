@@ -92,10 +92,10 @@
   .who{font-size:11px; color:#9FB3AE;}
   .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline; white-space:nowrap;}
 
-  .tabs{display:flex; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:57px; z-index:19;}
+  .tabs{display:flex; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:57px; z-index:19; overflow-x:auto;}
   .tab{
-    flex:1; text-align:center; padding:13px 8px; font-size:13.5px; font-weight:700; color:var(--muted);
-    cursor:pointer; border-bottom:3px solid transparent;
+    flex:1; text-align:center; padding:13px 6px; font-size:12.5px; font-weight:700; color:var(--muted);
+    cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;
   }
   .tab.active{color:var(--navy); border-bottom-color:var(--ochre);}
   .tab .count{
@@ -171,6 +171,18 @@
   }
   .detail-row span{ color:var(--muted); flex-shrink:0; }
   .detail-row strong{ text-align:right; font-weight:600; }
+
+  .calendar-week{ display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:6px; }
+  .cal-day{
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    padding:10px 2px; border-radius:10px; border:1.5px solid var(--line); background:#fff; cursor:pointer;
+  }
+  .cal-day-name{ font-size:9.5px; text-transform:uppercase; color:var(--muted); font-weight:700; }
+  .cal-day-num{ font-size:15px; font-weight:700; color:var(--navy); }
+  .cal-day.has-jobs{ background:var(--navy); border-color:var(--navy); }
+  .cal-day.has-jobs .cal-day-name, .cal-day.has-jobs .cal-day-num{ color:#fff; }
+  .cal-day.is-today:not(.has-jobs){ border-color:var(--sage); }
+  .cal-day.selected{ box-shadow:0 0 0 2px var(--ochre); }
 
   @media (max-width: 480px){
     .auth-wrap{ padding:16px; }
@@ -260,6 +272,8 @@ const TRANSLATIONS = {
     offlineLabel: "Çevrimdışı",
     offlineHint: "Çevrimdışısın — iş almak için çevrimiçi ol.",
     navHome: "Home",
+    navCalendar: "Takvim",
+    emptyCalendarDay: "Bu gün için onaylanmış bir işin yok.",
     greeting: "Merhaba, {{name}}",
     todaysJobsTitle: "Bugünkü İşlerin",
     emptyToday: "Bugün için onaylanmış bir işin yok.",
@@ -328,6 +342,8 @@ const TRANSLATIONS = {
     offlineLabel: "Offline",
     offlineHint: "You're offline — go online to take jobs.",
     navHome: "Home",
+    navCalendar: "Calendar",
+    emptyCalendarDay: "You have no confirmed jobs for this day.",
     greeting: "Hi, {{name}}",
     todaysJobsTitle: "Today's Jobs",
     emptyToday: "You have no confirmed jobs for today.",
@@ -396,6 +412,8 @@ const TRANSLATIONS = {
     offlineLabel: "Van mreže",
     offlineHint: "Van si mreže — uključi se na mrežu da bi preuzimao/la poslove.",
     navHome: "Početna",
+    navCalendar: "Kalendar",
+    emptyCalendarDay: "Nemaš potvrđenih poslova za ovaj dan.",
     greeting: "Zdravo, {{name}}",
     todaysJobsTitle: "Tvoji poslovi danas",
     emptyToday: "Nemaš potvrđenih poslova za danas.",
@@ -490,6 +508,8 @@ let state = {
   serviceCatalog: { services: [], commonAreaSubOptions: [] },
   myLocation: null,
   detailJob: null,
+  calendarWeekStart: formatDateKey(getMonday(new Date())),
+  selectedCalendarDate: formatDateKey(new Date()),
   availableJobs: [],
   myJobs: [],
   authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
@@ -686,11 +706,12 @@ function renderPanel(){
   ${!isOnline ? `<div class="offline-banner">${t('offlineHint')}</div>` : ''}
   <div class="tabs">
     <div class="tab ${state.page==='home'?'active':''}" data-page="home">${t('navHome')}</div>
+    <div class="tab ${state.page==='calendar'?'active':''}" data-page="calendar">${t('navCalendar')}</div>
     <div class="tab ${state.page==='available'?'active':''}" data-page="available">${t('navAvailable')}${state.availableJobs.length ? `<span class="count">${state.availableJobs.length}</span>` : ''}</div>
     <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
   </div>
   <div class="main">
-    ${state.page==='home' ? renderHome() : state.page==='available' ? renderAvailable() : renderMine()}
+    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='available' ? renderAvailable() : renderMine()}
   </div>
   ${state.detailJob ? renderJobDetailModal() : ''}
   `;
@@ -738,6 +759,90 @@ function renderJobCard(j, mode){
       ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
+}
+
+/* ================== TAKVİM PANELİ ================== */
+function formatDateKey(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function getMonday(d){
+  const date = new Date(d);
+  const day = date.getDay(); // 0=Pazar, 1=Pazartesi...
+  const diff = (day === 0 ? -6 : 1 - day);
+  date.setDate(date.getDate() + diff);
+  date.setHours(0,0,0,0);
+  return date;
+}
+function getWeekDates(mondayKey){
+  const monday = new Date(mondayKey + 'T00:00:00');
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate()+i); return d; });
+}
+function groupJobsByDate(jobs){
+  const map = {};
+  jobs.forEach(j => {
+    const key = formatDateKey(new Date(j.checkout_at));
+    if(!map[key]) map[key] = [];
+    map[key].push(j);
+  });
+  return map;
+}
+function weekRangeLabel(weekDates){
+  const opts = { day:'numeric', month:'short' };
+  return `${weekDates[0].toLocaleDateString(LOCALES[state.lang], opts)} – ${weekDates[6].toLocaleDateString(LOCALES[state.lang], opts)}`;
+}
+function findJobById(id){
+  return state.homeJobs.find(j => j.id === id)
+    || state.myJobs.find(j => j.id === id)
+    || state.availableJobs.find(j => j.id === id)
+    || null;
+}
+function estimateJobMinutesClient(job){
+  if(job.estimatedMinutes !== undefined) return job.estimatedMinutes;
+  if(job.service_key === 'common_area'){
+    try{
+      const selections = JSON.parse(job.service_params || '{}').selections || [];
+      return selections.reduce((sum, sel) => {
+        const sub = state.serviceCatalog.commonAreaSubOptions.find(s => s.key === sel.key);
+        return sum + (sub ? sub.estimatedMinutes || 0 : 0);
+      }, 0);
+    }catch(e){ return 0; }
+  }
+  const service = state.serviceCatalog.services.find(s => s.key === job.service_key);
+  return service ? (service.estimatedMinutes || 0) : 0;
+}
+
+function renderCalendar(){
+  const weekDates = getWeekDates(state.calendarWeekStart);
+  const jobsByDate = groupJobsByDate(state.myJobs);
+  const selectedKey = state.selectedCalendarDate;
+  const selectedJobs = jobsByDate[selectedKey] || [];
+  const todayKey = formatDateKey(new Date());
+
+  return `
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <button class="btn ghost btn-sm" id="cal-prev-week" style="width:auto; padding:6px 12px;">‹</button>
+    <div style="font-size:13.5px; font-weight:700; color:var(--navy);">${weekRangeLabel(weekDates)}</div>
+    <button class="btn ghost btn-sm" id="cal-next-week" style="width:auto; padding:6px 12px;">›</button>
+  </div>
+  <div class="calendar-week">
+    ${weekDates.map(d => {
+      const key = formatDateKey(d);
+      const hasJobs = !!(jobsByDate[key] && jobsByDate[key].length);
+      const isSelected = key === selectedKey;
+      const isToday = key === todayKey;
+      return `
+      <div class="cal-day ${hasJobs?'has-jobs':''} ${isSelected?'selected':''} ${isToday?'is-today':''}" data-cal-date="${key}">
+        <div class="cal-day-name">${d.toLocaleDateString(LOCALES[state.lang], {weekday:'short'})}</div>
+        <div class="cal-day-num">${d.getDate()}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:22px 0 10px;">
+    ${new Date(selectedKey+'T00:00:00').toLocaleDateString(LOCALES[state.lang], { weekday:'long', day:'numeric', month:'long' })}
+  </div>
+  ${selectedJobs.length === 0 ? `<div class="empty-state">${t('emptyCalendarDay')}</div>` : selectedJobs.map(j => renderHomeJobCard(j)).join('')}
+  `;
 }
 
 /* ================== HOME PANELİ ================== */
@@ -832,7 +937,7 @@ function renderJobDetailModal(){
       <div class="job-icon" style="width:56px; height:56px; margin-bottom:14px;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:26px;">🧹</span>`}</div>
       <div class="detail-row"><span>${t('detailServiceType')}</span><strong>${jobServiceLabel(j)}</strong></div>
       <div class="detail-row"><span>${t('detailLocation')}</span><strong>${j.property_address || ''}${j.property_city ? ', ' + j.property_city : ''}</strong></div>
-      <div class="detail-row"><span>${t('detailAvgDuration')}</span><strong>${t('minutesShort', { count: j.estimatedMinutes || 0 })}</strong></div>
+      <div class="detail-row"><span>${t('detailAvgDuration')}</span><strong>${t('minutesShort', { count: estimateJobMinutesClient(j) })}</strong></div>
       <div class="detail-row"><span>${t('detailTravelTime')}</span><strong>${travelHtml}</strong></div>
       <div class="detail-row"><span>${t('detailPrice')}</span><strong>${j.price} €</strong></div>
       <div class="detail-row" style="border-bottom:none;"><span>${t('detailPaymentStatus')}</span><strong>${payLabel}</strong></div>
@@ -858,6 +963,12 @@ async function loadAll(){
   state.myJobs = mine;
   state.homeJobs = home.todaysJobs;
   state.earningsToday = home.earningsToday;
+  if(!state.serviceCatalog.services.length){
+    try{
+      const catalog = await fetch(API + '/services').then(r => r.json());
+      state.serviceCatalog = { services: catalog.services || [], commonAreaSubOptions: catalog.commonAreaSubOptions || [] };
+    }catch(e){ /* sessizce geç, sadece süre gösterimi eksik kalır */ }
+  }
   render();
 }
 
@@ -971,8 +1082,27 @@ function attachHandlers(){
     }catch(err){ showToast(err.message); render(); }
   };
 
+  document.querySelectorAll('[data-cal-date]').forEach(el => el.onclick = () => {
+    state.selectedCalendarDate = el.dataset.calDate; render();
+  });
+
+  const calPrevWeek = document.getElementById('cal-prev-week');
+  if(calPrevWeek) calPrevWeek.onclick = () => {
+    const monday = new Date(state.calendarWeekStart + 'T00:00:00');
+    monday.setDate(monday.getDate() - 7);
+    state.calendarWeekStart = formatDateKey(monday);
+    render();
+  };
+  const calNextWeek = document.getElementById('cal-next-week');
+  if(calNextWeek) calNextWeek.onclick = () => {
+    const monday = new Date(state.calendarWeekStart + 'T00:00:00');
+    monday.setDate(monday.getDate() + 7);
+    state.calendarWeekStart = formatDateKey(monday);
+    render();
+  };
+
   document.querySelectorAll('[data-open-detail]').forEach(el => el.onclick = async () => {
-    const job = state.homeJobs.find(j => j.id === el.dataset.openDetail);
+    const job = findJobById(el.dataset.openDetail);
     if(!job) return;
     if(!state.myLocation){
       state.myLocation = await requestMyLocation();
