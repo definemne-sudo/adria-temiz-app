@@ -323,6 +323,42 @@ router.get('/performance', (req, res) => {
   });
 });
 
+// Personelin kendisine verilen değerlendirmeleri görmesi. BİLEREK sadece
+// like/dislike bilgisi dönüyor - müşterinin yazdığı yorum metni (staff_feedback)
+// buraya HİÇ dahil edilmiyor. Amaç: personelin memnuniyetsiz bir müşteriyle
+// şikayet detaylarına bakıp sonradan iletişime geçmeye çalışmasını önlemek.
+router.get('/ratings', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const period = req.query.period === 'month' ? 'month' : 'week';
+  const offset = parseInt(req.query.offset, 10) || 0;
+  const { start, end } = getPeriodRange(period, offset);
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+
+  const rows = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.service_params, j.completed_at, j.staff_rating,
+              p.name AS property_name, p.city AS property_city
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status = 'done' AND j.staff_rating IS NOT NULL
+         AND date(j.completed_at) BETWEEN ? AND ?
+       ORDER BY j.completed_at DESC`
+    )
+    .all(req.user.id, startKey, endKey);
+
+  const totalRated = rows.length;
+  const likeCount = rows.filter((r) => r.staff_rating === 'like').length;
+  const likePercentage = totalRated ? Math.round((likeCount / totalRated) * 100) : null;
+
+  res.json({
+    period, offset, startDate: startKey, endDate: endKey,
+    ratings: rows, totalRated, likeCount, dislikeCount: totalRated - likeCount, likePercentage,
+  });
+});
+
 // Durum güncelleme. 'done' olduğunda ödeme de otomatik sonuçlanır - müşteriye
 // ikinci bir "öde" adımı çıkarmıyoruz: kart zaten sipariş anında emanete
 // alınmıştı (held), burada personelin/sistemin tamamlama onayıyla serbest
