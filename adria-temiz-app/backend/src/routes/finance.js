@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcNetEarning, COMMISSION_RATE } = require('../services/catalog');
+const { calcNetEarning, getCommissionRate, getPayoutCycleDays } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -67,11 +67,12 @@ function getStaffPeriods(staffId) {
   if (!firstJob.d) return [];
 
   const periods = [];
+  const cycleDays = getPayoutCycleDays();
   let periodStart = new Date(firstJob.d + 'T00:00:00');
   const today = new Date();
   while (periodStart <= today) {
     const periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + 14);
+    periodEnd.setDate(periodEnd.getDate() + cycleDays - 1);
     const startKey = toDateKey(periodStart);
     const endKey = toDateKey(periodEnd);
     const stats = calcStaffRange(staffId, startKey, endKey);
@@ -80,7 +81,7 @@ function getStaffPeriods(staffId) {
       periodStart: startKey, periodEnd: endKey, ...stats,
       isPaid: !!mark, paidAt: mark ? mark.paid_at : null,
     });
-    periodStart.setDate(periodStart.getDate() + 15);
+    periodStart.setDate(periodStart.getDate() + cycleDays);
   }
   return periods.reverse();
 }
@@ -186,7 +187,7 @@ router.get('/overview', (req, res) => {
   });
 
   res.json({
-    granularity, series, commissionRate: COMMISSION_RATE,
+    granularity, series, commissionRate: getCommissionRate(),
     collectedRevenue: round2(collectedRevenue), pendingRevenue: round2(pendingRevenue),
     collectedCommission: round2(collectedCommission), pendingCommission: round2(pendingCommission),
   });
