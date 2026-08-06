@@ -130,6 +130,13 @@
   .status-done{ background:#DEEFE0; color:#2E7D46; }
 
   .review-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .services-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+  .service-price-card .field input{ padding:7px 9px; font-size:13px; }
+  .checklist-icon-btn{
+    background:#F0F4F2; border:1px solid var(--line); border-radius:5px; width:22px; height:22px; font-size:11px;
+    cursor:pointer; color:var(--navy); flex-shrink:0; padding:0; line-height:1;
+  }
+  .checklist-icon-btn:disabled{ opacity:.3; cursor:not-allowed; }
   .review-card{ border:1px solid var(--line); border-radius:8px; padding:14px; }
 
   table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
@@ -182,7 +189,28 @@ const T = {
   navBookings: "Siparişler",
   navWorkers: "Personel",
   navCustomers: "Müşteriler",
+  navServices: "Hizmetler & Fiyatlandırma",
   navApplications: "Personel Başvuruları",
+  servicesTitle: "Hizmetler & Fiyatlandırma",
+  servicesSubtitle: "Fiyat parametrelerini ve hizmet checklist'lerini buradan yönet.",
+  fieldBase: "Baz ücret (€)",
+  fieldRate: "m² başına (€)",
+  fieldMin: "Minimum ücret (€)",
+  fieldEstimatedMinutes: "Ortalama süre (dk)",
+  fieldRatePerFloor: "Kat başına (€)",
+  fieldRatePerSqm: "m² başına (€)",
+  fieldRatePerCapacity: "Kişi başına (€)",
+  saveBtn: "Kaydet",
+  savedToast: "Fiyatlandırma güncellendi.",
+  checklistTitle: "Görev Listesi (Checklist)",
+  addChecklistItemPlaceholder: "Yeni görev ekle…",
+  addBtn: "Ekle",
+  noChecklistItems: "Henüz görev eklenmedi.",
+  addonsPricingTitle: "Ekstra Hizmet Fiyatları",
+  suppliesFeesTitle: "Malzeme Yok Ücretleri",
+  fieldAddonRate: "Fiyat (€)",
+  fieldNoEquipment: "Ekipman yok ek ücreti (€)",
+  fieldNoChemicals: "Kimyasal yok ek ücreti (€)",
   bookingsTitle: "Siparişler",
   bookingsSubtitle: "Sistemdeki tüm siparişler.",
   filterAll: "Tümü",
@@ -300,6 +328,8 @@ let state = {
   customers: null,
   revenue: null,
   chats: null,
+  servicesData: null,
+  editedPricing: {},
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -356,6 +386,7 @@ const NAV_ICONS = {
   customers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.5 14.2c2.7.3 4.5 2.4 4.5 5.8"/></svg>`,
   support: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-1v-6h3M4 17v-5h3v6H5a2 2 0 0 1-1-1.7"/></svg>`,
   applications: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M9 12l2 2 4-4"/></svg>`,
+  services: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4l-2.7 2.7-2-2z"/></svg>`,
 };
 
 function navItem(page, icon, label, badgeCount){
@@ -376,6 +407,7 @@ function renderPanel(){
     ${navItem('bookings', 'bookings', T.navBookings)}
     ${navItem('workers', 'workers', T.navWorkers)}
     ${navItem('customers', 'customers', T.navCustomers)}
+    ${navItem('services', 'services', T.navServices)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
     <div class="spacer"></div>
@@ -392,6 +424,7 @@ function renderPanel(){
       : state.page==='bookings' ? renderBookings()
       : state.page==='workers' ? renderWorkers()
       : state.page==='customers' ? renderCustomers()
+      : state.page==='services' ? renderServicesPricing()
       : state.page==='support' ? renderSupport()
       : renderApplications()}
   </div>
@@ -698,6 +731,90 @@ function renderCustomers(){
   `;
 }
 
+function commonAreaFieldsFor(s){
+  if(s.paramType==='floors') return [['base',T.fieldBase],['ratePerFloor',T.fieldRatePerFloor],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  if(s.paramType==='corridor') return [['base',T.fieldBase],['ratePerFloor',T.fieldRatePerFloor],['ratePerSqm',T.fieldRatePerSqm],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  if(s.paramType==='elevator') return [['base',T.fieldBase],['ratePerCapacity',T.fieldRatePerCapacity],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  return [];
+}
+
+function renderServiceCard(s, fields){
+  const checklist = s.checklist || [];
+  return `
+  <div class="panel-card service-price-card">
+    <div class="panel-head"><h3>${s.name}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${s.description}</div></div>
+    <form data-pricing-form="${s.key}" style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px;">
+      ${fields.map(([field,label]) => `
+        <div class="field" style="margin-bottom:0;">
+          <label>${label}</label>
+          <input name="${field}" type="number" step="0.01" value="${s[field]}" />
+        </div>
+      `).join('')}
+      <button class="btn ochre btn-sm" type="submit" style="grid-column:1/-1;">${T.saveBtn}</button>
+    </form>
+    <div style="font-size:11px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${T.checklistTitle}</div>
+    ${checklist.length === 0 ? `<div style="font-size:12.5px; color:var(--muted); margin-bottom:10px;">${T.noChecklistItems}</div>` : `
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+        ${checklist.map((item,i) => `
+          <div style="display:flex; align-items:center; gap:6px; font-size:13px;">
+            <span style="flex:1;">${item.item_text}</span>
+            <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="up" ${i===0?'disabled':''}>↑</button>
+            <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="down" ${i===checklist.length-1?'disabled':''}>↓</button>
+            <button type="button" class="checklist-icon-btn" data-delete-item="${item.id}" style="color:var(--danger);">✕</button>
+          </div>
+        `).join('')}
+      </div>
+    `}
+    <form data-add-checklist="${s.key}" style="display:flex; gap:6px;">
+      <input name="itemText" placeholder="${T.addChecklistItemPlaceholder}" style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
+      <button class="btn ghost btn-sm" type="submit">${T.addBtn}</button>
+    </form>
+  </div>`;
+}
+
+function renderServicesPricing(){
+  const d = state.servicesData;
+  if(!d){
+    return `<div class="page-head"><div><h2>${T.servicesTitle}</h2><p>${T.servicesSubtitle}</p></div></div><div class="empty-state">…</div>`;
+  }
+  const priceableServices = d.services.filter(s => !s.isGroup);
+  return `
+  <div class="page-head"><div><h2>${T.servicesTitle}</h2><p>${T.servicesSubtitle}</p></div></div>
+  <div class="services-grid">
+    ${priceableServices.map(s => renderServiceCard(s, [['base',T.fieldBase],['rate',T.fieldRate],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]])).join('')}
+    ${d.commonAreaSubOptions.map(s => renderServiceCard(s, commonAreaFieldsFor(s))).join('')}
+  </div>
+
+  <div class="panel-card" style="margin-top:16px;">
+    <div class="panel-head"><h3>${T.addonsPricingTitle}</h3></div>
+    <form id="addons-pricing-form" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+      ${d.addons.map(a => `
+        <div class="field" style="margin-bottom:0;">
+          <label>${a.name}</label>
+          <input name="${a.key}" type="number" step="0.5" value="${a.rate}" style="width:100px;" />
+        </div>
+      `).join('')}
+      <button class="btn ochre btn-sm" type="submit">${T.saveBtn}</button>
+    </form>
+  </div>
+
+  <div class="panel-card" style="margin-top:16px;">
+    <div class="panel-head"><h3>${T.suppliesFeesTitle}</h3></div>
+    <form id="supplies-pricing-form" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldNoEquipment}</label>
+        <input name="noEquipment" type="number" step="0.5" value="${d.suppliesFees.noEquipment}" style="width:120px;" />
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldNoChemicals}</label>
+        <input name="noChemicals" type="number" step="0.5" value="${d.suppliesFees.noChemicals}" style="width:120px;" />
+      </div>
+      <button class="btn ochre btn-sm" type="submit">${T.saveBtn}</button>
+    </form>
+  </div>
+  `;
+}
+
 function renderSupport(){
   const chats = state.chats;
   const activeId = state.activeChatUserId;
@@ -842,6 +959,10 @@ async function loadChatMessages(userId){
   const thread = document.getElementById('chat-thread');
   if(thread) thread.scrollTop = thread.scrollHeight;
 }
+async function loadServicesData(){
+  state.servicesData = await api('/admin/services');
+  render();
+}
 
 function attachHandlers(){
   const loginForm = document.getElementById('login-form');
@@ -868,6 +989,7 @@ function attachHandlers(){
     if(state.page === 'workers') await loadWorkers();
     if(state.page === 'customers') await loadCustomers();
     if(state.page === 'support') await loadChats();
+    if(state.page === 'services') await loadServicesData();
   });
 
   document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
@@ -885,6 +1007,66 @@ function attachHandlers(){
       await loadChats();
     }catch(err){ showToast(err.message); }
   };
+
+  document.querySelectorAll('[data-pricing-form]').forEach(form => form.onsubmit = async (e) => {
+    e.preventDefault();
+    const key = form.dataset.pricingForm;
+    const fd = Object.fromEntries(new FormData(form));
+    try{
+      await api(`/admin/services/${key}/pricing`, { method:'PUT', body: JSON.stringify(fd) });
+      showToast(T.savedToast);
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  });
+
+  const addonsPricingForm = document.getElementById('addons-pricing-form');
+  if(addonsPricingForm) addonsPricingForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(addonsPricingForm));
+    try{
+      await Promise.all(Object.entries(fd).map(([key, rate]) =>
+        api(`/admin/services/${key}/pricing`, { method:'PUT', body: JSON.stringify({ rate }) })
+      ));
+      showToast(T.savedToast);
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const suppliesPricingForm = document.getElementById('supplies-pricing-form');
+  if(suppliesPricingForm) suppliesPricingForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(suppliesPricingForm));
+    try{
+      await api('/admin/supplies-fees', { method:'PUT', body: JSON.stringify(fd) });
+      showToast(T.savedToast);
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  };
+
+  document.querySelectorAll('[data-add-checklist]').forEach(form => form.onsubmit = async (e) => {
+    e.preventDefault();
+    const key = form.dataset.addChecklist;
+    const fd = Object.fromEntries(new FormData(form));
+    if(!fd.itemText.trim()) return;
+    try{
+      await api(`/admin/services/${key}/checklist`, { method:'POST', body: JSON.stringify({ itemText: fd.itemText }) });
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  });
+
+  document.querySelectorAll('[data-move-item]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/services/checklist/${el.dataset.moveItem}/move`, { method:'POST', body: JSON.stringify({ direction: el.dataset.moveDir }) });
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  });
+
+  document.querySelectorAll('[data-delete-item]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/services/checklist/${el.dataset.deleteItem}`, { method:'DELETE' });
+      await loadServicesData();
+    }catch(err){ showToast(err.message); }
+  });
 
   document.querySelectorAll('[data-booking-filter]').forEach(el => el.onclick = async () => {
     state.bookingsFilter = el.dataset.bookingFilter;
