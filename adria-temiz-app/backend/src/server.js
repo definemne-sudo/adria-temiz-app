@@ -10,6 +10,7 @@ const chatRoutes = require('./routes/chat');
 const staffApplicationRoutes = require('./routes/staffApplications');
 const adminRoutes = require('./routes/admin');
 const financeRoutes = require('./routes/finance');
+const marketingRoutes = require('./routes/marketing');
 // NOT: Sipariş Bildirimleri (push + dağıtım motoru) özelliği bilinçli olarak
 // ertelendi - routes/push.js ve services/dispatch.js dosyaları henüz repoya
 // eklenmedi. O özelliğe döndüğümüzde bu iki satırın ve aşağıdaki push route
@@ -32,6 +33,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/staff-applications', staffApplicationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/finance', financeRoutes);
+app.use('/api/admin/marketing', marketingRoutes);
 // app.use('/api/push', pushRoutes);
 
 // Genel hata yakalayıcı
