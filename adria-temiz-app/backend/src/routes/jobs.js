@@ -3,6 +3,9 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, COMMISSION_RATE } = require('../services/catalog');
+// NOT: Sipariş Bildirimleri özelliği ertelendi, services/dispatch.js henüz
+// repoda değil. O özelliğe dönünce bu satır ve aşağıdaki 2 çağrı geri açılacak.
+// const { dispatchJob } = require('../services/dispatch');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -35,7 +38,7 @@ function resolveScheduledAt(urgency, scheduledAt) {
 // bina parametreleri artık sipariş anında değil, mülk eklenirken bir kez
 // girilip properties tablosunda saklanıyor - müşteri her siparişte bunları
 // tekrar girmek zorunda kalmıyor, sadece hangi alt hizmeti istediğini seçiyor.
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const {
     propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
     hasEquipment, hasChemicals, serviceParams,
@@ -131,7 +134,11 @@ router.post('/', (req, res) => {
     paymentStatus
   );
 
-  res.status(201).json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+  const createdJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  res.status(201).json(createdJob);
+
+  // NOT: Sipariş Bildirimleri ertelendi - services/dispatch.js eklenince geri açılacak.
+  // dispatchJob(id).catch((err) => console.error('dispatchJob hata:', err));
 });
 
 // Kullanıcının (bireysel ev sahibi veya yönetim şirketi) erişebildiği
@@ -175,7 +182,12 @@ router.get('/pending', (req, res) => {
 // Personel bir işi kendine alır ("İşi Al" - Glovo'daki sipariş kabul etme
 // gibi). Sadece personel hesapları kullanabilir, sadece hâlâ kimse
 // tarafından alınmamış (pending) bir işi alabilirler.
-router.post('/:id/assign', (req, res) => {
+// Personel, kendisine bildirilen bir iş teklifini kabul eder. Sadece
+// gerçekten kendisine bildirilmiş (notified_staff_ids içinde) bir işi kabul
+// edebilir - rastgele bir iş id'siyle deneme yapılamaz. Acil siparişlerde
+// birden fazla personel aynı anda kabul etmeye çalışabileceği için atomik
+// bir UPDATE ile "ilk kabul eden alır" garantisi sağlanıyor.
+router.post('/:id/accept', (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
   }
@@ -186,13 +198,70 @@ router.post('/:id/assign', (req, res) => {
   const { id } = req.params;
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-  if (job.status !== 'pending') {
+
+  const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
+  if (!notifiedIds.includes(req.user.id)) {
+    return res.status(403).json({ error: 'Bu iş sana bildirilmedi.' });
+  }
+
+  const result = db
+    .prepare(`UPDATE cleaning_jobs SET status = 'assigned', assigned_staff_id = ?, accepted_at = datetime('now') WHERE id = ? AND status = 'pending'`)
+    .run(req.user.id, id);
+  if (result.changes === 0) {
     return res.status(409).json({ error: 'Bu iş başka bir personel tarafından zaten alınmış.' });
   }
-  db.prepare(
-    `UPDATE cleaning_jobs SET status = 'assigned', assigned_staff_id = ? WHERE id = ?`
-  ).run(req.user.id, id);
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+});
+
+// Personel bir iş teklifini reddeder. Acil olmayan siparişlerde bu, sırayı
+// bir sonraki en yakın adaya devreder. Acil (herkese aynı anda bildirilen)
+// siparişlerde reddetme başkasını engellemez, sadece kayıt altına alınır.
+router.post('/:id/reject', async (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (job.status !== 'pending') {
+    return res.json({ message: 'Bu iş artık uygun değil.' });
+  }
+  if (job.urgency !== 'urgent' && job.current_candidate_id === req.user.id) {
+    db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE id = ?`).run(id);
+    // NOT: Sipariş Bildirimleri ertelendi - services/dispatch.js eklenince geri açılacak.
+    // await dispatchJob(id);
+  }
+  res.json({ message: 'Reddedildi.' });
+});
+
+// Bildirime tıklayınca açılacak iş teklifi kartı için detay - fiyat, konum,
+// ortalama süre, ödeme tipi ve personelin net kazancı dahil.
+router.get('/:id/offer-detail', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const { id } = req.params;
+  const job = db
+    .prepare(
+      `SELECT j.*, p.name AS property_name, p.address AS property_address, p.city AS property_city,
+              p.latitude AS property_latitude, p.longitude AS property_longitude
+       FROM cleaning_jobs j JOIN properties p ON p.id = j.property_id WHERE j.id = ?`
+    )
+    .get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+
+  const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
+  const isCandidate = notifiedIds.includes(req.user.id) || job.assigned_staff_id === req.user.id;
+  if (!isCandidate) {
+    return res.status(403).json({ error: 'Bu işe erişim yetkiniz yok.' });
+  }
+
+  res.json({
+    ...job,
+    estimatedMinutes: estimateJobMinutes(job.service_key, JSON.parse(job.service_params || 'null')),
+    netEarning: calcNetEarning(job.price),
+    canRespond: job.status === 'pending',
+  });
 });
 
 // Personelin kendine aldığı, henüz tamamlamadığı işler ("İşlerim" listesi).
