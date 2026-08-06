@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, COMMISSION_RATE } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
 // NOT: Sipariş Bildirimleri özelliği ertelendi, services/dispatch.js henüz
 // repoda değil. O özelliğe dönünce bu satır ve aşağıdaki 2 çağrı geri açılacak.
 // const { dispatchJob } = require('../services/dispatch');
@@ -329,7 +329,7 @@ router.get('/home-summary', (req, res) => {
       jobCount: completedToday.length,
       grossTotal,
       netTotal: Math.round(netTotal * 100) / 100,
-      commissionRate: COMMISSION_RATE,
+      commissionRate: getCommissionRate(),
     },
   });
 });
@@ -393,7 +393,7 @@ router.get('/performance', (req, res) => {
     period, offset, startDate: startKey, endDate: endKey,
     jobs, jobCount: jobs.length, grossTotal, netTotal,
     daysWorked, totalDays, completionRate, bonus,
-    commissionRate: COMMISSION_RATE,
+    commissionRate: getCommissionRate(),
   });
 });
 
