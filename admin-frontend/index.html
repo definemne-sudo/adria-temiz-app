@@ -154,7 +154,42 @@ const T = {
   passwordLabel: "Şifre",
   loginBtn: "Giriş Yap",
   navDashboard: "Genel Bakış",
+  navBookings: "Siparişler",
+  navWorkers: "Personel",
+  navCustomers: "Müşteriler",
   navApplications: "Personel Başvuruları",
+  bookingsTitle: "Siparişler",
+  bookingsSubtitle: "Sistemdeki tüm siparişler.",
+  filterAll: "Tümü",
+  colService: "Hizmet",
+  colCustomerCol: "Müşteri",
+  colStaffCol: "Personel",
+  colPrice: "Fiyat",
+  colPayment: "Ödeme",
+  colStatus: "Durum",
+  noStaffAssigned: "—",
+  prevPage: "‹ Önceki",
+  nextPage: "Sonraki ›",
+  pageInfo: "Sayfa {{page}} / {{total}}",
+  workersTitle: "Personel",
+  workersSubtitle: "Tüm personel ve performans özeti.",
+  colWorkerName: "Ad",
+  colWorkerCity: "Şehir",
+  colWorkerStatusCol: "Durum",
+  colWorkerCompleted: "Tamamlanan",
+  colWorkerSatisfaction: "Memnuniyet",
+  noRatingsYet: "—",
+  customersTitle: "Müşteriler",
+  customersSubtitle: "Tüm bireysel ve şirket müşterileri.",
+  colCustomerType: "Tip",
+  colProperties: "Mülk",
+  colJobsCol: "Sipariş",
+  colTotalSpent: "Toplam Harcama",
+  typeIndividual: "Bireysel",
+  typeCompany: "Şirket",
+  emptyBookings: "Sipariş bulunamadı.",
+  emptyWorkers: "Personel bulunamadı.",
+  emptyCustomers: "Müşteri bulunamadı.",
   logout: "Çıkış yap",
   welcomeBack: "Tekrar hoş geldin, {{name}} 👋",
   welcomeSubtitle: "İşletmende bugün neler oluyor.",
@@ -224,6 +259,10 @@ let state = {
   page: 'dashboard',
   dashboard: null,
   applications: [],
+  bookings: null,
+  bookingsFilter: 'all',
+  workers: null,
+  customers: null,
   authError: '',
   modal: null,
   newCredentials: null,
@@ -276,6 +315,9 @@ function renderPanel(){
   <div class="sidebar">
     <div class="brand">${BRAND_MARK}<h1>MICISTOMan</h1></div>
     <div class="nav-item ${state.page==='dashboard'?'active':''}" data-page="dashboard">${T.navDashboard}</div>
+    <div class="nav-item ${state.page==='bookings'?'active':''}" data-page="bookings">${T.navBookings}</div>
+    <div class="nav-item ${state.page==='workers'?'active':''}" data-page="workers">${T.navWorkers}</div>
+    <div class="nav-item ${state.page==='customers'?'active':''}" data-page="customers">${T.navCustomers}</div>
     <div class="nav-item ${state.page==='applications'?'active':''}" data-page="applications">
       ${T.navApplications}
       ${state.dashboard && state.dashboard.stats.pendingApplications ? `<span class="badge-count">${state.dashboard.stats.pendingApplications}</span>` : ''}
@@ -285,7 +327,11 @@ function renderPanel(){
     <div class="logout" id="logout">${T.logout}</div>
   </div>
   <div class="main">
-    ${state.page==='dashboard' ? renderDashboard() : renderApplications()}
+    ${state.page==='dashboard' ? renderDashboard()
+      : state.page==='bookings' ? renderBookings()
+      : state.page==='workers' ? renderWorkers()
+      : state.page==='customers' ? renderCustomers()
+      : renderApplications()}
   </div>
   ${state.modal ? renderModal() : ''}
   `;
@@ -418,6 +464,111 @@ function renderBreakdownRow(label, count, total, color){
   </div>`;
 }
 
+function jobPaymentBadge(method){
+  const map = { cash:'💵', card:'💳', invoice:'🧾' };
+  return map[method] || '';
+}
+
+function renderBookings(){
+  const b = state.bookings;
+  return `
+  <div class="page-head">
+    <div><h2>${T.bookingsTitle}</h2><p>${T.bookingsSubtitle}</p></div>
+  </div>
+  <div class="option-row-filters" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+    ${['all','pending','assigned','in_progress','done'].map(s => `
+      <button class="btn ${state.bookingsFilter===s?'ochre':'ghost'} btn-sm" data-booking-filter="${s}">${s==='all'?T.filterAll:jobStatusLabel(s==='done'?'done':s)}</button>
+    `).join('')}
+  </div>
+  ${!b ? `<div class="empty-state">…</div>` : b.bookings.length === 0 ? `<div class="empty-state">${T.emptyBookings}</div>` : `
+    <table>
+      <thead><tr>
+        <th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colStaffCol}</th><th>${T.colPrice}</th><th>${T.colPayment}</th><th>${T.colStatus}</th>
+      </tr></thead>
+      <tbody>
+        ${b.bookings.map(j => `
+          <tr>
+            <td><strong>${serviceLabel(j.service_key)}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${j.property_name} · ${j.property_city||''}</span></td>
+            <td>${j.customer_name}</td>
+            <td>${j.staff_name || T.noStaffAssigned}</td>
+            <td>${j.price} €</td>
+            <td>${jobPaymentBadge(j.payment_method)} ${j.payment_status}</td>
+            <td><span class="status-pill status-${j.status}">${jobStatusLabel(j.status)}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <div style="display:flex; align-items:center; justify-content:center; gap:14px; margin-top:16px;">
+      <button class="btn ghost btn-sm" id="booking-prev-page" ${b.page<=1?'disabled':''}>${T.prevPage}</button>
+      <span style="font-size:12.5px; color:var(--muted);">${tt('pageInfo',{page:b.page, total:b.totalPages})}</span>
+      <button class="btn ghost btn-sm" id="booking-next-page" ${b.page>=b.totalPages?'disabled':''}>${T.nextPage}</button>
+    </div>
+  `}
+  `;
+}
+
+function serviceLabel(key){
+  const map = { checkin_checkout:'Airbnb/Booking Temizliği', deep_clean:'Detaylı Temizlik', office:'Ofis/İşyeri Temizliği', common_area:'Ortak Alan Temizliği' };
+  return map[key] || key;
+}
+
+function renderWorkers(){
+  const w = state.workers;
+  return `
+  <div class="page-head">
+    <div><h2>${T.workersTitle}</h2><p>${T.workersSubtitle}</p></div>
+  </div>
+  ${!w ? `<div class="empty-state">…</div>` : w.workers.length === 0 ? `<div class="empty-state">${T.emptyWorkers}</div>` : `
+    <table>
+      <thead><tr>
+        <th>${T.colWorkerName}</th><th>${T.colWorkerCity}</th><th>${T.colWorkerStatusCol}</th><th>${T.colWorkerCompleted}</th><th>${T.colWorkerSatisfaction}</th>
+      </tr></thead>
+      <tbody>
+        ${w.workers.map(x => `
+          <tr>
+            <td><strong>${x.name}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${x.phone}</span></td>
+            <td>${x.current_city || '—'}</td>
+            <td>
+              ${x.is_online ? (x.isBusy ? `<span class="status-pill status-in_progress">${T.statusBusy}</span>` : `<span class="status-pill status-done">${T.statusAvailable}</span>`)
+                             : `<span class="status-pill" style="background:#EDF0EE; color:#5B7A6C;">${T.statusOffline}</span>`}
+            </td>
+            <td>${x.completed_jobs}</td>
+            <td>${x.satisfactionPercent !== null ? '%' + x.satisfactionPercent : T.noRatingsYet}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
+function renderCustomers(){
+  const c = state.customers;
+  return `
+  <div class="page-head">
+    <div><h2>${T.customersTitle}</h2><p>${T.customersSubtitle}</p></div>
+  </div>
+  ${!c ? `<div class="empty-state">…</div>` : c.customers.length === 0 ? `<div class="empty-state">${T.emptyCustomers}</div>` : `
+    <table>
+      <thead><tr>
+        <th>${T.colName}</th><th>${T.colCustomerType}</th><th>${T.colProperties}</th><th>${T.colJobsCol}</th><th>${T.colTotalSpent}</th>
+      </tr></thead>
+      <tbody>
+        ${c.customers.map(x => `
+          <tr>
+            <td><strong>${x.company_name || x.name}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${x.phone}</span></td>
+            <td>${x.account_type==='company' ? T.typeCompany : T.typeIndividual}</td>
+            <td>${x.property_count}</td>
+            <td>${x.job_count}</td>
+            <td>${x.total_spent} €</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
 function renderApplications(){
   return `
   <div class="page-head">
@@ -491,6 +642,20 @@ async function loadApplications(){
   state.applications = await api('/admin/staff-applications?status=pending');
   render();
 }
+async function loadBookings(page){
+  const p = page || (state.bookings ? state.bookings.page : 1);
+  const status = state.bookingsFilter === 'all' ? '' : `&status=${state.bookingsFilter}`;
+  state.bookings = await api(`/admin/bookings?page=${p}${status}`);
+  render();
+}
+async function loadWorkers(){
+  state.workers = await api('/admin/workers');
+  render();
+}
+async function loadCustomers(){
+  state.customers = await api('/admin/customers');
+  render();
+}
 
 function attachHandlers(){
   const loginForm = document.getElementById('login-form');
@@ -512,7 +677,19 @@ function attachHandlers(){
     state.page = el.dataset.page; render();
     if(state.page === 'applications') await loadApplications();
     if(state.page === 'dashboard') await loadDashboard();
+    if(state.page === 'bookings') await loadBookings(1);
+    if(state.page === 'workers') await loadWorkers();
+    if(state.page === 'customers') await loadCustomers();
   });
+
+  document.querySelectorAll('[data-booking-filter]').forEach(el => el.onclick = async () => {
+    state.bookingsFilter = el.dataset.bookingFilter;
+    await loadBookings(1);
+  });
+  const bookingPrev = document.getElementById('booking-prev-page');
+  if(bookingPrev) bookingPrev.onclick = async () => { await loadBookings(state.bookings.page - 1); };
+  const bookingNext = document.getElementById('booking-next-page');
+  if(bookingNext) bookingNext.onclick = async () => { await loadBookings(state.bookings.page + 1); };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
