@@ -191,6 +191,32 @@ const T = {
   navCustomers: "Müşteriler",
   navServices: "Hizmetler & Fiyatlandırma",
   navFinance: "Finans",
+  navSettings: "Ayarlar",
+  settingsTitle: "Ayarlar",
+  settingsSubtitle: "İşletme genelindeki parametreler ve hesap yönetimi.",
+  generalSettingsTitle: "Genel Ayarlar",
+  fieldCommissionRatePercent: "MICISTO Komisyon Oranı (%)",
+  fieldPayoutCycleDays: "Personel Ödeme Döngüsü (gün)",
+  myAccountTitle: "Hesabım",
+  fieldCurrentPassword: "Mevcut Şifre",
+  fieldNewPassword: "Yeni Şifre",
+  changePasswordBtn: "Şifreyi Değiştir",
+  adminsTitle: "Admin Hesapları",
+  adminsSubtitle: "MICISTOMan'e giriş yapabilen hesaplar.",
+  colUsername: "Kullanıcı Adı",
+  colCreatedAt: "Oluşturulma",
+  deleteBtn: "Sil",
+  addAdminTitle: "Yeni Admin Ekle",
+  fieldAdminName: "Ad Soyad",
+  fieldAdminUsername: "Kullanıcı Adı",
+  fieldAdminPassword: "Şifre",
+  createAdminBtn: "Admin Oluştur",
+  toastSettingsSaved: "Ayarlar güncellendi.",
+  toastPasswordChanged: "Şifre değiştirildi.",
+  toastAdminCreated: "Admin hesabı oluşturuldu.",
+  toastAdminDeleted: "Admin hesabı silindi.",
+  confirmDeleteAdminTitle: "Admin hesabını sil",
+  confirmDeleteAdminHint: "Bu işlem geri alınamaz. Emin misin?",
   financeTitle: "Finans",
   financeSubtitle: "Ciro, komisyon ve personel mutabakatı.",
   financeTotalRevenue: "Toplam Ciro",
@@ -394,6 +420,10 @@ let state = {
   staffPeriods: null,
   financeCancellations: null,
   financeTxModal: null,
+  settingsData: null,
+  adminsList: null,
+  settingsError: '',
+  deleteAdminTargetId: null,
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -452,6 +482,7 @@ const NAV_ICONS = {
   applications: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M9 12l2 2 4-4"/></svg>`,
   services: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4l-2.7 2.7-2-2z"/></svg>`,
   finance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6.5c0-2-2.2-3-5-3s-5 1.2-5 3.2 2.2 2.8 5 3.3 5 1.3 5 3.3-2.2 3.2-5 3.2-5-1-5-3"/></svg>`,
+  settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
 };
 
 function navItem(page, icon, label, badgeCount){
@@ -474,6 +505,7 @@ function renderPanel(){
     ${navItem('customers', 'customers', T.navCustomers)}
     ${navItem('services', 'services', T.navServices)}
     ${navItem('finance', 'finance', T.navFinance)}
+    ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
     <div class="spacer"></div>
@@ -492,6 +524,7 @@ function renderPanel(){
       : state.page==='customers' ? renderCustomers()
       : state.page==='services' ? renderServicesPricing()
       : state.page==='finance' ? renderFinance()
+      : state.page==='settings' ? renderSettings()
       : state.page==='support' ? renderSupport()
       : renderApplications()}
   </div>
@@ -1039,6 +1072,88 @@ function renderFinanceTxModal(){
   </div>`;
 }
 
+function renderSettings(){
+  const s = state.settingsData;
+  const admins = state.adminsList;
+  return `
+  <div class="page-head"><div><h2>${T.settingsTitle}</h2><p>${T.settingsSubtitle}</p></div></div>
+
+  <div class="panel-card" style="margin-bottom:16px; max-width:480px;">
+    <div class="panel-head"><h3>${T.generalSettingsTitle}</h3></div>
+    ${!s ? `<div class="empty-state" style="margin:0;">…</div>` : `
+      <form id="general-settings-form" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldCommissionRatePercent}</label>
+          <input name="commissionRatePercent" type="number" step="1" min="0" max="100" value="${Math.round(s.commissionRate*100)}" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldPayoutCycleDays}</label>
+          <input name="payoutCycleDays" type="number" step="1" min="1" value="${s.payoutCycleDays}" />
+        </div>
+        <button class="btn ochre btn-sm" type="submit" style="align-self:flex-start;">${T.saveBtn}</button>
+      </form>
+    `}
+  </div>
+
+  <div class="panel-card" style="margin-bottom:16px; max-width:480px;">
+    <div class="panel-head"><h3>${T.myAccountTitle}</h3></div>
+    <form id="change-password-form" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldCurrentPassword}</label>
+        <input name="currentPassword" type="password" required />
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldNewPassword}</label>
+        <input name="newPassword" type="password" required minlength="6" />
+      </div>
+      ${state.settingsError ? `<div class="error-msg" style="margin:0;">${state.settingsError}</div>` : ''}
+      <button class="btn ochre btn-sm" type="submit" style="align-self:flex-start;">${T.changePasswordBtn}</button>
+    </form>
+  </div>
+
+  <div class="panel-card" style="max-width:600px;">
+    <div class="panel-head"><h3>${T.adminsTitle}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${T.adminsSubtitle}</div></div>
+    ${!admins ? `<div class="empty-state" style="margin:0 0 16px;">…</div>` : `
+      <table style="margin-bottom:20px;">
+        <thead><tr><th>${T.colName}</th><th>${T.colUsername}</th><th>${T.colCreatedAt}</th><th></th></tr></thead>
+        <tbody>
+          ${admins.admins.map(a => `
+            <tr>
+              <td><strong>${a.name}</strong>${a.id===state.user.id ? ' <span style="color:var(--muted); font-size:11px;">(sen)</span>' : ''}</td>
+              <td>${a.username}</td>
+              <td>${new Date(a.created_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short',year:'numeric'})}</td>
+              <td>${a.id!==state.user.id ? `<button type="button" class="btn danger btn-sm" data-delete-admin="${a.id}">${T.deleteBtn}</button>` : ''}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${T.addAdminTitle}</div>
+    <form id="add-admin-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div class="field" style="margin-bottom:0; flex:1; min-width:140px;"><label>${T.fieldAdminName}</label><input name="name" required /></div>
+      <div class="field" style="margin-bottom:0; flex:1; min-width:140px;"><label>${T.fieldAdminUsername}</label><input name="username" required autocapitalize="off" /></div>
+      <div class="field" style="margin-bottom:0; flex:1; min-width:140px;"><label>${T.fieldAdminPassword}</label><input name="password" type="password" required minlength="6" /></div>
+      <button class="btn ochre btn-sm" type="submit">${T.createAdminBtn}</button>
+    </form>
+  </div>
+  ${state.deleteAdminTargetId ? renderDeleteAdminModal() : ''}
+  `;
+}
+
+function renderDeleteAdminModal(){
+  return `
+  <div class="modal-backdrop" id="delete-admin-backdrop">
+    <div class="modal">
+      <h3>${T.confirmDeleteAdminTitle}</h3>
+      <div class="hint" style="margin:-6px 0 18px;">${T.confirmDeleteAdminHint}</div>
+      <div class="row-actions">
+        <button class="btn ghost" id="cancel-delete-admin" style="flex:1;">${T.cancelBtn}</button>
+        <button class="btn danger" id="confirm-delete-admin" style="flex:1;">${T.deleteBtn}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderServicesPricing(){
   const d = state.servicesData;
   if(!d){
@@ -1261,6 +1376,14 @@ async function loadFinanceSubPage(){
     await loadFinanceStaffList();
   } else await loadFinanceCancellations();
 }
+async function loadSettings(){
+  state.settingsData = await api('/admin/settings');
+  render();
+}
+async function loadAdmins(){
+  state.adminsList = await api('/admin/admins');
+  render();
+}
 
 function attachHandlers(){
   const loginForm = document.getElementById('login-form');
@@ -1289,6 +1412,7 @@ function attachHandlers(){
     if(state.page === 'support') await loadChats();
     if(state.page === 'services') await loadServicesData();
     if(state.page === 'finance') await loadFinanceSubPage();
+    if(state.page === 'settings'){ await loadSettings(); await loadAdmins(); }
   });
 
   document.querySelectorAll('[data-finance-subpage]').forEach(el => el.onclick = async () => {
@@ -1363,6 +1487,62 @@ function attachHandlers(){
       showToast(T.toastCsvExported);
     }catch(err){ showToast(err.message); }
   };
+
+  const generalSettingsForm = document.getElementById('general-settings-form');
+  if(generalSettingsForm) generalSettingsForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(generalSettingsForm));
+    try{
+      await api('/admin/settings', { method:'PUT', body: JSON.stringify({
+        commissionRate: Number(fd.commissionRatePercent) / 100,
+        payoutCycleDays: fd.payoutCycleDays,
+      })});
+      showToast(T.toastSettingsSaved);
+      await loadSettings();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const changePasswordForm = document.getElementById('change-password-form');
+  if(changePasswordForm) changePasswordForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(changePasswordForm));
+    try{
+      await api('/admin/account/password', { method:'PUT', body: JSON.stringify(fd) });
+      state.settingsError = '';
+      showToast(T.toastPasswordChanged);
+      changePasswordForm.reset();
+      render();
+    }catch(err){ state.settingsError = err.message; render(); }
+  };
+
+  const addAdminForm = document.getElementById('add-admin-form');
+  if(addAdminForm) addAdminForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(addAdminForm));
+    try{
+      await api('/admin/admins', { method:'POST', body: JSON.stringify(fd) });
+      showToast(T.toastAdminCreated);
+      await loadAdmins();
+    }catch(err){ showToast(err.message); }
+  };
+
+  document.querySelectorAll('[data-delete-admin]').forEach(el => el.onclick = () => {
+    state.deleteAdminTargetId = el.dataset.deleteAdmin;
+    render();
+  });
+  const cancelDeleteAdmin = document.getElementById('cancel-delete-admin');
+  if(cancelDeleteAdmin) cancelDeleteAdmin.onclick = () => { state.deleteAdminTargetId = null; render(); };
+  const confirmDeleteAdmin = document.getElementById('confirm-delete-admin');
+  if(confirmDeleteAdmin) confirmDeleteAdmin.onclick = async () => {
+    try{
+      await api(`/admin/admins/${state.deleteAdminTargetId}`, { method:'DELETE' });
+      showToast(T.toastAdminDeleted);
+      state.deleteAdminTargetId = null;
+      await loadAdmins();
+    }catch(err){ showToast(err.message); state.deleteAdminTargetId = null; render(); }
+  };
+  const deleteAdminBackdrop = document.getElementById('delete-admin-backdrop');
+  if(deleteAdminBackdrop) deleteAdminBackdrop.onclick = (e) => { if(e.target===deleteAdminBackdrop){ state.deleteAdminTargetId = null; render(); } };
 
   document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
     await loadChatMessages(el.dataset.openChat);
