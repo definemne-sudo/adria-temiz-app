@@ -4,7 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateUsername, generatePassword } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, COMMISSION_RATE } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -536,9 +536,101 @@ router.get('/finance', (req, res) => {
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
-    totalRevenue, totalCommission, totalPayout, commissionRate: COMMISSION_RATE,
+    totalRevenue, totalCommission, totalPayout, commissionRate: getCommissionRate(),
     paymentBreakdown, staffSettlements, jobCount: jobs.length,
   });
+});
+
+// --- Ayarlar (Settings) ------------------------------------------------------
+
+router.get('/settings', (req, res) => {
+  res.json({
+    commissionRate: getCommissionRate(),
+    payoutCycleDays: getPayoutCycleDays(),
+  });
+});
+
+router.put('/settings', (req, res) => {
+  const { commissionRate, payoutCycleDays } = req.body || {};
+  const upsert = db.prepare(
+    `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+  );
+  if (commissionRate !== undefined && commissionRate !== '') {
+    const num = Number(commissionRate);
+    if (Number.isNaN(num) || num < 0 || num > 1) {
+      return res.status(400).json({ error: 'Komisyon oranı 0 ile 1 arasında bir ondalık sayı olmalı (örn. %20 için 0.2).' });
+    }
+    upsert.run('system.commissionRate', num);
+  }
+  if (payoutCycleDays !== undefined && payoutCycleDays !== '') {
+    const num = Number(payoutCycleDays);
+    if (Number.isNaN(num) || num < 1) {
+      return res.status(400).json({ error: 'Ödeme döngüsü en az 1 gün olmalı.' });
+    }
+    upsert.run('system.payoutCycleDays', num);
+  }
+  res.json({ message: 'Ayarlar güncellendi.' });
+});
+
+// --- Admin hesap yönetimi ----------------------------------------------------
+
+router.get('/admins', (req, res) => {
+  const admins = db.prepare(`SELECT id, name, username, created_at FROM users WHERE account_type = 'admin' ORDER BY created_at ASC`).all();
+  res.json({ admins });
+});
+
+// Yeni bir admin hesabı oluşturur - artık Railway konsoluna girmeye gerek
+// yok, panel içinden birbirini davet edebilirler.
+router.post('/admins', (req, res) => {
+  const { name, username, password } = req.body || {};
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'Ad, kullanıcı adı ve şifre zorunlu.' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Şifre en az 6 karakter olmalı.' });
+  }
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username.trim());
+  if (existing) return res.status(409).json({ error: 'Bu kullanıcı adı zaten alınmış.' });
+
+  const id = uuid();
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const placeholderPhone = `admin-${id.slice(0, 8)}`;
+  db.prepare(
+    `INSERT INTO users (id, phone, name, account_type, username, password_hash, profile_completed)
+     VALUES (?, ?, ?, 'admin', ?, ?, 1)`
+  ).run(id, placeholderPhone, name.trim(), username.trim(), passwordHash);
+  res.status(201).json({ message: 'Admin hesabı oluşturuldu.', admin: { id, name: name.trim(), username: username.trim() } });
+});
+
+router.delete('/admins/:id', (req, res) => {
+  if (req.params.id === req.user.id) {
+    return res.status(400).json({ error: 'Kendi hesabını silemezsin.' });
+  }
+  const totalAdmins = db.prepare(`SELECT COUNT(*) AS c FROM users WHERE account_type = 'admin'`).get().c;
+  if (totalAdmins <= 1) {
+    return res.status(400).json({ error: 'Son admin hesabı silinemez.' });
+  }
+  db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
+  res.json({ message: 'Admin hesabı silindi.' });
+});
+
+// Giriş yapmış admin kendi şifresini değiştirir.
+router.put('/account/password', (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Mevcut şifre ve yeni şifre zorunlu.' });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
+  }
+  const me = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (!me || !bcrypt.compareSync(currentPassword, me.password_hash)) {
+    return res.status(401).json({ error: 'Mevcut şifre hatalı.' });
+  }
+  const newHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, req.user.id);
+  res.json({ message: 'Şifre güncellendi.' });
 });
 
 module.exports = router;
