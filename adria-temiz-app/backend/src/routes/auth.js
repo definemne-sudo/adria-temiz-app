@@ -5,42 +5,11 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth, JWT_SECRET } = require('../middleware/auth');
 const { syncPropertyCalendar } = require('../services/icalSync');
+const { generateUsername, generatePassword } = require('../services/credentials');
 
 const router = express.Router();
 
 const OTP_TTL_MINUTES = 5;
-
-// Personel hesabı, telefon doğrulamasıyla bir kez "aktive" edildiğinde
-// (bkz. complete-profile) sistem otomatik bir kullanıcı adı + şifre üretir.
-// Bundan sonraki tüm girişler bu bilgilerle yapılır, tekrar SMS gerekmez -
-// hem personel için daha kolay hem bize SMS maliyeti çıkarmaz.
-// NOT: Admin paneli yazıldığında, bu üretim admin tarafından yapılan/
-// görüntülenen bir akışa dönüştürülebilir - şu an otomatik üretiyoruz.
-function slugifyName(name) {
-  return (name || 'personel')
-    .toLowerCase()
-    .replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g').replace(/[ıİ]/g, 'i')
-    .replace(/[öÖ]/g, 'o').replace(/[şŞ]/g, 's').replace(/[üÜ]/g, 'u')
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 12) || 'personel';
-}
-
-function generateUsername(name) {
-  const base = slugifyName(name);
-  for (let i = 0; i < 20; i++) {
-    const candidate = base + Math.floor(100 + Math.random() * 900);
-    const exists = db.prepare('SELECT id FROM users WHERE username = ?').get(candidate);
-    if (!exists) return candidate;
-  }
-  return base + Date.now();
-}
-
-function generatePassword() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
-  let out = '';
-  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
 
 function normalizePhone(raw) {
   // Boşluk/tire gibi karakterleri temizler, rakam ve baştaki '+' kalır.
@@ -275,15 +244,41 @@ router.post('/staff-login', (req, res) => {
   });
 });
 
+// MICISTOMan (admin paneli) girişi - kullanıcı adı/şifre ile. Admin
+// hesapları self-servis oluşturulmaz (güvenlik) - ilk admin, bir seed
+// script'iyle (bkz. scripts/create-admin.js) elle oluşturulur.
+router.post('/admin-login', (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Kullanıcı adı ve şifre zorunlu.' });
+  }
+  const user = db.prepare('SELECT * FROM users WHERE username = ? AND account_type = ?').get(username.trim(), 'admin');
+  if (!user || !user.password_hash || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ error: 'Kullanıcı adı veya şifre hatalı.' });
+  }
+  const token = jwt.sign(
+    { id: user.id, phone: user.phone, accountType: user.account_type },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+  res.json({
+    token,
+    user: { id: user.id, name: user.name, accountType: user.account_type, username: user.username },
+  });
+});
+
 // Personelin çevrimiçi/çevrimdışı durumunu değiştirmesi - çevrimdışıyken
 // yeni iş alamaz (bkz. jobs.js /assign).
 router.patch('/staff-status', requireAuth, (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
   }
-  const { isOnline } = req.body;
-  db.prepare('UPDATE users SET is_online = ? WHERE id = ?').run(isOnline ? 1 : 0, req.user.id);
-  res.json({ isOnline: !!isOnline });
+  const { isOnline, lat, lng, city } = req.body;
+  db.prepare(
+    `UPDATE users SET is_online = ?, current_lat = COALESCE(?, current_lat), current_lng = COALESCE(?, current_lng), current_city = COALESCE(?, current_city) WHERE id = ?`
+  ).run(isOnline ? 1 : 0, lat != null ? Number(lat) : null, lng != null ? Number(lng) : null, city || null, req.user.id);
+  const user = db.prepare('SELECT is_online, current_lat, current_lng, current_city FROM users WHERE id = ?').get(req.user.id);
+  res.json({ isOnline: !!user.is_online, city: user.current_city, lat: user.current_lat, lng: user.current_lng });
 });
 
 module.exports = router;
