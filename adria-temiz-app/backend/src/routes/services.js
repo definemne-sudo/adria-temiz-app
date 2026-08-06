@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, COMMISSION_RATE } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, getCommissionRate } = require('../services/catalog');
 
 const router = express.Router();
 
@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
     commonAreaSubOptions: getAllCommonAreaSubOptions(),
     addons: getAllAddons(),
     suppliesFees: getSuppliesFees(),
-    commissionRate: COMMISSION_RATE,
+    commissionRate: getCommissionRate(),
   });
 });
 
