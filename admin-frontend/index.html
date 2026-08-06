@@ -210,6 +210,39 @@ const T = {
   settlementStaffOwes: "Personel {{amount}}€ borçlu",
   settlementEven: "Eşit",
   emptySettlements: "Bu dönemde tamamlanan iş yok.",
+  exportCsvBtn: "Dışa Aktar (CSV)",
+  financeSubOverview: "Genel Bakış",
+  financeSubStaff: "Personel Ödemeleri",
+  financeSubCancellations: "İptal / İadeler",
+  granularity_day: "Gün",
+  granularity_week: "Hafta",
+  granularity_month: "Ay",
+  financeCollected: "Tahsil Edilen Komisyon",
+  financePending: "Bekleyen Komisyon",
+  financeClickToView: "Detay için tıkla →",
+  financeCommissionChartTitle: "MICISTO Komisyon Kazancı",
+  financeTotalEarned: "Toplam Kazanç",
+  financeUnpaidPeriods: "ödenmemiş dönem",
+  financeAllSettled: "Tüm dönemler ödendi ✓",
+  financeBackToStaff: "Personel listesine dön",
+  financeNoPeriodsYet: "Henüz tamamlanmış işi yok.",
+  colPeriod: "Dönem",
+  colPaidStatus: "Ödeme Durumu",
+  paidLabel: "Ödendi",
+  unpaidLabel: "Ödenmedi",
+  markPaidBtn: "Ödendi İşaretle",
+  undoBtn: "Geri Al",
+  financeTotalLoss: "Toplam Kayıp",
+  financeCancelCount: "İptal Sayısı",
+  financeRefundedCount: "İade Edilen",
+  emptyCancellations: "Bu dönemde iptal/iade yok.",
+  colCancelReason: "İptal Nedeni",
+  financeTransactionsTitle: "İşlemler",
+  emptyTransactions: "Bu kategoride işlem yok.",
+  txModalTitle_collected: "Tahsil Edilen İşlemler",
+  txModalTitle_pending: "Bekleyen İşlemler",
+  toastMarkedPaid: "Ödeme mutabakatı işaretlendi.",
+  toastCsvExported: "CSV indirildi.",
   navApplications: "Personel Başvuruları",
   servicesTitle: "Hizmetler & Fiyatlandırma",
   servicesSubtitle: "Fiyat parametrelerini ve hizmet checklist'lerini buradan yönet.",
@@ -353,6 +386,14 @@ let state = {
   finance: null,
   financePeriod: 'week',
   financeOffset: 0,
+  financeSubPage: 'overview',
+  financeOverview: null,
+  financeGranularity: 'day',
+  financeStaffList: null,
+  selectedFinanceStaffId: null,
+  staffPeriods: null,
+  financeCancellations: null,
+  financeTxModal: null,
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -809,60 +850,193 @@ function financePeriodLabel(f){
 }
 
 function renderFinance(){
-  const f = state.finance;
-  if(!f){
-    return `<div class="page-head"><div><h2>${T.financeTitle}</h2><p>${T.financeSubtitle}</p></div></div><div class="empty-state">…</div>`;
-  }
   return `
-  <div class="page-head"><div><h2>${T.financeTitle}</h2><p>${T.financeSubtitle}</p></div></div>
-
-  <div style="display:flex; gap:8px; margin-bottom:14px;">
-    <button class="btn ${state.financePeriod==='week'?'ochre':'ghost'} btn-sm" data-finance-period="week">Hafta</button>
-    <button class="btn ${state.financePeriod==='month'?'ochre':'ghost'} btn-sm" data-finance-period="month">Ay</button>
+  <div class="page-head">
+    <div><h2>${T.financeTitle}</h2><p>${T.financeSubtitle}</p></div>
+    <button class="btn ghost btn-sm" id="finance-export-btn">${T.exportCsvBtn}</button>
   </div>
-  <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px;">
-    <button class="btn ghost btn-sm" id="finance-prev">‹</button>
-    <span style="font-size:13px; font-weight:700; color:var(--navy);">${financePeriodLabel(f)}</span>
-    <button class="btn ghost btn-sm" id="finance-next">›</button>
+  <div style="display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:12px;">
+    <button class="btn ${state.financeSubPage==='overview'?'ochre':'ghost'} btn-sm" data-finance-subpage="overview">${T.financeSubOverview}</button>
+    <button class="btn ${state.financeSubPage==='staff'?'ochre':'ghost'} btn-sm" data-finance-subpage="staff">${T.financeSubStaff}</button>
+    <button class="btn ${state.financeSubPage==='cancellations'?'ochre':'ghost'} btn-sm" data-finance-subpage="cancellations">${T.financeSubCancellations}</button>
   </div>
+  ${state.financeSubPage==='overview' ? renderFinanceOverview()
+    : state.financeSubPage==='staff' ? renderFinanceStaff()
+    : renderFinanceCancellations()}
+  ${state.financeTxModal ? renderFinanceTxModal() : ''}
+  `;
+}
 
-  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
-    <div class="stat-card"><div class="value">${f.totalRevenue} €</div><div class="label">${T.financeTotalRevenue}</div></div>
-    <div class="stat-card"><div class="value">${f.totalCommission} €</div><div class="label">${T.financeTotalCommission}</div></div>
-    <div class="stat-card"><div class="value">${f.totalPayout} €</div><div class="label">${T.financeTotalPayout}</div></div>
+/* ---- Alt sayfa: Genel Bakış (MICISTO'nun kendi kazancı) ---- */
+function renderFinanceOverview(){
+  const o = state.financeOverview;
+  if(!o) return `<div class="empty-state">…</div>`;
+  const w = 700, h = 160, padX = 24, padY = 16;
+  const max = Math.max(1, ...o.series.map(s => s.commission));
+  const stepX = (w - padX*2) / Math.max(1, o.series.length - 1);
+  const points = o.series.map((s,i) => ({ x: padX+i*stepX, y: h-padY-(s.commission/max)*(h-padY*2), s }));
+  const linePath = points.map((p,i) => `${i===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+  return `
+  <div style="display:flex; gap:8px; margin-bottom:16px;">
+    ${['day','week','month'].map(g => `<button class="btn ${state.financeGranularity===g?'ochre':'ghost'} btn-sm" data-finance-granularity="${g}">${T['granularity_'+g]}</button>`).join('')}
   </div>
-
-  <div class="panel-card" style="margin-bottom:16px;">
-    <div class="panel-head"><h3>${T.paymentBreakdownTitle}</h3></div>
-    ${renderBreakdownRow(T.payCash, f.paymentBreakdown.cash.count, f.jobCount, '#C98A3E')}
-    ${renderBreakdownRow(T.payCard, f.paymentBreakdown.card.count, f.jobCount, 'var(--sage)')}
-    ${renderBreakdownRow(T.payInvoice, f.paymentBreakdown.invoice.count, f.jobCount, '#5B3F9E')}
+  <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-bottom:16px;">
+    <div class="stat-card" data-open-tx="collected" style="cursor:pointer;">
+      <div class="value" style="color:var(--sage-dark);">${o.collectedCommission} €</div>
+      <div class="label">${T.financeCollected}</div>
+      <div class="sub-label">${T.financeClickToView}</div>
+    </div>
+    <div class="stat-card" data-open-tx="pending" style="cursor:pointer;">
+      <div class="value" style="color:#C98A3E;">${o.pendingCommission} €</div>
+      <div class="label">${T.financePending}</div>
+      <div class="sub-label">${T.financeClickToView}</div>
+    </div>
   </div>
-
   <div class="panel-card">
-    <div class="panel-head"><h3>${T.settlementTitle}</h3></div>
-    <div class="hint" style="margin:-8px 0 14px;">${T.settlementHint}</div>
-    ${f.staffSettlements.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptySettlements}</div>` : `
-      <table>
-        <thead><tr><th>${T.colStaffName}</th><th>${T.colCashJobs}</th><th>${T.colCardInvoiceJobs}</th><th>${T.colNetSettlement}</th></tr></thead>
-        <tbody>
-          ${f.staffSettlements.map(s => `
-            <tr>
-              <td><strong>${s.staffName}</strong></td>
-              <td>${s.cashJobs} iş — ${s.cashTotal} €</td>
-              <td>${s.otherJobs} iş — ${s.otherTotal} €</td>
-              <td>
-                ${s.netSettlement > 0 ? `<span style="color:var(--sage-dark); font-weight:700;">${tt('settlementBusinessOwes',{amount:s.netSettlement})}</span>`
-                  : s.netSettlement < 0 ? `<span style="color:var(--danger); font-weight:700;">${tt('settlementStaffOwes',{amount:Math.abs(s.netSettlement)})}</span>`
-                  : `<span style="color:var(--muted);">${T.settlementEven}</span>`}
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `}
+    <div class="panel-head"><h3>${T.financeCommissionChartTitle}</h3></div>
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto;">
+      <path d="${linePath}" fill="none" stroke="#1D9E73" stroke-width="2.5" />
+      ${points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#0F3D2E" />`).join('')}
+      ${points.map((p,i) => i % Math.ceil(points.length/8||1) === 0 ? `<text x="${p.x.toFixed(1)}" y="${h-2}" font-size="9" fill="#5B7A6C" text-anchor="middle">${p.s.label.slice(5)}</text>` : '').join('')}
+    </svg>
   </div>
   `;
+}
+
+/* ---- Alt sayfa: Personel Ödemeleri ---- */
+function renderFinanceStaff(){
+  if(state.selectedFinanceStaffId) return renderStaffPeriods();
+  const list = state.financeStaffList;
+  if(!list) return `<div class="empty-state">…</div>`;
+  return `
+  <div class="review-grid">
+    ${list.staff.map(s => `
+      <div class="panel-card" data-open-staff-finance="${s.id}" style="cursor:pointer;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <div class="booking-avatar">${(s.name||'?').charAt(0).toUpperCase()}</div>
+          <div>
+            <div style="font-weight:700; color:var(--navy);">${s.name}</div>
+            <div style="font-size:11.5px; color:var(--muted);">${s.current_city || '—'}</div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); margin-bottom:4px;">
+          <span>${T.financeTotalEarned}</span><strong style="color:var(--navy);">${s.totalEarned} €</strong>
+        </div>
+        ${s.unpaidPeriodCount > 0 ? `
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--line); font-size:12px;">
+            <span class="badge-count" style="background:#C98A3E;">${s.unpaidPeriodCount}</span>
+            <span style="color:var(--muted); margin-left:6px;">${T.financeUnpaidPeriods}</span>
+          </div>
+        ` : `<div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--line); font-size:12px; color:var(--sage-dark);">${T.financeAllSettled}</div>`}
+      </div>
+    `).join('')}
+  </div>
+  `;
+}
+
+function renderStaffPeriods(){
+  const data = state.staffPeriods;
+  if(!data) return `<div class="empty-state">…</div>`;
+  return `
+  <button class="btn ghost btn-sm" id="back-to-staff-list" style="margin-bottom:14px;">‹ ${T.financeBackToStaff}</button>
+  <h3 style="margin-bottom:14px;">${data.staff.name}</h3>
+  ${data.periods.length === 0 ? `<div class="empty-state">${T.financeNoPeriodsYet}</div>` : `
+    <table>
+      <thead><tr>
+        <th>${T.colPeriod}</th><th>${T.colCashJobs}</th><th>${T.colCardInvoiceJobs}</th><th>${T.colNetSettlement}</th><th>${T.colPaidStatus}</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${data.periods.map(p => `
+          <tr>
+            <td>${new Date(p.periodStart+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})} – ${new Date(p.periodEnd+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+            <td>${p.owedToBusiness} €</td>
+            <td>${p.owedToStaff} €</td>
+            <td>
+              ${p.netSettlement > 0 ? `<span style="color:var(--sage-dark); font-weight:700;">${tt('settlementBusinessOwes',{amount:p.netSettlement})}</span>`
+                : p.netSettlement < 0 ? `<span style="color:var(--danger); font-weight:700;">${tt('settlementStaffOwes',{amount:Math.abs(p.netSettlement)})}</span>`
+                : `<span style="color:var(--muted);">${T.settlementEven}</span>`}
+            </td>
+            <td>${p.isPaid ? `<span class="status-pill status-done">${T.paidLabel}</span>` : `<span class="status-pill" style="background:#F2DADA; color:#A13A3A;">${T.unpaidLabel}</span>`}</td>
+            <td>
+              ${p.isPaid
+                ? `<button type="button" class="btn ghost btn-sm" data-unmark-paid="${p.periodStart}">${T.undoBtn}</button>`
+                : `<button type="button" class="btn ochre btn-sm" data-mark-paid="${p.periodStart}" data-mark-paid-end="${p.periodEnd}" data-mark-paid-amount="${p.netSettlement}">${T.markPaidBtn}</button>`}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
+/* ---- Alt sayfa: İptal/İadeler ---- */
+function renderFinanceCancellations(){
+  const c = state.financeCancellations;
+  if(!c) return `<div class="empty-state">…</div>`;
+  return `
+  <div style="display:flex; gap:8px; margin-bottom:14px;">
+    <button class="btn ${state.financePeriod==='week'?'ochre':'ghost'} btn-sm" data-cancel-period="week">Hafta</button>
+    <button class="btn ${state.financePeriod==='month'?'ochre':'ghost'} btn-sm" data-cancel-period="month">Ay</button>
+  </div>
+  <div style="display:flex; align-items:center; gap:14px; margin-bottom:18px;">
+    <button class="btn ghost btn-sm" id="cancel-prev">‹</button>
+    <span style="font-size:13px; font-weight:700; color:var(--navy);">${financePeriodLabel(c)}</span>
+    <button class="btn ghost btn-sm" id="cancel-next">›</button>
+  </div>
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
+    <div class="stat-card"><div class="value" style="color:var(--danger);">${c.totalLoss} €</div><div class="label">${T.financeTotalLoss}</div></div>
+    <div class="stat-card"><div class="value">${c.count}</div><div class="label">${T.financeCancelCount}</div></div>
+    <div class="stat-card"><div class="value">${c.refundedCount}</div><div class="label">${T.financeRefundedCount}</div></div>
+  </div>
+  ${c.cancellations.length === 0 ? `<div class="empty-state">${T.emptyCancellations}</div>` : `
+    <table>
+      <thead><tr><th>${T.colDate}</th><th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colPrice}</th><th>${T.colCancelReason}</th></tr></thead>
+      <tbody>
+        ${c.cancellations.map(r => `
+          <tr>
+            <td>${new Date(r.cancelled_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+            <td>${serviceLabel(r.service_key)}</td>
+            <td>${r.customer_name}</td>
+            <td>${r.price} €</td>
+            <td>${r.cancel_reason || '—'}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
+/* ---- Drill-down modal (kart tıklama -> işlem listesi) ---- */
+function renderFinanceTxModal(){
+  const m = state.financeTxModal;
+  return `
+  <div class="modal-backdrop" id="tx-modal-backdrop">
+    <div class="modal" style="max-width:600px;">
+      <h3 style="margin-bottom:14px;">${T['txModalTitle_'+m.category] || T.financeTransactionsTitle}</h3>
+      ${!m.transactions ? `<div class="empty-state" style="margin:0;">…</div>` : m.transactions.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyTransactions}</div>` : `
+        <div style="max-height:400px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>${T.colDate}</th><th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colStaffCol}</th><th>${T.colPrice}</th></tr></thead>
+            <tbody>
+              ${m.transactions.map(t => `
+                <tr>
+                  <td>${new Date(t.eventDate.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+                  <td>${serviceLabel(t.service_key)}</td>
+                  <td>${t.customer_name}</td>
+                  <td>${t.staff_name || T.noStaffAssigned}</td>
+                  <td>${t.price} €</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `}
+      <button class="btn ochre full" id="close-tx-modal" style="margin-top:14px;">${T.closeBtn}</button>
+    </div>
+  </div>`;
 }
 
 function renderServicesPricing(){
@@ -1056,9 +1230,36 @@ async function loadServicesData(){
   state.servicesData = await api('/admin/services');
   render();
 }
-async function loadFinance(){
-  state.finance = await api(`/admin/finance?period=${state.financePeriod}&offset=${state.financeOffset}`);
+async function loadFinanceOverview(){
+  state.financeOverview = await api(`/admin/finance/overview?granularity=${state.financeGranularity}`);
   render();
+}
+async function loadFinanceStaffList(){
+  state.financeStaffList = await api('/admin/finance/staff');
+  render();
+}
+async function loadStaffPeriods(staffId){
+  state.selectedFinanceStaffId = staffId;
+  state.staffPeriods = await api(`/admin/finance/staff/${staffId}/periods`);
+  render();
+}
+async function loadFinanceCancellations(){
+  state.financeCancellations = await api(`/admin/finance/cancellations?period=${state.financePeriod}&offset=${state.financeOffset}`);
+  render();
+}
+async function loadFinanceTx(category){
+  state.financeTxModal = { category, transactions: null };
+  render();
+  const data = await api(`/admin/finance/transactions?category=${category}&period=${state.financeGranularity==='month'?'month':'week'}&offset=0`);
+  state.financeTxModal = { category, transactions: data.transactions };
+  render();
+}
+async function loadFinanceSubPage(){
+  if(state.financeSubPage === 'overview') await loadFinanceOverview();
+  else if(state.financeSubPage === 'staff'){
+    state.selectedFinanceStaffId = null;
+    await loadFinanceStaffList();
+  } else await loadFinanceCancellations();
 }
 
 function attachHandlers(){
@@ -1087,17 +1288,81 @@ function attachHandlers(){
     if(state.page === 'customers') await loadCustomers();
     if(state.page === 'support') await loadChats();
     if(state.page === 'services') await loadServicesData();
-    if(state.page === 'finance') await loadFinance();
+    if(state.page === 'finance') await loadFinanceSubPage();
   });
 
-  document.querySelectorAll('[data-finance-period]').forEach(el => el.onclick = async () => {
-    state.financePeriod = el.dataset.financePeriod; state.financeOffset = 0;
-    await loadFinance();
+  document.querySelectorAll('[data-finance-subpage]').forEach(el => el.onclick = async () => {
+    state.financeSubPage = el.dataset.financeSubpage;
+    state.selectedFinanceStaffId = null;
+    await loadFinanceSubPage();
   });
-  const financePrev = document.getElementById('finance-prev');
-  if(financePrev) financePrev.onclick = async () => { state.financeOffset -= 1; await loadFinance(); };
-  const financeNext = document.getElementById('finance-next');
-  if(financeNext) financeNext.onclick = async () => { state.financeOffset += 1; await loadFinance(); };
+
+  document.querySelectorAll('[data-finance-granularity]').forEach(el => el.onclick = async () => {
+    state.financeGranularity = el.dataset.financeGranularity;
+    await loadFinanceOverview();
+  });
+
+  document.querySelectorAll('[data-open-tx]').forEach(el => el.onclick = async () => {
+    await loadFinanceTx(el.dataset.openTx);
+  });
+  const closeTxModal = document.getElementById('close-tx-modal');
+  if(closeTxModal) closeTxModal.onclick = () => { state.financeTxModal = null; render(); };
+  const txBackdrop = document.getElementById('tx-modal-backdrop');
+  if(txBackdrop) txBackdrop.onclick = (e) => { if(e.target===txBackdrop){ state.financeTxModal = null; render(); } };
+
+  document.querySelectorAll('[data-open-staff-finance]').forEach(el => el.onclick = async () => {
+    await loadStaffPeriods(el.dataset.openStaffFinance);
+  });
+  const backToStaffList = document.getElementById('back-to-staff-list');
+  if(backToStaffList) backToStaffList.onclick = async () => {
+    state.selectedFinanceStaffId = null; state.staffPeriods = null;
+    await loadFinanceStaffList();
+  };
+
+  document.querySelectorAll('[data-mark-paid]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/finance/staff/${state.selectedFinanceStaffId}/periods/mark-paid`, {
+        method:'POST',
+        body: JSON.stringify({ periodStart: el.dataset.markPaid, periodEnd: el.dataset.markPaidEnd, amount: el.dataset.markPaidAmount }),
+      });
+      showToast(T.toastMarkedPaid);
+      await loadStaffPeriods(state.selectedFinanceStaffId);
+    }catch(err){ showToast(err.message); }
+  });
+  document.querySelectorAll('[data-unmark-paid]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/finance/staff/${state.selectedFinanceStaffId}/periods/unmark-paid`, {
+        method:'POST', body: JSON.stringify({ periodStart: el.dataset.unmarkPaid }),
+      });
+      await loadStaffPeriods(state.selectedFinanceStaffId);
+    }catch(err){ showToast(err.message); }
+  });
+
+  document.querySelectorAll('[data-cancel-period]').forEach(el => el.onclick = async () => {
+    state.financePeriod = el.dataset.cancelPeriod; state.financeOffset = 0;
+    await loadFinanceCancellations();
+  });
+  const cancelPrev = document.getElementById('cancel-prev');
+  if(cancelPrev) cancelPrev.onclick = async () => { state.financeOffset -= 1; await loadFinanceCancellations(); };
+  const cancelNext = document.getElementById('cancel-next');
+  if(cancelNext) cancelNext.onclick = async () => { state.financeOffset += 1; await loadFinanceCancellations(); };
+
+  const financeExportBtn = document.getElementById('finance-export-btn');
+  if(financeExportBtn) financeExportBtn.onclick = async () => {
+    try{
+      const res = await fetch(`${API}/admin/finance/export?period=${state.financePeriod}&offset=${state.financeOffset}`, {
+        headers: { Authorization: 'Bearer ' + state.token },
+      });
+      if(!res.ok) throw new Error('İndirme başarısız.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `micisto-finans-${state.financePeriod}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      showToast(T.toastCsvExported);
+    }catch(err){ showToast(err.message); }
+  };
 
   document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
     await loadChatMessages(el.dataset.openChat);
