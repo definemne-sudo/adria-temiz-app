@@ -4,7 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateUsername, generatePassword } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, COMMISSION_RATE } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -446,6 +446,99 @@ router.post('/services/checklist/:itemId/move', (req, res) => {
   db.prepare('UPDATE service_checklists SET sort_order = ? WHERE id = ?').run(neighbor.sort_order, item.id);
   db.prepare('UPDATE service_checklists SET sort_order = ? WHERE id = ?').run(item.sort_order, neighbor.id);
   res.json({ message: 'Sıra güncellendi.' });
+});
+
+// --- Finans -----------------------------------------------------------------
+
+function getFinancePeriodRange(period, offset) {
+  const now = new Date();
+  if (period === 'month') {
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const start = new Date(target.getFullYear(), target.getMonth(), 1);
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0);
+    return { start, end };
+  }
+  const day = now.getDay();
+  const diffToMonday = (day === 0 ? -6 : 1 - day);
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: monday, end: sunday };
+}
+function toDateKey(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Seçilen dönemde tamamlanan işlerden: toplam ciro, MICISTO komisyonu,
+// ödeme yöntemi dağılımı, ve personel bazında mutabakat (kim kime ne kadar
+// borçlu). Nakit işlerde para zaten personelde - o yüzden personel bize
+// komisyonu ÖDEMELİ. Kart/fatura işlerinde para bizde - o yüzden biz
+// personele net kazancını ÖDEMELİYİZ. netSettlement = biz personele
+// borçluysak pozitif, personel bize borçluysa negatif.
+router.get('/finance', (req, res) => {
+  const period = req.query.period === 'month' ? 'month' : 'week';
+  const offset = parseInt(req.query.offset, 10) || 0;
+  const { start, end } = getFinancePeriodRange(period, offset);
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+
+  const jobs = db
+    .prepare(
+      `SELECT j.price, j.payment_method, j.assigned_staff_id, u.name AS staff_name
+       FROM cleaning_jobs j
+       LEFT JOIN users u ON u.id = j.assigned_staff_id
+       WHERE j.status = 'done' AND date(j.completed_at) BETWEEN ? AND ?`
+    )
+    .all(startKey, endKey);
+
+  const totalRevenue = jobs.reduce((sum, j) => sum + j.price, 0);
+  const totalCommission = Math.round(jobs.reduce((sum, j) => sum + (j.price - calcNetEarning(j.price)), 0) * 100) / 100;
+  const totalPayout = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0) * 100) / 100;
+
+  const paymentBreakdown = { cash: { count: 0, total: 0 }, card: { count: 0, total: 0 }, invoice: { count: 0, total: 0 } };
+  jobs.forEach((j) => {
+    const method = paymentBreakdown[j.payment_method] ? j.payment_method : 'cash';
+    paymentBreakdown[method].count += 1;
+    paymentBreakdown[method].total += j.price;
+  });
+
+  const byStaff = {};
+  jobs.forEach((j) => {
+    if (!j.assigned_staff_id) return;
+    if (!byStaff[j.assigned_staff_id]) {
+      byStaff[j.assigned_staff_id] = {
+        staffId: j.assigned_staff_id, staffName: j.staff_name,
+        cashJobs: 0, cashTotal: 0, otherJobs: 0, otherTotal: 0,
+        owedToStaff: 0, owedToBusiness: 0,
+      };
+    }
+    const s = byStaff[j.assigned_staff_id];
+    const net = calcNetEarning(j.price);
+    if (j.payment_method === 'cash') {
+      s.cashJobs += 1;
+      s.cashTotal += j.price;
+      s.owedToBusiness += (j.price - net); // personel bizim komisyonumuzu bize ödemeli
+    } else {
+      s.otherJobs += 1;
+      s.otherTotal += j.price;
+      s.owedToStaff += net; // biz personele net kazancini odemeliyiz
+    }
+  });
+  const staffSettlements = Object.values(byStaff).map((s) => ({
+    ...s,
+    owedToStaff: Math.round(s.owedToStaff * 100) / 100,
+    owedToBusiness: Math.round(s.owedToBusiness * 100) / 100,
+    netSettlement: Math.round((s.owedToStaff - s.owedToBusiness) * 100) / 100,
+  })).sort((a, b) => b.otherTotal + b.cashTotal - (a.otherTotal + a.cashTotal));
+
+  res.json({
+    period, offset, startDate: startKey, endDate: endKey,
+    totalRevenue, totalCommission, totalPayout, commissionRate: COMMISSION_RATE,
+    paymentBreakdown, staffSettlements, jobCount: jobs.length,
+  });
 });
 
 module.exports = router;
