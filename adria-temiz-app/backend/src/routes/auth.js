@@ -100,6 +100,7 @@ router.post('/verify-otp', (req, res) => {
       companyName: user.company_name,
       taxNumber: user.tax_number,
       billingAddress: user.billing_address,
+      referralCode: user.referral_code,
       profileCompleted: !!user.profile_completed,
     },
   });
@@ -110,7 +111,7 @@ router.post('/verify-otp', (req, res) => {
 // (property alanı gönderilirse). Yönetim şirketi mülk eklemeyi panelden yapar,
 // çünkü genelde çok sayıda mülk portföy olarak eklenir, kayıt formuna sığmaz.
 router.post('/complete-profile', requireAuth, async (req, res) => {
-  const { name, accountType, companyName, taxNumber, billingAddress, property } = req.body;
+  const { name, accountType, companyName, taxNumber, billingAddress, property, referredByCode } = req.body;
   if (!name || !accountType) {
     return res.status(400).json({ error: 'name ve accountType zorunlu.' });
   }
@@ -135,6 +136,23 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
     accountType === 'company' ? billingAddress : null,
     req.user.id
   );
+
+  // Bireysel/şirket müşteriler için benzersiz bir referans kodu üretilir -
+  // MICISTOMan > Marketing'de bu kodla kaç kişi kazandırdıklarını
+  // görebiliyoruz. Kayıt sırasında başka birinin kodu girildiyse (referredByCode),
+  // o kişi "yönlendiren" olarak kaydediliyor.
+  if ((accountType === 'individual' || accountType === 'company') ) {
+    const existingRefCode = db.prepare('SELECT referral_code FROM users WHERE id = ?').get(req.user.id).referral_code;
+    if (!existingRefCode) {
+      const refCode = generateUsername(name).toUpperCase();
+      let referredByUserId = null;
+      if (referredByCode) {
+        const referrer = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referredByCode.trim().toUpperCase());
+        if (referrer && referrer.id !== req.user.id) referredByUserId = referrer.id;
+      }
+      db.prepare('UPDATE users SET referral_code = ?, referred_by_user_id = ? WHERE id = ?').run(refCode, referredByUserId, req.user.id);
+    }
+  }
 
   // Personel hesabı aktive ediliyor ya da telefonla kimlik doğrulayıp
   // giriş bilgilerini sıfırlıyor (şifresini unutan personel için de bu
@@ -203,6 +221,7 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
       billingAddress: user.billing_address,
       username: user.username,
       isOnline: !!user.is_online,
+      referralCode: user.referral_code,
       profileCompleted: true,
     },
     property: createdProperty,
