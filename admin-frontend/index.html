@@ -191,6 +191,70 @@ const T = {
   navCustomers: "Müşteriler",
   navServices: "Hizmetler & Fiyatlandırma",
   navFinance: "Finans",
+  navMarketing: "Marketing",
+  marketingTitle: "Marketing",
+  marketingSubtitle: "Reklam kampanyaları, promosyon kodları ve sadakat/referans hedefleme.",
+  marketingSubAds: "Reklam Kampanyaları",
+  marketingSubPromos: "Promosyon Kodları",
+  marketingSubLoyalty: "Sadakat & Referans",
+  adCampaignsSubtitle: "Kendi reklam panelinden (Meta, Google Ads, TikTok vb.) gördüğün rakamları buraya elle gir - gerçek zamanlı otomatik veri çekimi yok.",
+  addCampaignTitle: "Yeni Kampanya Ekle",
+  fieldPlatform: "Platform",
+  fieldCampaignName: "Kampanya Adı",
+  fieldStartDate: "Başlangıç Tarihi",
+  fieldEndDate: "Bitiş Tarihi (opsiyonel)",
+  fieldSpend: "Harcama (€)",
+  fieldImpressions: "Görüntülenme",
+  fieldClicks: "Tıklama",
+  fieldSignups: "Kayıt (tahmini)",
+  colPlatform: "Platform",
+  colCampaign: "Kampanya",
+  colSpend: "Harcama",
+  colClicks: "Tıklama",
+  colCPC: "TBM (CPC)",
+  colCPA: "Kayıt Başı Maliyet",
+  emptyAdCampaigns: "Henüz kampanya eklenmedi.",
+  totalSpendLabel: "Toplam Harcama",
+  totalClicksLabel: "Toplam Tıklama",
+  totalSignupsLabel: "Toplam Kayıt (tahmini)",
+  addCampaignBtn: "Kampanya Ekle",
+  createPromoTitle: "Yeni Promosyon Kodu",
+  fieldPromoCode: "Kod",
+  fieldDiscountType: "İndirim Tipi",
+  discountTypePercent: "Yüzde (%)",
+  discountTypeFixed: "Sabit Tutar (€)",
+  fieldDiscountValue: "İndirim Değeri",
+  fieldStartHour: "Başlangıç Saati (opsiyonel)",
+  fieldEndHour: "Bitiş Saati (opsiyonel)",
+  fieldCity: "Şehir (opsiyonel, boşsa tüm şehirler)",
+  fieldServiceKey: "Hizmet (opsiyonel, boşsa tüm hizmetler)",
+  fieldMaxUses: "Toplam Kullanım Limiti (opsiyonel)",
+  fieldMaxUsesPerCustomer: "Müşteri Başına Limit",
+  allServicesOption: "Tüm hizmetler",
+  createPromoBtn: "Kod Oluştur",
+  colCode: "Kod",
+  colDiscount: "İndirim",
+  colScope: "Kapsam",
+  colUsage: "Kullanım",
+  colActive: "Aktif",
+  emptyPromoCodes: "Henüz promosyon kodu yok.",
+  toggleBtn: "Değiştir",
+  loyaltyTitle: "Sadakat Programı",
+  loyaltySubtitle: "Belirli sipariş sayısının üzerindeki müşterilere özel kod oluştur.",
+  fieldMinOrders: "Minimum Tamamlanmış Sipariş",
+  loyaltyCustomersFound: "{{count}} müşteri bu eşiği karşılıyor.",
+  generateLoyaltyBtn: "Sadakat Kodu Oluştur",
+  referralTitle: "Referans (Tavsiye) Programı",
+  referralSubtitle: "Bize müşteri kazandırmış kullanıcılara özel kod oluştur.",
+  colReferralCount: "Kazandırdığı Müşteri",
+  emptyReferrers: "Henüz kimse müşteri kazandırmamış.",
+  fieldMinReferrals: "Minimum Kazandırılan Müşteri",
+  generateReferralBtn: "Referans Kodu Oluştur",
+  toastCampaignAdded: "Kampanya eklendi.",
+  toastCampaignDeleted: "Kampanya silindi.",
+  toastPromoCreated: "Promosyon kodu oluşturuldu.",
+  toastPromoToggled: "Durum güncellendi.",
+  toastPromoDeleted: "Kod silindi.",
   navSettings: "Ayarlar",
   settingsTitle: "Ayarlar",
   settingsSubtitle: "İşletme genelindeki parametreler ve hesap yönetimi.",
@@ -424,6 +488,12 @@ let state = {
   adminsList: null,
   settingsError: '',
   deleteAdminTargetId: null,
+  marketingSubPage: 'ads',
+  adCampaigns: null,
+  promoCodes: null,
+  loyaltyMinOrders: 5,
+  loyaltyCustomers: null,
+  topReferrers: null,
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -483,6 +553,7 @@ const NAV_ICONS = {
   services: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4l-2.7 2.7-2-2z"/></svg>`,
   finance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6.5c0-2-2.2-3-5-3s-5 1.2-5 3.2 2.2 2.8 5 3.3 5 1.3 5 3.3-2.2 3.2-5 3.2-5-1-5-3"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  marketing: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>`,
 };
 
 function navItem(page, icon, label, badgeCount){
@@ -505,6 +576,7 @@ function renderPanel(){
     ${navItem('customers', 'customers', T.navCustomers)}
     ${navItem('services', 'services', T.navServices)}
     ${navItem('finance', 'finance', T.navFinance)}
+    ${navItem('marketing', 'marketing', T.navMarketing)}
     ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
@@ -524,6 +596,7 @@ function renderPanel(){
       : state.page==='customers' ? renderCustomers()
       : state.page==='services' ? renderServicesPricing()
       : state.page==='finance' ? renderFinance()
+      : state.page==='marketing' ? renderMarketing()
       : state.page==='settings' ? renderSettings()
       : state.page==='support' ? renderSupport()
       : renderApplications()}
@@ -1072,6 +1145,184 @@ function renderFinanceTxModal(){
   </div>`;
 }
 
+function renderMarketing(){
+  return `
+  <div class="page-head"><div><h2>${T.marketingTitle}</h2><p>${T.marketingSubtitle}</p></div></div>
+  <div style="display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:12px;">
+    <button class="btn ${state.marketingSubPage==='ads'?'ochre':'ghost'} btn-sm" data-marketing-subpage="ads">${T.marketingSubAds}</button>
+    <button class="btn ${state.marketingSubPage==='promos'?'ochre':'ghost'} btn-sm" data-marketing-subpage="promos">${T.marketingSubPromos}</button>
+    <button class="btn ${state.marketingSubPage==='loyalty'?'ochre':'ghost'} btn-sm" data-marketing-subpage="loyalty">${T.marketingSubLoyalty}</button>
+  </div>
+  ${state.marketingSubPage==='ads' ? renderAdCampaigns()
+    : state.marketingSubPage==='promos' ? renderPromoCodes()
+    : renderLoyaltyReferral()}
+  `;
+}
+
+function renderAdCampaigns(){
+  const d = state.adCampaigns;
+  return `
+  <div class="hint" style="margin:-4px 0 16px;">${T.adCampaignsSubtitle}</div>
+  ${!d ? `<div class="empty-state">…</div>` : `
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
+      <div class="stat-card"><div class="value">${d.totals.spend} €</div><div class="label">${T.totalSpendLabel}</div></div>
+      <div class="stat-card"><div class="value">${d.totals.clicks}</div><div class="label">${T.totalClicksLabel}</div></div>
+      <div class="stat-card"><div class="value">${d.totals.signups}</div><div class="label">${T.totalSignupsLabel}</div></div>
+    </div>
+    ${d.campaigns.length === 0 ? `<div class="empty-state" style="margin-bottom:16px;">${T.emptyAdCampaigns}</div>` : `
+      <table style="margin-bottom:20px;">
+        <thead><tr><th>${T.colPlatform}</th><th>${T.colCampaign}</th><th>${T.colSpend}</th><th>${T.colClicks}</th><th>${T.colCPC}</th><th>${T.colCPA}</th><th></th></tr></thead>
+        <tbody>
+          ${d.campaigns.map(c => `
+            <tr>
+              <td>${c.platform}</td>
+              <td><strong>${c.campaign_name}</strong><br/><span style="color:var(--muted); font-size:11px;">${c.start_date}${c.end_date ? ' – '+c.end_date : ''}</span></td>
+              <td>${c.spend} €</td>
+              <td>${c.clicks}</td>
+              <td>${c.cpc !== null ? c.cpc+' €' : '—'}</td>
+              <td>${c.cpa !== null ? c.cpa+' €' : '—'}</td>
+              <td><button type="button" class="btn danger btn-sm" data-delete-campaign="${c.id}">${T.deleteBtn}</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+  `}
+  <div class="panel-card" style="max-width:600px;">
+    <div class="panel-head"><h3>${T.addCampaignTitle}</h3></div>
+    <form id="add-campaign-form" style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldPlatform}</label><input name="platform" required placeholder="Instagram, Google Ads…" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldCampaignName}</label><input name="campaignName" required /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldStartDate}</label><input name="startDate" type="date" required /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldEndDate}</label><input name="endDate" type="date" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldSpend}</label><input name="spend" type="number" step="0.01" min="0" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldImpressions}</label><input name="impressions" type="number" min="0" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldClicks}</label><input name="clicks" type="number" min="0" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldSignups}</label><input name="signups" type="number" min="0" /></div>
+      <button class="btn ochre btn-sm" type="submit" style="grid-column:1/-1;">${T.addCampaignBtn}</button>
+    </form>
+  </div>
+  `;
+}
+
+function promoScopeLabel(p){
+  const parts = [];
+  if(p.city) parts.push(p.city);
+  if(p.service_key) parts.push(serviceLabel(p.service_key));
+  if(p.start_hour !== null && p.end_hour !== null) parts.push(`${String(p.start_hour).padStart(2,'0')}:00–${String(p.end_hour).padStart(2,'0')}:00`);
+  if(p.start_date || p.end_date) parts.push(`${p.start_date||'…'} – ${p.end_date||'…'}`);
+  if(p.source === 'loyalty') parts.push('🎖️ Sadakat');
+  if(p.source === 'referral') parts.push('🤝 Referans');
+  return parts.length ? parts.join(' · ') : 'Genel';
+}
+
+function renderPromoCodes(){
+  const d = state.promoCodes;
+  return `
+  ${!d ? `<div class="empty-state" style="margin-bottom:20px;">…</div>` : d.codes.length === 0 ? `<div class="empty-state" style="margin-bottom:20px;">${T.emptyPromoCodes}</div>` : `
+    <table style="margin-bottom:20px;">
+      <thead><tr><th>${T.colCode}</th><th>${T.colDiscount}</th><th>${T.colScope}</th><th>${T.colUsage}</th><th>${T.colActive}</th><th></th></tr></thead>
+      <tbody>
+        ${d.codes.map(p => `
+          <tr>
+            <td><strong style="font-family:monospace;">${p.code}</strong></td>
+            <td>${p.discount_type==='percent' ? '%'+p.discount_value : p.discount_value+' €'}</td>
+            <td style="font-size:12px; color:var(--muted);">${promoScopeLabel(p)}</td>
+            <td>${p.used_count}${p.max_uses ? ' / '+p.max_uses : ''}</td>
+            <td>${p.is_active ? `<span class="status-pill status-done">Aktif</span>` : `<span class="status-pill" style="background:#EDF0EE; color:#5B7A6C;">Pasif</span>`}</td>
+            <td class="row-actions">
+              <button type="button" class="btn ghost btn-sm" data-toggle-promo="${p.id}">${T.toggleBtn}</button>
+              <button type="button" class="btn danger btn-sm" data-delete-promo="${p.id}">${T.deleteBtn}</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  <div class="panel-card" style="max-width:640px;">
+    <div class="panel-head"><h3>${T.createPromoTitle}</h3></div>
+    <form id="create-promo-form" style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px;">
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldPromoCode}</label><input name="code" required style="text-transform:uppercase;" /></div>
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldDiscountType}</label>
+        <select name="discountType"><option value="percent">${T.discountTypePercent}</option><option value="fixed">${T.discountTypeFixed}</option></select>
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldDiscountValue}</label><input name="discountValue" type="number" step="0.01" min="0" required /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldMaxUsesPerCustomer}</label><input name="maxUsesPerCustomer" type="number" min="1" value="1" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldStartDate}</label><input name="startDate" type="date" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldEndDate}</label><input name="endDate" type="date" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldStartHour}</label><input name="startHour" type="number" min="0" max="23" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldEndHour}</label><input name="endHour" type="number" min="0" max="23" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldCity}</label><input name="city" /></div>
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldServiceKey}</label>
+        <select name="serviceKey">
+          <option value="">${T.allServicesOption}</option>
+          <option value="checkin_checkout">Airbnb/Booking</option>
+          <option value="deep_clean">Detaylı Temizlik</option>
+          <option value="office">Ofis/İşyeri</option>
+          <option value="common_area">Ortak Alan</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldMaxUses}</label><input name="maxUses" type="number" min="1" /></div>
+      <button class="btn ochre btn-sm" type="submit" style="grid-column:1/-1;">${T.createPromoBtn}</button>
+    </form>
+  </div>
+  `;
+}
+
+function renderLoyaltyReferral(){
+  const lc = state.loyaltyCustomers;
+  const refs = state.topReferrers;
+  return `
+  <div class="dash-grid">
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.loyaltyTitle}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${T.loyaltySubtitle}</div></div>
+      <div class="field" style="max-width:220px;">
+        <label>${T.fieldMinOrders}</label>
+        <input id="loyalty-min-orders" type="number" min="0" value="${state.loyaltyMinOrders}" />
+      </div>
+      <div style="font-size:13px; color:var(--navy); margin-bottom:14px;">${lc ? tt('loyaltyCustomersFound',{count:lc.customers.length}) : '…'}</div>
+      <form id="generate-loyalty-form" style="display:flex; flex-direction:column; gap:10px;">
+        <div class="field" style="margin-bottom:0;"><label>${T.fieldPromoCode}</label><input name="code" required style="text-transform:uppercase;" /></div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="margin-bottom:0; flex:1;">
+            <label>${T.fieldDiscountType}</label>
+            <select name="discountType"><option value="percent">${T.discountTypePercent}</option><option value="fixed">${T.discountTypeFixed}</option></select>
+          </div>
+          <div class="field" style="margin-bottom:0; flex:1;"><label>${T.fieldDiscountValue}</label><input name="discountValue" type="number" step="0.01" min="0" required /></div>
+        </div>
+        <button class="btn ochre btn-sm" type="submit">${T.generateLoyaltyBtn}</button>
+      </form>
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.referralTitle}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${T.referralSubtitle}</div></div>
+      ${!refs ? `<div class="empty-state" style="margin:0 0 14px;">…</div>` : refs.referrers.length === 0 ? `<div class="empty-state" style="margin:0 0 14px;">${T.emptyReferrers}</div>` : `
+        <table style="margin-bottom:16px;">
+          <thead><tr><th>${T.colName}</th><th>${T.colReferralCount}</th></tr></thead>
+          <tbody>
+            ${refs.referrers.map(r => `<tr><td>${r.name}</td><td>${r.referralCount}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      `}
+      <form id="generate-referral-form" style="display:flex; flex-direction:column; gap:10px;">
+        <div class="field" style="margin-bottom:0;"><label>${T.fieldPromoCode}</label><input name="code" required style="text-transform:uppercase;" /></div>
+        <div style="display:flex; gap:10px;">
+          <div class="field" style="margin-bottom:0; flex:1;">
+            <label>${T.fieldDiscountType}</label>
+            <select name="discountType"><option value="percent">${T.discountTypePercent}</option><option value="fixed">${T.discountTypeFixed}</option></select>
+          </div>
+          <div class="field" style="margin-bottom:0; flex:1;"><label>${T.fieldDiscountValue}</label><input name="discountValue" type="number" step="0.01" min="0" required /></div>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>${T.fieldMinReferrals}</label><input name="minReferrals" type="number" min="1" value="1" /></div>
+        <button class="btn ochre btn-sm" type="submit">${T.generateReferralBtn}</button>
+      </form>
+    </div>
+  </div>
+  `;
+}
+
 function renderSettings(){
   const s = state.settingsData;
   const admins = state.adminsList;
@@ -1376,6 +1627,28 @@ async function loadFinanceSubPage(){
     await loadFinanceStaffList();
   } else await loadFinanceCancellations();
 }
+async function loadAdCampaigns(){
+  state.adCampaigns = await api('/admin/marketing/ad-campaigns');
+  render();
+}
+async function loadPromoCodes(){
+  state.promoCodes = await api('/admin/marketing/promo-codes');
+  render();
+}
+async function loadLoyaltyCustomers(){
+  state.loyaltyCustomers = await api(`/admin/marketing/loyalty-customers?minOrders=${state.loyaltyMinOrders}`);
+  render();
+}
+async function loadTopReferrers(){
+  state.topReferrers = await api('/admin/marketing/top-referrers');
+  render();
+}
+async function loadMarketingSubPage(){
+  if(state.marketingSubPage === 'ads') await loadAdCampaigns();
+  else if(state.marketingSubPage === 'promos') await loadPromoCodes();
+  else { await loadLoyaltyCustomers(); await loadTopReferrers(); }
+}
+
 async function loadSettings(){
   state.settingsData = await api('/admin/settings');
   render();
@@ -1413,6 +1686,7 @@ function attachHandlers(){
     if(state.page === 'services') await loadServicesData();
     if(state.page === 'finance') await loadFinanceSubPage();
     if(state.page === 'settings'){ await loadSettings(); await loadAdmins(); }
+    if(state.page === 'marketing') await loadMarketingSubPage();
   });
 
   document.querySelectorAll('[data-finance-subpage]').forEach(el => el.onclick = async () => {
@@ -1543,6 +1817,87 @@ function attachHandlers(){
   };
   const deleteAdminBackdrop = document.getElementById('delete-admin-backdrop');
   if(deleteAdminBackdrop) deleteAdminBackdrop.onclick = (e) => { if(e.target===deleteAdminBackdrop){ state.deleteAdminTargetId = null; render(); } };
+
+  document.querySelectorAll('[data-marketing-subpage]').forEach(el => el.onclick = async () => {
+    state.marketingSubPage = el.dataset.marketingSubpage;
+    await loadMarketingSubPage();
+  });
+
+  const addCampaignForm = document.getElementById('add-campaign-form');
+  if(addCampaignForm) addCampaignForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(addCampaignForm));
+    try{
+      await api('/admin/marketing/ad-campaigns', { method:'POST', body: JSON.stringify(fd) });
+      showToast(T.toastCampaignAdded);
+      addCampaignForm.reset();
+      await loadAdCampaigns();
+    }catch(err){ showToast(err.message); }
+  };
+  document.querySelectorAll('[data-delete-campaign]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/marketing/ad-campaigns/${el.dataset.deleteCampaign}`, { method:'DELETE' });
+      showToast(T.toastCampaignDeleted);
+      await loadAdCampaigns();
+    }catch(err){ showToast(err.message); }
+  });
+
+  const createPromoForm = document.getElementById('create-promo-form');
+  if(createPromoForm) createPromoForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(createPromoForm));
+    try{
+      await api('/admin/marketing/promo-codes', { method:'POST', body: JSON.stringify(fd) });
+      showToast(T.toastPromoCreated);
+      createPromoForm.reset();
+      await loadPromoCodes();
+    }catch(err){ showToast(err.message); }
+  };
+  document.querySelectorAll('[data-toggle-promo]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/marketing/promo-codes/${el.dataset.togglePromo}/toggle`, { method:'PUT' });
+      showToast(T.toastPromoToggled);
+      await loadPromoCodes();
+    }catch(err){ showToast(err.message); }
+  });
+  document.querySelectorAll('[data-delete-promo]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/marketing/promo-codes/${el.dataset.deletePromo}`, { method:'DELETE' });
+      showToast(T.toastPromoDeleted);
+      await loadPromoCodes();
+    }catch(err){ showToast(err.message); }
+  });
+
+  const loyaltyMinOrdersInput = document.getElementById('loyalty-min-orders');
+  if(loyaltyMinOrdersInput) loyaltyMinOrdersInput.onchange = async () => {
+    state.loyaltyMinOrders = loyaltyMinOrdersInput.value;
+    await loadLoyaltyCustomers();
+  };
+  const generateLoyaltyForm = document.getElementById('generate-loyalty-form');
+  if(generateLoyaltyForm) generateLoyaltyForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(generateLoyaltyForm));
+    try{
+      const result = await api('/admin/marketing/promo-codes/generate-loyalty', { method:'POST', body: JSON.stringify({ ...fd, minOrders: state.loyaltyMinOrders }) });
+      showToast(result.message);
+      generateLoyaltyForm.reset();
+      state.marketingSubPage = 'promos';
+      await loadPromoCodes();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const generateReferralForm = document.getElementById('generate-referral-form');
+  if(generateReferralForm) generateReferralForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(generateReferralForm));
+    try{
+      const result = await api('/admin/marketing/promo-codes/generate-referral', { method:'POST', body: JSON.stringify(fd) });
+      showToast(result.message);
+      generateReferralForm.reset();
+      state.marketingSubPage = 'promos';
+      await loadPromoCodes();
+    }catch(err){ showToast(err.message); }
+  };
 
   document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
     await loadChatMessages(el.dataset.openChat);
