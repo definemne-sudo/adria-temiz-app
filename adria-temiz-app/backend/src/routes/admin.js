@@ -4,6 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateUsername, generatePassword } = require('../services/credentials');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -348,6 +349,103 @@ router.post('/chats/:userId/messages', (req, res) => {
     `INSERT INTO chat_messages (id, user_id, sender, message) VALUES (?, ?, 'admin', ?)`
   ).run(id, req.params.userId, message.trim());
   res.status(201).json(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id));
+});
+
+// --- Hizmetler & Fiyatlandırma ----------------------------------------------
+
+// Fiyatlandırma alanı isimlerinin pricing_settings'teki anahtara nasıl
+// eşlendiğini kontrol eder - admin rastgele bir sütuna yazamasın diye
+// (SQL injection değil ama en azından anlamsız bir key üretmesin diye).
+const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor', 'ratePerSqm', 'ratePerCapacity'];
+
+function getChecklist(serviceKey) {
+  return db
+    .prepare('SELECT * FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
+    .all(serviceKey);
+}
+
+router.get('/services', (req, res) => {
+  const services = getAllServices().map((s) => ({ ...s, checklist: s.isGroup ? [] : getChecklist(s.key) }));
+  const commonAreaSubOptions = getAllCommonAreaSubOptions().map((s) => ({ ...s, checklist: getChecklist(s.key) }));
+  const addons = getAllAddons();
+  const suppliesFees = getSuppliesFees();
+  res.json({ services, commonAreaSubOptions, addons, suppliesFees });
+});
+
+// Bir hizmetin (ya da ortak alan alt seçeneğinin, ya da ekstra/tedarik
+// ücretinin) fiyat parametrelerini günceller. Body: { base: 22, rate: 0.3, ... }
+// - sadece gönderilen alanlar güncellenir, diğerlerine dokunulmaz.
+router.put('/services/:key/pricing', (req, res) => {
+  const { key } = req.params;
+  const updates = req.body || {};
+  const upsert = db.prepare(
+    `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+  );
+  let changed = 0;
+  for (const field of PRICING_FIELDS) {
+    if (updates[field] !== undefined && updates[field] !== null && updates[field] !== '') {
+      const num = Number(updates[field]);
+      if (Number.isNaN(num)) return res.status(400).json({ error: `${field} sayısal bir değer olmalı.` });
+      upsert.run(`${key}.${field}`, num);
+      changed++;
+    }
+  }
+  if (changed === 0) return res.status(400).json({ error: 'Güncellenecek bir alan gönderilmedi.' });
+  res.json({ message: 'Fiyatlandırma güncellendi.' });
+});
+
+router.post('/services/:key/checklist', (req, res) => {
+  const { key } = req.params;
+  const { itemText } = req.body;
+  if (!itemText || !itemText.trim()) return res.status(400).json({ error: 'Görev metni boş olamaz.' });
+
+  const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM service_checklists WHERE service_key = ?').get(key).m;
+  const id = uuid();
+  db.prepare('INSERT INTO service_checklists (id, service_key, item_text, sort_order) VALUES (?, ?, ?, ?)')
+    .run(id, key, itemText.trim(), maxOrder + 1);
+  res.status(201).json(db.prepare('SELECT * FROM service_checklists WHERE id = ?').get(id));
+});
+
+router.delete('/services/checklist/:itemId', (req, res) => {
+  db.prepare('DELETE FROM service_checklists WHERE id = ?').run(req.params.itemId);
+  res.json({ message: 'Silindi.' });
+});
+
+// Malzeme yok ("ekipman/kimyasal yok") ek ücretlerini günceller - bunlar
+// belirli bir hizmete değil genel ayarlara ait olduğu için ayrı bir endpoint.
+router.put('/supplies-fees', (req, res) => {
+  const { noEquipment, noChemicals } = req.body || {};
+  const upsert = db.prepare(
+    `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
+  );
+  if (noEquipment !== undefined && noEquipment !== '') {
+    const num = Number(noEquipment);
+    if (Number.isNaN(num)) return res.status(400).json({ error: 'noEquipment sayısal olmalı.' });
+    upsert.run('supplies.noEquipment', num);
+  }
+  if (noChemicals !== undefined && noChemicals !== '') {
+    const num = Number(noChemicals);
+    if (Number.isNaN(num)) return res.status(400).json({ error: 'noChemicals sayısal olmalı.' });
+    upsert.run('supplies.noChemicals', num);
+  }
+  res.json({ message: 'Güncellendi.' });
+});
+
+router.post('/services/checklist/:itemId/move', (req, res) => {
+  const { direction } = req.body; // 'up' | 'down'
+  const item = db.prepare('SELECT * FROM service_checklists WHERE id = ?').get(req.params.itemId);
+  if (!item) return res.status(404).json({ error: 'Görev bulunamadı.' });
+
+  const neighbor = direction === 'up'
+    ? db.prepare('SELECT * FROM service_checklists WHERE service_key = ? AND sort_order < ? ORDER BY sort_order DESC LIMIT 1').get(item.service_key, item.sort_order)
+    : db.prepare('SELECT * FROM service_checklists WHERE service_key = ? AND sort_order > ? ORDER BY sort_order ASC LIMIT 1').get(item.service_key, item.sort_order);
+  if (!neighbor) return res.json({ message: 'Zaten uçta.' });
+
+  db.prepare('UPDATE service_checklists SET sort_order = ? WHERE id = ?').run(neighbor.sort_order, item.id);
+  db.prepare('UPDATE service_checklists SET sort_order = ? WHERE id = ?').run(item.sort_order, neighbor.id);
+  res.json({ message: 'Sıra güncellendi.' });
 });
 
 module.exports = router;
