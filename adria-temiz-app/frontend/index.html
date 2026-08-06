@@ -469,6 +469,10 @@ const TRANSLATIONS = {
     notAvailableOpt: "Yok",
     suppliesFeeHint: "\"Yok\" seçilirse ek ücret uygulanır.",
     receiptTitle: "Sipariş özeti",
+    promoDiscountLabel: "Promosyon İndirimi",
+    promoCodePlaceholder: "Promosyon kodu",
+    applyPromoBtn: "Uygula",
+    promoAppliedHint: "Kod uygulandı! 🎉",
     noEquipmentFeeLabel: "Temizlik araçları (yok)",
     noChemicalsFeeLabel: "Temizlik kimyasalları (yok)",
     receiptTotalLabel: "Toplam",
@@ -666,6 +670,10 @@ const TRANSLATIONS = {
     notAvailableOpt: "Not available",
     suppliesFeeHint: "Choosing \"Not available\" adds an extra fee.",
     receiptTitle: "Order summary",
+    promoDiscountLabel: "Promo Discount",
+    promoCodePlaceholder: "Promo code",
+    applyPromoBtn: "Apply",
+    promoAppliedHint: "Code applied! 🎉",
     noEquipmentFeeLabel: "Cleaning equipment (not available)",
     noChemicalsFeeLabel: "Cleaning chemicals (not available)",
     receiptTotalLabel: "Total",
@@ -863,6 +871,10 @@ const TRANSLATIONS = {
     notAvailableOpt: "Nemam",
     suppliesFeeHint: "Ako izabereš \"Nemam\", dodaje se dodatna naknada.",
     receiptTitle: "Pregled narudžbe",
+    promoDiscountLabel: "Promo popust",
+    promoCodePlaceholder: "Promo kod",
+    applyPromoBtn: "Primijeni",
+    promoAppliedHint: "Kod primijenjen! 🎉",
     noEquipmentFeeLabel: "Sredstva za čišćenje (nema)",
     noChemicalsFeeLabel: "Hemija za čišćenje (nema)",
     receiptTotalLabel: "Ukupno",
@@ -1093,6 +1105,8 @@ let state = {
   bookingPaymentMethod: 'cash',
   savedCard: null,
   pendingBooking: null,
+  promoCodeInput: '',
+  promoValidation: null,
   syncPropertyId: null,
   syncStep: 'url', // 'url' -> 'payment'
   syncIcalUrl: '',
@@ -1774,6 +1788,9 @@ function renderBookingPanel(service, props, selectedProperty){
 
 function renderReceiptPanel(draft){
   const { lines, total } = buildReceiptLines(draft);
+  const promo = state.promoValidation;
+  const discountAmount = (promo && promo.discountAmount) ? promo.discountAmount : 0;
+  const finalTotal = Math.max(0, Math.round((total - discountAmount) * 100) / 100);
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
     <h3 style="font-size:15px; margin-bottom:12px;">${t('receiptTitle')}</h3>
@@ -1783,10 +1800,25 @@ function renderReceiptPanel(draft){
           <span>${l.label}</span><span>${l.amount} €</span>
         </div>
       `).join('')}
+      ${discountAmount > 0 ? `
+        <div style="display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--sage-dark);">
+          <span>${t('promoDiscountLabel')} (${state.promoCodeInput.toUpperCase()})</span><span>-${discountAmount} €</span>
+        </div>
+      ` : ''}
       <div style="display:flex; justify-content:space-between; font-family:'Fraunces',serif; font-size:17px; color:var(--navy); border-top:1px dashed var(--line); margin-top:8px; padding-top:10px;">
-        <span>${t('receiptTotalLabel')}</span><span>${total} €</span>
+        <span>${t('receiptTotalLabel')}</span><span>${finalTotal} €</span>
       </div>
     </div>
+
+    <div style="margin-bottom:14px;">
+      <div style="display:flex; gap:8px;">
+        <input id="promo-code-input" placeholder="${t('promoCodePlaceholder')}" value="${state.promoCodeInput}" style="flex:1; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13.5px; text-transform:uppercase;" />
+        <button type="button" class="btn ghost btn-sm" id="apply-promo-btn" style="width:auto;">${t('applyPromoBtn')}</button>
+      </div>
+      ${promo && promo.error ? `<div class="error-msg" style="margin:6px 0 0;">${promo.error}</div>` : ''}
+      ${promo && promo.discountAmount ? `<div style="font-size:12px; color:var(--sage-dark); margin-top:6px;">${t('promoAppliedHint')}</div>` : ''}
+    </div>
+
     <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
       ${paymentNote(draft.paymentMethod)}
     </div>
@@ -2493,6 +2525,8 @@ function attachHandlers(){
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
+    state.promoCodeInput = '';
+    state.promoValidation = null;
     state.bookingPropertyId = null;
     if(key === 'common_area'){
       const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
@@ -2617,12 +2651,38 @@ function attachHandlers(){
   const backToConfig = document.querySelector('[data-back-to-config]');
   if(backToConfig) backToConfig.onclick = () => { state.bookingStep = 'config'; render(); };
 
+  const applyPromoBtn = document.getElementById('apply-promo-btn');
+  if(applyPromoBtn) applyPromoBtn.onclick = async () => {
+    const input = document.getElementById('promo-code-input');
+    const code = input.value.trim();
+    state.promoCodeInput = code;
+    if(!code){ state.promoValidation = null; render(); return; }
+    const draft = state.pendingBooking;
+    if(!draft) return;
+    const { total } = buildReceiptLines(draft);
+    try{
+      const result = await api('/jobs/validate-promo', { method:'POST', body: JSON.stringify({
+        code, propertyId: draft.propertyId, serviceKey: draft.serviceKey, priceBeforeDiscount: total,
+      })});
+      state.promoValidation = result;
+    }catch(err){
+      state.promoValidation = { error: err.message };
+    }
+    render();
+  };
+
   const confirmBooking = document.querySelector('[data-confirm-booking]');
   if(confirmBooking) confirmBooking.onclick = async () => {
     if(!state.pendingBooking) return;
-    await submitBooking(state.pendingBooking);
+    const bookingToSubmit = { ...state.pendingBooking };
+    if(state.promoValidation && state.promoValidation.discountAmount){
+      bookingToSubmit.promoCode = state.promoCodeInput;
+    }
+    await submitBooking(bookingToSubmit);
     state.bookingStep = 'config';
     state.pendingBooking = null;
+    state.promoCodeInput = '';
+    state.promoValidation = null;
   };
 
   const modalCancel = document.getElementById('modal-cancel');
