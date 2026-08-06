@@ -102,4 +102,84 @@ router.get('/stats', (req, res) => {
   });
 });
 
+// Dashboard ana ekranı için tek seferde tüm veri. NOT: "Cancelled" durumu
+// şu an sistemde yok (sipariş iptal akışı henüz yazılmadı), o yüzden iş
+// durumu dağılımında yer almıyor. Ortalama puan, bizim like/dislike tabanlı
+// değerlendirme sistemimize uygun şekilde "memnuniyet yüzdesi" olarak
+// veriliyor - uydurma bir 5 yıldız ortalaması değil.
+router.get('/dashboard', (req, res) => {
+  const count = (sql, ...params) => db.prepare(sql).get(...params).c;
+
+  const totalJobs = count(`SELECT COUNT(*) AS c FROM cleaning_jobs`);
+  const completedJobs = count(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE status = 'done'`);
+  const pendingJobs = count(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE status = 'pending'`);
+  const inProgressJobs = count(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE status = 'in_progress'`);
+  const assignedJobs = count(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE status = 'assigned'`);
+
+  const totalStaff = count(`SELECT COUNT(*) AS c FROM users WHERE account_type = 'staff'`);
+  const onlineStaff = count(`SELECT COUNT(*) AS c FROM users WHERE account_type = 'staff' AND is_online = 1`);
+  const pendingApplications = count(`SELECT COUNT(*) AS c FROM staff_applications WHERE status = 'pending'`);
+  const busyStaff = count(
+    `SELECT COUNT(DISTINCT assigned_staff_id) AS c FROM cleaning_jobs WHERE status = 'in_progress' AND assigned_staff_id IS NOT NULL`
+  );
+  const offlineStaff = totalStaff - onlineStaff;
+  const availableStaff = Math.max(0, onlineStaff - busyStaff);
+
+  const todayRevenue = db
+    .prepare(`SELECT COALESCE(SUM(price), 0) AS total FROM cleaning_jobs WHERE status = 'done' AND date(completed_at) = date('now')`)
+    .get().total;
+
+  const satisfactionRow = db
+    .prepare(
+      `SELECT COUNT(*) AS total, SUM(CASE WHEN service_rating = 'like' THEN 1 ELSE 0 END) AS likes
+       FROM cleaning_jobs WHERE service_rating IS NOT NULL`
+    )
+    .get();
+  const satisfactionPercent = satisfactionRow.total ? Math.round((satisfactionRow.likes / satisfactionRow.total) * 100) : null;
+
+  const todaysBookings = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.price,
+              p.name AS property_name, p.city AS property_city, p.address AS property_address,
+              u.name AS customer_name
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       JOIN users u ON u.id = p.owner_id
+       WHERE date(j.checkout_at) = date('now')
+       ORDER BY j.checkout_at ASC
+       LIMIT 20`
+    )
+    .all();
+
+  const recentReviews = db
+    .prepare(
+      `SELECT j.id, j.service_rating, j.service_feedback, j.rated_at,
+              p.name AS property_name, p.city AS property_city, u.name AS customer_name
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       JOIN users u ON u.id = p.owner_id
+       WHERE j.service_feedback IS NOT NULL AND j.service_feedback != ''
+       ORDER BY j.rated_at DESC
+       LIMIT 6`
+    )
+    .all();
+
+  res.json({
+    stats: {
+      totalBookings: totalJobs,
+      completedJobs,
+      pendingJobs,
+      totalStaff,
+      onlineStaff,
+      pendingApplications,
+      todayRevenue,
+      satisfactionPercent,
+    },
+    workerSummary: { total: totalStaff, online: availableStaff, busy: busyStaff, offline: offlineStaff },
+    jobStatusBreakdown: { completed: completedJobs, inProgress: inProgressJobs, assigned: assignedJobs, pending: pendingJobs, total: totalJobs },
+    todaysBookings,
+    recentReviews,
+  });
+});
+
 module.exports = router;
