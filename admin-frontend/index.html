@@ -97,6 +97,11 @@
 
   .booking-list{ display:flex; flex-direction:column; gap:10px; }
   .booking-row{ display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  .chat-list-row{
+    display:flex; align-items:center; gap:10px; padding:12px 14px; cursor:pointer; border-bottom:1px solid var(--line);
+  }
+  .chat-list-row:hover{ background:#F5F8F6; }
+  .chat-list-row.active{ background:var(--bg); }
   .booking-avatar{
     width:36px; height:36px; border-radius:50%; background:var(--sage); color:#fff; font-weight:700; font-size:14px;
     display:flex; align-items:center; justify-content:center; flex-shrink:0;
@@ -190,6 +195,16 @@ const T = {
   emptyBookings: "Sipariş bulunamadı.",
   emptyWorkers: "Personel bulunamadı.",
   emptyCustomers: "Müşteri bulunamadı.",
+  revenueOverviewTitle: "Ciro Görünümü (Son 7 Gün)",
+  revenueVsPrevious: "önceki döneme göre",
+  navSupport: "Destek",
+  supportTitle: "Destek Sohbetleri",
+  supportSubtitle: "Müşterilerin gönderdiği mesajlar.",
+  noChats: "Henüz mesaj yok.",
+  selectChatHint: "Görüntülemek için bir konuşma seç.",
+  messagePlaceholder: "Yanıt yaz…",
+  sendBtn: "Gönder",
+  unreadLabel: "yeni",
   logout: "Çıkış yap",
   welcomeBack: "Tekrar hoş geldin, {{name}} 👋",
   welcomeSubtitle: "İşletmende bugün neler oluyor.",
@@ -263,6 +278,10 @@ let state = {
   bookingsFilter: 'all',
   workers: null,
   customers: null,
+  revenue: null,
+  chats: null,
+  activeChatUserId: null,
+  chatMessages: null,
   authError: '',
   modal: null,
   newCredentials: null,
@@ -318,6 +337,10 @@ function renderPanel(){
     <div class="nav-item ${state.page==='bookings'?'active':''}" data-page="bookings">${T.navBookings}</div>
     <div class="nav-item ${state.page==='workers'?'active':''}" data-page="workers">${T.navWorkers}</div>
     <div class="nav-item ${state.page==='customers'?'active':''}" data-page="customers">${T.navCustomers}</div>
+    <div class="nav-item ${state.page==='support'?'active':''}" data-page="support">
+      ${T.navSupport}
+      ${state.dashboard && state.dashboard.stats.unreadChats ? `<span class="badge-count">${state.dashboard.stats.unreadChats}</span>` : ''}
+    </div>
     <div class="nav-item ${state.page==='applications'?'active':''}" data-page="applications">
       ${T.navApplications}
       ${state.dashboard && state.dashboard.stats.pendingApplications ? `<span class="badge-count">${state.dashboard.stats.pendingApplications}</span>` : ''}
@@ -331,6 +354,7 @@ function renderPanel(){
       : state.page==='bookings' ? renderBookings()
       : state.page==='workers' ? renderWorkers()
       : state.page==='customers' ? renderCustomers()
+      : state.page==='support' ? renderSupport()
       : renderApplications()}
   </div>
   ${state.modal ? renderModal() : ''}
@@ -342,6 +366,48 @@ function statIcon(kind){
     bookings: '📋', completed: '✅', workers: '🧑‍🔧', revenue: '💶', satisfaction: '⭐', pending: '⏳',
   };
   return icons[kind] || '•';
+}
+
+function renderRevenuePanel(){
+  const r = state.revenue;
+  if(!r) return `<div class="panel-card" style="margin-bottom:16px;"><div class="empty-state" style="margin:0;">…</div></div>`;
+
+  const w = 700, h = 200, padX = 30, padY = 20;
+  const max = Math.max(1, ...r.series.map(s => s.total));
+  const stepX = (w - padX*2) / Math.max(1, r.series.length - 1);
+  const points = r.series.map((s,i) => {
+    const x = padX + i*stepX;
+    const y = h - padY - (s.total/max) * (h - padY*2);
+    return { x, y, s };
+  });
+  const linePath = points.map((p,i) => `${i===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L ${points[points.length-1].x.toFixed(1)} ${h-padY} L ${points[0].x.toFixed(1)} ${h-padY} Z`;
+
+  const changeColor = r.percentChange === null ? 'var(--muted)' : r.percentChange >= 0 ? 'var(--sage-dark)' : 'var(--danger)';
+  const changeSign = r.percentChange !== null && r.percentChange >= 0 ? '↑' : '↓';
+
+  return `
+  <div class="panel-card" style="margin-bottom:16px;">
+    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:flex-start;">
+      <div>
+        <h3>${T.revenueOverviewTitle}</h3>
+        <div style="font-family:'Fraunces',serif; font-size:26px; color:var(--navy); margin-top:6px;">${r.totalRevenue} €</div>
+        ${r.percentChange !== null ? `<div style="font-size:12px; color:${changeColor}; margin-top:2px;">${changeSign} %${Math.abs(r.percentChange)} ${T.revenueVsPrevious}</div>` : ''}
+      </div>
+    </div>
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; margin-top:8px;">
+      <defs>
+        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#1D9E73" stop-opacity="0.25" />
+          <stop offset="100%" stop-color="#1D9E73" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <path d="${areaPath}" fill="url(#revGrad)" />
+      <path d="${linePath}" fill="none" stroke="#1D9E73" stroke-width="2.5" />
+      ${points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="#0F3D2E" />`).join('')}
+      ${points.map(p => `<text x="${p.x.toFixed(1)}" y="${h-4}" font-size="10" fill="#5B7A6C" text-anchor="middle">${new Date(p.s.date).toLocaleDateString('sr-Latn-ME',{weekday:'short'})}</text>`).join('')}
+    </svg>
+  </div>`;
 }
 
 function renderDashboard(){
@@ -388,6 +454,8 @@ function renderDashboard(){
       </div>
     `).join('')}
   </div>
+
+  ${renderRevenuePanel()}
 
   <div class="dash-grid">
     <div class="panel-card">
@@ -569,6 +637,48 @@ function renderCustomers(){
   `;
 }
 
+function renderSupport(){
+  const chats = state.chats;
+  const activeId = state.activeChatUserId;
+  const activeChat = chats && chats.find(c => c.user_id === activeId);
+  return `
+  <div class="page-head">
+    <div><h2>${T.supportTitle}</h2><p>${T.supportSubtitle}</p></div>
+  </div>
+  <div style="display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start;">
+    <div class="panel-card" style="padding:0; overflow:hidden;">
+      ${!chats ? `<div class="empty-state" style="margin:0; border:none;">…</div>` : chats.length === 0 ? `<div class="empty-state" style="margin:0; border:none;">${T.noChats}</div>` : chats.map(c => `
+        <div class="chat-list-row ${c.user_id===activeId?'active':''}" data-open-chat="${c.user_id}">
+          <div class="booking-avatar">${(c.customer_name||'?').charAt(0).toUpperCase()}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:700; font-size:13px; color:var(--navy);">${c.customer_name}</div>
+            <div style="font-size:11.5px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.last_message || ''}</div>
+          </div>
+          ${c.unread_count > 0 ? `<span class="badge-count">${c.unread_count}</span>` : ''}
+        </div>
+      `).join('')}
+    </div>
+    <div class="panel-card" style="min-height:420px; display:flex; flex-direction:column;">
+      ${!activeChat ? `<div class="empty-state" style="margin:auto; border:none;">${T.selectChatHint}</div>` : `
+        <div style="font-weight:700; color:var(--navy); margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--line);">${activeChat.customer_name}</div>
+        <div id="chat-thread" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px; max-height:340px; margin-bottom:12px;">
+          ${(state.chatMessages||[]).map(m => `
+            <div style="align-self:${m.sender==='admin'?'flex-end':'flex-start'}; max-width:75%;">
+              <div style="background:${m.sender==='admin'?'var(--navy)':'#F0F4F2'}; color:${m.sender==='admin'?'#fff':'var(--text)'}; padding:9px 13px; border-radius:12px; font-size:13.5px;">${m.message}</div>
+              <div style="font-size:10px; color:var(--muted); margin-top:3px; text-align:${m.sender==='admin'?'right':'left'};">${new Date(m.created_at.replace(' ','T')).toLocaleString('sr-Latn-ME',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+            </div>
+          `).join('')}
+        </div>
+        <form id="chat-reply-form" style="display:flex; gap:8px;">
+          <input name="message" placeholder="${T.messagePlaceholder}" required style="flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px;" />
+          <button class="btn ochre" type="submit">${T.sendBtn}</button>
+        </form>
+      `}
+    </div>
+  </div>
+  `;
+}
+
 function renderApplications(){
   return `
   <div class="page-head">
@@ -656,6 +766,21 @@ async function loadCustomers(){
   state.customers = await api('/admin/customers');
   render();
 }
+async function loadRevenue(){
+  state.revenue = await api('/admin/revenue?days=7');
+  render();
+}
+async function loadChats(){
+  state.chats = await api('/admin/chats');
+  render();
+}
+async function loadChatMessages(userId){
+  state.activeChatUserId = userId;
+  state.chatMessages = await api(`/admin/chats/${userId}/messages`);
+  render();
+  const thread = document.getElementById('chat-thread');
+  if(thread) thread.scrollTop = thread.scrollHeight;
+}
 
 function attachHandlers(){
   const loginForm = document.getElementById('login-form');
@@ -669,6 +794,7 @@ function attachHandlers(){
       localStorage.setItem('adminUser', JSON.stringify(data.user));
       state.authError = '';
       await loadDashboard();
+      await loadRevenue();
       await loadApplications();
     }catch(err){ state.authError = err.message; render(); }
   };
@@ -676,11 +802,28 @@ function attachHandlers(){
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; render();
     if(state.page === 'applications') await loadApplications();
-    if(state.page === 'dashboard') await loadDashboard();
+    if(state.page === 'dashboard'){ await loadDashboard(); await loadRevenue(); }
     if(state.page === 'bookings') await loadBookings(1);
     if(state.page === 'workers') await loadWorkers();
     if(state.page === 'customers') await loadCustomers();
+    if(state.page === 'support') await loadChats();
   });
+
+  document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
+    await loadChatMessages(el.dataset.openChat);
+  });
+
+  const chatReplyForm = document.getElementById('chat-reply-form');
+  if(chatReplyForm) chatReplyForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(chatReplyForm));
+    if(!fd.message.trim()) return;
+    try{
+      await api(`/admin/chats/${state.activeChatUserId}/messages`, { method:'POST', body: JSON.stringify({ message: fd.message }) });
+      await loadChatMessages(state.activeChatUserId);
+      await loadChats();
+    }catch(err){ showToast(err.message); }
+  };
 
   document.querySelectorAll('[data-booking-filter]').forEach(el => el.onclick = async () => {
     state.bookingsFilter = el.dataset.bookingFilter;
@@ -735,6 +878,7 @@ function attachHandlers(){
   if(state.token){
     try{
       await loadDashboard();
+      await loadRevenue();
       await loadApplications();
     }catch(err){
       localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
