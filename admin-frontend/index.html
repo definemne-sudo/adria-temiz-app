@@ -77,6 +77,38 @@
   .stat-card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; }
   .stat-card .value{ font-family:'Fraunces',serif; font-size:28px; color:var(--navy); }
   .stat-card .label{ font-size:12px; color:var(--muted); margin-top:4px; }
+  .stat-card .sub-label{ font-size:11px; color:var(--sage-dark); margin-top:6px; font-weight:600; }
+  .stat-icon{
+    width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:17px; margin-bottom:10px; background:var(--bg);
+  }
+  .stat-icon-bookings{ background:#DCE7F5; }
+  .stat-icon-completed{ background:#DEEFE0; }
+  .stat-icon-workers{ background:#E4E0F5; }
+  .stat-icon-revenue{ background:#DEEFE0; }
+  .stat-icon-satisfaction{ background:#F6EBD2; }
+  .stat-icon-pending{ background:#F2DADA; }
+
+  .dash-grid{ display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:16px; align-items:start; }
+  @media (max-width:1000px){ .dash-grid{ grid-template-columns:1fr; } }
+  .panel-card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; }
+  .panel-head{ margin-bottom:14px; }
+  .panel-head h3{ font-size:15px; color:var(--navy); }
+
+  .booking-list{ display:flex; flex-direction:column; gap:10px; }
+  .booking-row{ display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--line); border-radius:8px; }
+  .booking-avatar{
+    width:36px; height:36px; border-radius:50%; background:var(--sage); color:#fff; font-weight:700; font-size:14px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .status-pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px; margin-top:3px; }
+  .status-pending{ background:#F2DADA; color:#A13A3A; }
+  .status-assigned{ background:#E4E0F5; color:#5B3F9E; }
+  .status-in_progress{ background:#DCE7F5; color:#2C5C8A; }
+  .status-done{ background:#DEEFE0; color:#2E7D46; }
+
+  .review-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+  .review-card{ border:1px solid var(--line); border-radius:8px; padding:14px; }
 
   table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
   th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:12px 14px; background:#F5F8F6; border-bottom:1px solid var(--line);}
@@ -124,6 +156,31 @@ const T = {
   navDashboard: "Genel Bakış",
   navApplications: "Personel Başvuruları",
   logout: "Çıkış yap",
+  welcomeBack: "Tekrar hoş geldin, {{name}} 👋",
+  welcomeSubtitle: "İşletmende bugün neler oluyor.",
+  statTotalBookings: "Toplam Sipariş",
+  statCompletedJobsCard: "Tamamlanan İş",
+  statActiveWorkers: "Aktif Personel",
+  statTodayRevenue: "Bugünkü Ciro",
+  statSatisfaction: "Memnuniyet",
+  statPendingJobsCard: "Bekleyen Sipariş",
+  onlineSuffix: "Çevrimiçi: {{count}}",
+  todaysBookingsTitle: "Bugünkü Siparişler",
+  workerSummaryTitle: "Personel Özeti",
+  jobStatusTitle: "Sipariş Durumu",
+  recentReviewsTitle: "Son Değerlendirmeler",
+  totalWorkersLabel: "Toplam Personel",
+  totalJobsLabel: "Toplam Sipariş",
+  statusAvailable: "Müsait",
+  statusBusy: "Meşgul",
+  statusOffline: "Çevrimdışı",
+  jobStatusCompleted: "Tamamlandı",
+  jobStatusInProgress: "Devam Ediyor",
+  jobStatusAssigned: "Atandı",
+  jobStatusPending: "Bekliyor",
+  noBookingsToday: "Bugün için sipariş yok.",
+  noReviews: "Henüz değerlendirme yok.",
+  noSatisfactionData: "—",
   statCustomers: "Müşteri",
   statStaff: "Personel",
   statOnlineStaff: "Şu An Çevrimiçi",
@@ -155,11 +212,17 @@ const T = {
   toastRejected: "Başvuru reddedildi.",
 };
 
+function tt(key, vars){
+  let str = T[key] || key;
+  if(vars) Object.keys(vars).forEach(k => { str = str.split('{{'+k+'}}').join(vars[k]); });
+  return str;
+}
+
 let state = {
   token: localStorage.getItem('adminToken') || null,
   user: JSON.parse(localStorage.getItem('adminUser') || 'null'),
   page: 'dashboard',
-  stats: null,
+  dashboard: null,
   applications: [],
   authError: '',
   modal: null,
@@ -215,7 +278,7 @@ function renderPanel(){
     <div class="nav-item ${state.page==='dashboard'?'active':''}" data-page="dashboard">${T.navDashboard}</div>
     <div class="nav-item ${state.page==='applications'?'active':''}" data-page="applications">
       ${T.navApplications}
-      ${state.stats && state.stats.pendingApplications ? `<span class="badge-count">${state.stats.pendingApplications}</span>` : ''}
+      ${state.dashboard && state.dashboard.stats.pendingApplications ? `<span class="badge-count">${state.dashboard.stats.pendingApplications}</span>` : ''}
     </div>
     <div class="spacer"></div>
     <div class="who">${state.user.name}</div>
@@ -228,29 +291,131 @@ function renderPanel(){
   `;
 }
 
+function statIcon(kind){
+  const icons = {
+    bookings: '📋', completed: '✅', workers: '🧑‍🔧', revenue: '💶', satisfaction: '⭐', pending: '⏳',
+  };
+  return icons[kind] || '•';
+}
+
 function renderDashboard(){
-  const s = state.stats;
-  if(!s) return `<div class="empty-state">…</div>`;
+  const d = state.dashboard;
+  if(!d) return `<div class="empty-state">…</div>`;
+  const s = d.stats;
+
   const cards = [
-    [s.totalCustomers, T.statCustomers],
-    [s.totalStaff, T.statStaff],
-    [s.onlineStaff, T.statOnlineStaff],
-    [s.pendingApplications, T.statPendingApps],
-    [s.totalProperties, T.statProperties],
-    [s.totalJobs, T.statJobs],
-    [s.completedJobs, T.statCompletedJobs],
-    [s.pendingJobs, T.statPendingJobs],
-    [s.revenue + ' €', T.statRevenue],
-    [s.unreadChats, T.statUnreadChats],
+    ['bookings', s.totalBookings, T.statTotalBookings, null],
+    ['completed', s.completedJobs, T.statCompletedJobsCard, null],
+    ['workers', s.totalStaff, T.statActiveWorkers, tt('onlineSuffix', { count: s.onlineStaff })],
+    ['revenue', s.todayRevenue + ' €', T.statTodayRevenue, null],
+    ['satisfaction', s.satisfactionPercent !== null ? '%' + s.satisfactionPercent : T.noSatisfactionData, T.statSatisfaction, null],
+    ['pending', s.pendingJobs, T.statPendingJobsCard, null],
   ];
+
+  const w = d.workerSummary;
+  const workerRows = [
+    [T.statusAvailable, w.online, 'var(--sage)'],
+    [T.statusBusy, w.busy, '#C98A3E'],
+    [T.statusOffline, w.offline, '#9AA8A2'],
+  ];
+
+  const js = d.jobStatusBreakdown;
+  const jobRows = [
+    [T.jobStatusCompleted, js.completed, 'var(--sage)'],
+    [T.jobStatusInProgress, js.inProgress, '#2C5C8A'],
+    [T.jobStatusAssigned, js.assigned, '#5B3F9E'],
+    [T.jobStatusPending, js.pending, '#C98A3E'],
+  ];
+
   return `
-  <div class="page-head"><div><h2>${T.navDashboard}</h2></div></div>
+  <div class="page-head">
+    <div><h2>${tt('welcomeBack', { name: state.user.name })}</h2><p>${T.welcomeSubtitle}</p></div>
+  </div>
+
   <div class="stat-grid">
-    ${cards.map(([value,label]) => `
-      <div class="stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>
+    ${cards.map(([kind,value,label,sub]) => `
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-${kind}">${statIcon(kind)}</div>
+        <div class="value">${value}</div>
+        <div class="label">${label}</div>
+        ${sub ? `<div class="sub-label">${sub}</div>` : ''}
+      </div>
     `).join('')}
   </div>
+
+  <div class="dash-grid">
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.todaysBookingsTitle}</h3></div>
+      ${d.todaysBookings.length === 0 ? `<div class="empty-state" style="margin:0;">${T.noBookingsToday}</div>` : `
+        <div class="booking-list">
+          ${d.todaysBookings.map(b => `
+            <div class="booking-row">
+              <div class="booking-avatar">${(b.customer_name||'?').charAt(0).toUpperCase()}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:13.5px; color:var(--navy);">${b.customer_name}</div>
+                <div style="font-size:12px; color:var(--muted);">${b.property_city || ''}${b.property_name ? ' · ' + b.property_name : ''}</div>
+              </div>
+              <div style="text-align:right; flex-shrink:0;">
+                <div style="font-size:12px; color:var(--muted);">${new Date(b.checkout_at).toLocaleTimeString('sr-Latn-ME',{hour:'2-digit',minute:'2-digit'})}</div>
+                <span class="status-pill status-${b.status}">${jobStatusLabel(b.status)}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `}
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.workerSummaryTitle}</h3></div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">${T.totalWorkersLabel}: <strong style="color:var(--navy);">${w.total}</strong></div>
+      ${workerRows.map(([label,count,color]) => renderBreakdownRow(label, count, w.total, color)).join('')}
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.jobStatusTitle}</h3></div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">${T.totalJobsLabel}: <strong style="color:var(--navy);">${js.total}</strong></div>
+      ${jobRows.map(([label,count,color]) => renderBreakdownRow(label, count, js.total, color)).join('')}
+    </div>
+  </div>
+
+  <div class="panel-card" style="margin-top:16px;">
+    <div class="panel-head"><h3>${T.recentReviewsTitle}</h3></div>
+    ${d.recentReviews.length === 0 ? `<div class="empty-state" style="margin:0;">${T.noReviews}</div>` : `
+      <div class="review-grid">
+        ${d.recentReviews.map(r => `
+          <div class="review-card">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div class="booking-avatar" style="width:30px; height:30px; font-size:12px;">${(r.customer_name||'?').charAt(0).toUpperCase()}</div>
+              <div style="font-weight:700; font-size:13px; color:var(--navy);">${r.customer_name}</div>
+              <div style="margin-left:auto; font-size:16px;">${r.service_rating==='like' ? '👍' : '👎'}</div>
+            </div>
+            <div style="font-size:13px; color:var(--text); line-height:1.5;">${r.service_feedback}</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:8px;">${r.property_city || ''} · ${new Date(r.rated_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  </div>
   `;
+}
+
+function jobStatusLabel(status){
+  const map = { done:T.jobStatusCompleted, in_progress:T.jobStatusInProgress, assigned:T.jobStatusAssigned, pending:T.jobStatusPending };
+  return map[status] || status;
+}
+
+function renderBreakdownRow(label, count, total, color){
+  const pct = total ? Math.round((count/total)*100) : 0;
+  return `
+  <div style="margin-bottom:12px;">
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;">
+      <span style="color:var(--text);"><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${color}; margin-right:6px;"></span>${label}</span>
+      <span style="color:var(--muted);">${count} (${pct}%)</span>
+    </div>
+    <div style="background:#EDF3F0; border-radius:20px; height:6px; overflow:hidden;">
+      <div style="width:${pct}%; height:100%; background:${color};"></div>
+    </div>
+  </div>`;
 }
 
 function renderApplications(){
@@ -318,8 +483,8 @@ function renderModal(){
   return '';
 }
 
-async function loadStats(){
-  state.stats = await api('/admin/stats');
+async function loadDashboard(){
+  state.dashboard = await api('/admin/dashboard');
   render();
 }
 async function loadApplications(){
@@ -338,7 +503,7 @@ function attachHandlers(){
       localStorage.setItem('adminToken', data.token);
       localStorage.setItem('adminUser', JSON.stringify(data.user));
       state.authError = '';
-      await loadStats();
+      await loadDashboard();
       await loadApplications();
     }catch(err){ state.authError = err.message; render(); }
   };
@@ -346,7 +511,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; render();
     if(state.page === 'applications') await loadApplications();
-    if(state.page === 'dashboard') await loadStats();
+    if(state.page === 'dashboard') await loadDashboard();
   });
 
   const logout = document.getElementById('logout');
@@ -392,7 +557,7 @@ function attachHandlers(){
   render();
   if(state.token){
     try{
-      await loadStats();
+      await loadDashboard();
       await loadApplications();
     }catch(err){
       localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
