@@ -1,39 +1,29 @@
+const db = require('../db');
+
 /**
- * Ana hizmetler: m²'ye göre fiyatlanır, "Hizmetler" ekranında kart olarak gösterilir.
- * accountTypes: bu hizmetin hangi hesap tipine gösterileceğini belirtir -
- * frontend filtrelemeyi burada tutuyoruz ki tek bir doğru kaynak olsun.
- * Ekstra hizmetler (ADDONS): halı/koltuk yıkama gibi, herhangi bir ana hizmete
- * "+" olarak eklenir, adet bazlı fiyatlanır, kendi başına ayrı bir kart değildir.
+ * Yapısal hizmet tanımları (isim, açıklama, hangi hesap tipine gösterileceği,
+ * parametre tipi) kodda sabit - bunlar nadiren değişir. Fiyatlandırma
+ * (base/rate/min/estimatedMinutes vb.) ise pricing_settings tablosundan canlı
+ * okunuyor - MICISTOMan > Hizmetler & Fiyatlandırma ekranından admin
+ * tarafından değiştirilebilir, kod değişikliği/deploy gerektirmez.
  */
-const SERVICES = [
+const SERVICE_DEFS = [
   {
     key: 'checkin_checkout',
     name: 'Airbnb/Booking Temizliği',
     description: 'Misafir çıkışı ve girişi arasında hızlı, standart temizlik.',
-    base: 20,
-    rate: 0.28,
-    min: 30,
-    estimatedMinutes: 60,
     accountTypes: ['individual', 'company'],
   },
   {
     key: 'deep_clean',
     name: 'Detaylı temizlik',
     description: 'Dolap içi, fırın, cam gibi detayları kapsayan kapsamlı temizlik.',
-    base: 30,
-    rate: 0.48,
-    min: 45,
-    estimatedMinutes: 150,
     accountTypes: ['individual'],
   },
   {
     key: 'office',
     name: 'Ofis / Dükkan / Çalışma Alanı Temizliği',
     description: 'Çalışma alanları için düzenli veya tek seferlik temizlik.',
-    base: 25,
-    rate: 0.22,
-    min: 40,
-    estimatedMinutes: 90,
     accountTypes: ['individual', 'company'],
   },
   {
@@ -45,78 +35,91 @@ const SERVICES = [
   },
 ];
 
-// Ortak Alan Temizliği - yalnızca yönetim şirketi hesaplarında görünür.
-// Hizmetler ekranında TEK kart olarak görünür ("common_area"), müşteri
-// bunun altında istediği kadar alt seçeneği (checkbox) işaretleyip tek
-// siparişte birleştirebilir. Her alt seçeneğin kendi parametresi var.
-const COMMON_AREA_SUB_OPTIONS = [
+const COMMON_AREA_SUB_DEFS = [
   {
     key: 'staircase',
     name: 'Merdiven Temizliği',
     description: 'Bina merdivenlerinin düzenli temizliği, kat sayısına göre fiyatlanır.',
-    base: 15,
-    ratePerFloor: 4,
-    min: 25,
-    estimatedMinutes: 40,
     paramType: 'floors', // { floorCount }
   },
   {
     key: 'corridor',
     name: 'Kat Koridoru Temizliği',
     description: 'Kat koridorlarının temizliği, kat sayısı ve kat başına m²ye göre fiyatlanır.',
-    base: 12,
-    ratePerSqm: 0.3,
-    ratePerFloor: 3,
-    min: 30,
-    estimatedMinutes: 35,
     paramType: 'corridor', // { floorCount, sqmPerFloor }
   },
   {
     key: 'elevator',
     name: 'Asansör Temizliği',
     description: 'Asansör kabini temizliği, kişi kapasitesine göre fiyatlanır.',
-    base: 12,
-    ratePerCapacity: 1.4,
-    min: 20,
-    estimatedMinutes: 20,
     paramType: 'elevator', // { elevatorCapacity }
   },
 ];
 
-const ADDONS = [
-  { key: 'carpet', name: 'Halı yıkama', rate: 18, unitLabel: 'adet' },
-  { key: 'upholstery', name: 'Koltuk yıkama', rate: 22, unitLabel: 'adet' },
+const ADDON_DEFS = [
+  { key: 'carpet', name: 'Halı yıkama', unitLabel: 'adet' },
+  { key: 'upholstery', name: 'Koltuk yıkama', unitLabel: 'adet' },
 ];
-
-// Müşteride temizlik aracı/kimyasalı yoksa uygulanan ek ücret.
-// NOT: Bu rakamlar başlangıç varsayımı - gerçek maliyet verisi geldikçe
-// birlikte ayarlanacak (kullanıcıyla konuşulduğu üzere).
-const SUPPLIES_FEES = {
-  noEquipment: 15,
-  noChemicals: 10,
-};
 
 // MICISTO'nun her tamamlanan işten aldığı komisyon oranı - personel
 // kazancı hesaplanırken bu düşülür. NOT: Başlangıç varsayımı (%20),
-// gerçek iş modeli netleşince birlikte ayarlanacak.
+// gerçek iş modeli netleşince birlikte ayarlanacak. Fiyatlandırma
+// ekranından değil, ayrı bir yerden yönetilecek (henüz admin arayüzü yok).
 const COMMISSION_RATE = 0.20;
 
+function getPricingValue(key, fallback = 0) {
+  const row = db.prepare('SELECT value FROM pricing_settings WHERE key = ?').get(key);
+  return row ? row.value : fallback;
+}
+
+// Yapısal tanımı + canlı fiyatlandırmayı birleştirip tek bir nesne döner.
 function getService(key) {
-  const service = SERVICES.find((s) => s.key === key);
-  if (service) return service;
-  throw new Error('Geçersiz hizmet türü.');
+  const def = SERVICE_DEFS.find((s) => s.key === key);
+  if (!def) throw new Error('Geçersiz hizmet türü.');
+  if (def.isGroup) return def;
+  return {
+    ...def,
+    base: getPricingValue(`${key}.base`),
+    rate: getPricingValue(`${key}.rate`),
+    min: getPricingValue(`${key}.min`),
+    estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
+  };
 }
 
 function getCommonAreaSubOption(key) {
-  const sub = COMMON_AREA_SUB_OPTIONS.find((s) => s.key === key);
-  if (!sub) throw new Error('Geçersiz ortak alan alt seçeneği.');
-  return sub;
+  const def = COMMON_AREA_SUB_DEFS.find((s) => s.key === key);
+  if (!def) throw new Error('Geçersiz ortak alan alt seçeneği.');
+  return {
+    ...def,
+    base: getPricingValue(`${key}.base`),
+    ratePerFloor: getPricingValue(`${key}.ratePerFloor`),
+    ratePerSqm: getPricingValue(`${key}.ratePerSqm`),
+    ratePerCapacity: getPricingValue(`${key}.ratePerCapacity`),
+    min: getPricingValue(`${key}.min`),
+    estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
+  };
 }
 
 function getAddon(key) {
-  const addon = ADDONS.find((a) => a.key === key);
-  if (!addon) throw new Error('Geçersiz ekstra hizmet.');
-  return addon;
+  const def = ADDON_DEFS.find((a) => a.key === key);
+  if (!def) throw new Error('Geçersiz ekstra hizmet.');
+  return { ...def, rate: getPricingValue(`${key}.rate`) };
+}
+
+function getAllServices() {
+  return SERVICE_DEFS.map((s) => getService(s.key));
+}
+function getAllCommonAreaSubOptions() {
+  return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key));
+}
+function getAllAddons() {
+  return ADDON_DEFS.map((a) => getAddon(a.key));
+}
+function getSuppliesFees() {
+  return {
+    noEquipment: getPricingValue('supplies.noEquipment'),
+    noChemicals: getPricingValue('supplies.noChemicals'),
+  };
 }
 
 function calcPrice(serviceKey, { sizeSqm } = {}) {
@@ -162,9 +165,10 @@ function calcAddonsTotal(addons) {
 }
 
 function calcSuppliesFee({ hasEquipment, hasChemicals }) {
+  const fees = getSuppliesFees();
   let fee = 0;
-  if (!hasEquipment) fee += SUPPLIES_FEES.noEquipment;
-  if (!hasChemicals) fee += SUPPLIES_FEES.noChemicals;
+  if (!hasEquipment) fee += fees.noEquipment;
+  if (!hasChemicals) fee += fees.noChemicals;
   return fee;
 }
 
@@ -198,8 +202,16 @@ function estimateJobMinutes(serviceKey, serviceParams) {
 }
 
 module.exports = {
-  SERVICES, COMMON_AREA_SUB_OPTIONS, ADDONS, SUPPLIES_FEES, COMMISSION_RATE,
+  // Geriye dönük uyumluluk için düz diziler de export ediliyor (mevcut
+  // kodun SERVICES/COMMON_AREA_SUB_OPTIONS/ADDONS'u doğrudan kullandığı
+  // yerler için) - ama bunlar artık GETTER, her erişimde canlı hesaplanıyor.
+  get SERVICES() { return getAllServices(); },
+  get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
+  get ADDONS() { return getAllAddons(); },
+  get SUPPLIES_FEES() { return getSuppliesFees(); },
+  COMMISSION_RATE,
   getService, getAddon, getCommonAreaSubOption,
+  getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
   calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
 };
