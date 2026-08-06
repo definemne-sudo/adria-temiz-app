@@ -181,6 +181,20 @@ CREATE TABLE IF NOT EXISTS service_checklists (
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Personele 15 günde bir yapılan ödemelerin "ödendi" işaretlemesi. Dönemler
+-- kendisi burada saklanmıyor - personelin ilk tamamladığı işten itibaren
+-- 15 günlük pencereler halinde CANLI hesaplanıyor (bkz. admin.js). Bu tablo
+-- sadece "şu dönem ödendi" bilgisini tutuyor.
+CREATE TABLE IF NOT EXISTS staff_payment_marks (
+  id TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  amount REAL NOT NULL DEFAULT 0,
+  paid_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(staff_id, period_start)
+);
 `);
 
 module.exports = db;
@@ -205,6 +219,8 @@ ensureColumn('cleaning_jobs', 'notified_staff_ids', "TEXT NOT NULL DEFAULT '[]'"
 ensureColumn('cleaning_jobs', 'current_candidate_id', 'TEXT');
 ensureColumn('cleaning_jobs', 'notification_sent_at', 'TEXT');
 ensureColumn('cleaning_jobs', 'accepted_at', 'TEXT');
+ensureColumn('cleaning_jobs', 'cancelled_at', 'TEXT');
+ensureColumn('cleaning_jobs', 'cancel_reason', 'TEXT');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
