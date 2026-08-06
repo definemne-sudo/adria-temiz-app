@@ -62,10 +62,20 @@ const ADDON_DEFS = [
 ];
 
 // MICISTO'nun her tamamlanan işten aldığı komisyon oranı - personel
-// kazancı hesaplanırken bu düşülür. NOT: Başlangıç varsayımı (%20),
-// gerçek iş modeli netleşince birlikte ayarlanacak. Fiyatlandırma
-// ekranından değil, ayrı bir yerden yönetilecek (henüz admin arayüzü yok).
-const COMMISSION_RATE = 0.20;
+// kazancı hesaplanırken bu düşülür. Artık pricing_settings tablosundan
+// (MICISTOMan > Settings ekranından) canlı okunuyor - fonksiyon olarak,
+// GETTER SERVICES/ADDONS'ta yaşadığımız "sunucu açılışında donma" hatasına
+// tekrar düşmemek için (bkz. services.js geçmişi) her yerde
+// getCommissionRate() ÇAĞRISI kullanılmalı, sabit bir değişkene
+// destructure edilip saklanmamalı.
+function getCommissionRate() {
+  return getPricingValue('system.commissionRate', 0.20);
+}
+
+// Personel ödemelerinin kaç günde bir dönemlere bölüneceği (varsayılan 15).
+function getPayoutCycleDays() {
+  return getPricingValue('system.payoutCycleDays', 15);
+}
 
 function getPricingValue(key, fallback = 0) {
   const row = db.prepare('SELECT value FROM pricing_settings WHERE key = ?').get(key);
@@ -175,7 +185,7 @@ function calcSuppliesFee({ hasEquipment, hasChemicals }) {
 // Bir işin fiyatından MICISTO komisyonu düşüldükten sonra personele
 // kalan net kazanç.
 function calcNetEarning(price) {
-  return Math.round(price * (1 - COMMISSION_RATE) * 100) / 100;
+  return Math.round(price * (1 - getCommissionRate()) * 100) / 100;
 }
 
 // Personel performans bonusu - o dönemde (hafta/ay) çalıştığı gün sayısının
@@ -209,7 +219,7 @@ module.exports = {
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
-  COMMISSION_RATE,
+  getCommissionRate, getPayoutCycleDays,
   getService, getAddon, getCommonAreaSubOption,
   getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
