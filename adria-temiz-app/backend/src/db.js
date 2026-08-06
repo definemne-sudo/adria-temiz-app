@@ -235,6 +235,7 @@ const DEFAULT_PRICING = {
   'elevator.base': 12, 'elevator.ratePerCapacity': 1.4, 'elevator.min': 20, 'elevator.estimatedMinutes': 20,
   'carpet.rate': 18, 'upholstery.rate': 22,
   'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
+  'system.commissionRate': 0.20, 'system.payoutCycleDays': 15,
 };
 const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
 for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
