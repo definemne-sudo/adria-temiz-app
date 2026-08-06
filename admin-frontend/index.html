@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="me" id="html-root">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MICISTOMan</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0F3D2E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F3D2E;
+    --navy-2:#14503D;
+    --sage:#1D9E73;
+    --sage-dark:#14503D;
+    --ochre:#1D9E73;
+    --bg:#EFF7F2;
+    --panel:#FFFFFF;
+    --line:#D7E7DE;
+    --text:#16241C;
+    --muted:#5B7A6C;
+    --danger:#B5542A;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  h1,h2,h3{font-family:'Fraunces',serif; font-weight:600; margin:0;}
+  .brand h1{font-family:'Poppins',sans-serif; font-weight:700;}
+  .app{display:flex; min-height:100vh;}
+
+  .auth-wrap{
+    display:flex; align-items:center; justify-content:center; width:100%; min-height:100vh; padding:24px;
+    background: radial-gradient(circle at 15% 20%, rgba(124,156,130,.25), transparent 45%),
+                radial-gradient(circle at 85% 80%, rgba(201,138,62,.18), transparent 45%), var(--navy);
+  }
+  .auth-card{ width:100%; max-width:400px; background:var(--panel); border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+  .brand{display:flex; align-items:center; gap:10px; margin-bottom:20px;}
+  .brand svg{width:38px; height:38px; display:block; flex-shrink:0;}
+  .brand h1{font-size:23px; color:var(--navy);}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:600; color:var(--muted); margin-bottom:5px; text-transform:uppercase; letter-spacing:.03em;}
+  .field input, .field select{
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; background:#fbfcfb;
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--sage); border-color:var(--sage);}
+  .btn{ padding:10px 16px; border:none; border-radius:8px; background:var(--navy); color:#fff; font-weight:600; font-size:14px; cursor:pointer; font-family:inherit; }
+  .btn:hover{background:var(--navy-2);}
+  .btn.ochre{background:var(--ochre);}
+  .btn.ochre:hover{background:#178a63;}
+  .btn.ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
+  .btn.danger{background:transparent; color:var(--danger); border:1.5px solid #e6c3b3;}
+  .btn.full{width:100%;}
+  .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:6px;}
+  .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
+  .hint{font-size:12px; color:var(--muted); margin-top:14px; line-height:1.5;}
+
+  .sidebar{ width:230px; background:var(--navy); color:#EAF0EE; padding:22px 18px; flex-shrink:0; display:flex; flex-direction:column; }
+  .sidebar .brand{ color:#fff; margin-bottom:26px; }
+  .sidebar .brand h1{ color:#fff; font-size:20px; }
+  .nav-item{
+    padding:10px 12px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; color:#C9D6D2; margin-bottom:4px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .nav-item.active{ background:rgba(255,255,255,.1); color:#fff; }
+  .nav-item .badge-count{ background:var(--ochre); color:#fff; font-size:10.5px; font-weight:700; border-radius:20px; padding:1px 7px; }
+  .sidebar .spacer{flex:1;}
+  .who{font-size:12px; color:#9FB3AE; line-height:1.5; margin-bottom:10px;}
+  .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline;}
+
+  .main{flex:1; padding:32px 40px; max-width:1200px;}
+  .page-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px;}
+  .page-head h2{font-size:24px; color:var(--navy);}
+  .page-head p{color:var(--muted); font-size:13px; margin-top:4px;}
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-bottom:28px; }
+  .stat-card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; }
+  .stat-card .value{ font-family:'Fraunces',serif; font-size:28px; color:var(--navy); }
+  .stat-card .label{ font-size:12px; color:var(--muted); margin-top:4px; }
+
+  table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:12px 14px; background:#F5F8F6; border-bottom:1px solid var(--line);}
+  td{padding:12px 14px; font-size:13.5px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .empty-state{ border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px; text-align:center; color:var(--muted); }
+  .row-actions{display:flex; gap:8px;}
+
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex; align-items:center; justify-content:center; z-index:50; }
+  .modal{ background:#fff; border-radius:14px; padding:26px; width:100%; max-width:420px; }
+  .modal h3{margin-bottom:14px; color:var(--navy);}
+  .toast{
+    position:fixed; bottom:24px; right:24px; background:var(--navy); color:#fff; padding:12px 18px;
+    border-radius:8px; font-size:13px; box-shadow:0 8px 24px rgba(0,0,0,.25); z-index:60;
+  }
+
+  @media (max-width:800px){
+    .app{ flex-direction:column; }
+    .sidebar{ width:100%; flex-direction:row; align-items:center; flex-wrap:wrap; gap:10px 16px; }
+    .sidebar .brand{ margin-bottom:0; }
+    .sidebar .spacer{ display:none; }
+    .sidebar .who{ display:none; }
+    .main{ padding:20px; }
+  }
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+
+<script>
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:4000/api'
+  : 'https://adria-temiz-app-production.up.railway.app/api';
+
+const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+  <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
+  <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
+  <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
+
+const T = {
+  loginTitle: "Kullanıcı adı",
+  passwordLabel: "Şifre",
+  loginBtn: "Giriş Yap",
+  navDashboard: "Genel Bakış",
+  navApplications: "Personel Başvuruları",
+  logout: "Çıkış yap",
+  statCustomers: "Müşteri",
+  statStaff: "Personel",
+  statOnlineStaff: "Şu An Çevrimiçi",
+  statPendingApps: "Bekleyen Başvuru",
+  statProperties: "Mülk",
+  statJobs: "Toplam Sipariş",
+  statCompletedJobs: "Tamamlanan",
+  statPendingJobs: "Bekleyen Sipariş",
+  statRevenue: "Toplam Ciro",
+  statUnreadChats: "Yanıt Bekleyen Sohbet",
+  appsTitle: "Personel Başvuruları",
+  appsSubtitle: "MICISTO'da çalışmak için başvuranlar - onaylarsan otomatik personel hesabı açılır.",
+  colName: "Ad Soyad",
+  colPhone: "Telefon",
+  colCity: "Şehir",
+  colMessage: "Mesaj",
+  colDate: "Tarih",
+  approveBtn: "Onayla",
+  rejectBtn: "Reddet",
+  emptyApps: "Bekleyen başvuru yok.",
+  credentialsModalTitle: "Personel Hesabı Oluşturuldu",
+  credentialsModalHint: "Bu bilgileri işe aldığın kişiye ilet - MICISTORad'a bunlarla giriş yapacak. Bir daha gösterilmeyecek.",
+  usernameLabel: "Kullanıcı adı",
+  closeBtn: "Kapat",
+  confirmRejectTitle: "Başvuruyu reddet",
+  confirmRejectHint: "Bu işlem geri alınamaz. Emin misin?",
+  cancelBtn: "Vazgeç",
+  toastApproved: "Başvuru onaylandı.",
+  toastRejected: "Başvuru reddedildi.",
+};
+
+let state = {
+  token: localStorage.getItem('adminToken') || null,
+  user: JSON.parse(localStorage.getItem('adminUser') || 'null'),
+  page: 'dashboard',
+  stats: null,
+  applications: [],
+  authError: '',
+  modal: null,
+  newCredentials: null,
+  rejectTargetId: null,
+};
+
+function render(){
+  document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth();
+  attachHandlers();
+}
+
+function showToast(msg){
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 2800);
+}
+
+async function api(path, opts={}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}),
+      ...(opts.headers||{}),
+    },
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || 'Bir hata oluştu.');
+  return data;
+}
+
+function renderAuth(){
+  return `
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand">${BRAND_MARK}<h1>MICISTOMan</h1></div>
+      <form id="login-form">
+        <div class="field"><label>${T.loginTitle}</label><input name="username" required autofocus autocapitalize="off" /></div>
+        <div class="field"><label>${T.passwordLabel}</label><input name="password" type="password" required /></div>
+        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+        <button class="btn ochre full" type="submit">${T.loginBtn}</button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function renderPanel(){
+  return `
+  <div class="sidebar">
+    <div class="brand">${BRAND_MARK}<h1>MICISTOMan</h1></div>
+    <div class="nav-item ${state.page==='dashboard'?'active':''}" data-page="dashboard">${T.navDashboard}</div>
+    <div class="nav-item ${state.page==='applications'?'active':''}" data-page="applications">
+      ${T.navApplications}
+      ${state.stats && state.stats.pendingApplications ? `<span class="badge-count">${state.stats.pendingApplications}</span>` : ''}
+    </div>
+    <div class="spacer"></div>
+    <div class="who">${state.user.name}</div>
+    <div class="logout" id="logout">${T.logout}</div>
+  </div>
+  <div class="main">
+    ${state.page==='dashboard' ? renderDashboard() : renderApplications()}
+  </div>
+  ${state.modal ? renderModal() : ''}
+  `;
+}
+
+function renderDashboard(){
+  const s = state.stats;
+  if(!s) return `<div class="empty-state">…</div>`;
+  const cards = [
+    [s.totalCustomers, T.statCustomers],
+    [s.totalStaff, T.statStaff],
+    [s.onlineStaff, T.statOnlineStaff],
+    [s.pendingApplications, T.statPendingApps],
+    [s.totalProperties, T.statProperties],
+    [s.totalJobs, T.statJobs],
+    [s.completedJobs, T.statCompletedJobs],
+    [s.pendingJobs, T.statPendingJobs],
+    [s.revenue + ' €', T.statRevenue],
+    [s.unreadChats, T.statUnreadChats],
+  ];
+  return `
+  <div class="page-head"><div><h2>${T.navDashboard}</h2></div></div>
+  <div class="stat-grid">
+    ${cards.map(([value,label]) => `
+      <div class="stat-card"><div class="value">${value}</div><div class="label">${label}</div></div>
+    `).join('')}
+  </div>
+  `;
+}
+
+function renderApplications(){
+  return `
+  <div class="page-head">
+    <div><h2>${T.appsTitle}</h2><p>${T.appsSubtitle}</p></div>
+  </div>
+  ${state.applications.length === 0 ? `<div class="empty-state">${T.emptyApps}</div>` : `
+    <table>
+      <thead><tr>
+        <th>${T.colName}</th><th>${T.colPhone}</th><th>${T.colCity}</th><th>${T.colMessage}</th><th>${T.colDate}</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${state.applications.map(a => `
+          <tr>
+            <td><strong>${a.name}</strong></td>
+            <td>${a.phone}</td>
+            <td>${a.city || '—'}</td>
+            <td style="max-width:220px;">${a.message || '—'}</td>
+            <td>${new Date(a.created_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn ochre btn-sm" data-approve="${a.id}">${T.approveBtn}</button>
+                <button class="btn danger btn-sm" data-reject="${a.id}">${T.rejectBtn}</button>
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
+  `;
+}
+
+function renderModal(){
+  if(state.modal === 'credentials' && state.newCredentials){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${T.credentialsModalTitle}</h3>
+        <div class="hint" style="margin:-6px 0 16px;">${T.credentialsModalHint}</div>
+        <div style="background:var(--bg); border:1.5px dashed var(--sage); border-radius:10px; padding:16px; margin-bottom:16px;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${T.usernameLabel}</div>
+          <div style="font-size:18px; font-weight:700; color:var(--navy); margin-bottom:12px; font-family:monospace;">${state.newCredentials.username}</div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${T.passwordLabel}</div>
+          <div style="font-size:18px; font-weight:700; color:var(--navy); font-family:monospace;">${state.newCredentials.password}</div>
+        </div>
+        <button class="btn ochre full" id="modal-close">${T.closeBtn}</button>
+      </div>
+    </div>`;
+  }
+  if(state.modal === 'confirm-reject'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${T.confirmRejectTitle}</h3>
+        <div class="hint" style="margin:-6px 0 18px;">${T.confirmRejectHint}</div>
+        <div class="row-actions">
+          <button class="btn ghost" id="modal-cancel" style="flex:1;">${T.cancelBtn}</button>
+          <button class="btn danger" id="modal-confirm-reject" style="flex:1;">${T.rejectBtn}</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+async function loadStats(){
+  state.stats = await api('/admin/stats');
+  render();
+}
+async function loadApplications(){
+  state.applications = await api('/admin/staff-applications?status=pending');
+  render();
+}
+
+function attachHandlers(){
+  const loginForm = document.getElementById('login-form');
+  if(loginForm) loginForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(loginForm));
+    try{
+      const data = await api('/auth/admin-login', { method:'POST', body: JSON.stringify(fd) });
+      state.token = data.token; state.user = data.user;
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
+      state.authError = '';
+      await loadStats();
+      await loadApplications();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
+    state.page = el.dataset.page; render();
+    if(state.page === 'applications') await loadApplications();
+    if(state.page === 'dashboard') await loadStats();
+  });
+
+  const logout = document.getElementById('logout');
+  if(logout) logout.onclick = () => {
+    localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
+    state.token = null; state.user = null; render();
+  };
+
+  document.querySelectorAll('[data-approve]').forEach(el => el.onclick = async () => {
+    try{
+      const result = await api(`/admin/staff-applications/${el.dataset.approve}/approve`, { method:'POST' });
+      state.newCredentials = result.credentials;
+      state.modal = 'credentials';
+      showToast(T.toastApproved);
+      await loadApplications();
+      render();
+    }catch(err){ showToast(err.message); }
+  });
+
+  document.querySelectorAll('[data-reject]').forEach(el => el.onclick = () => {
+    state.rejectTargetId = el.dataset.reject;
+    state.modal = 'confirm-reject';
+    render();
+  });
+
+  const modalCancel = document.getElementById('modal-cancel');
+  if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.rejectTargetId = null; render(); };
+  const modalClose = document.getElementById('modal-close');
+  if(modalClose) modalClose.onclick = () => { state.modal = null; state.newCredentials = null; render(); };
+
+  const confirmReject = document.getElementById('modal-confirm-reject');
+  if(confirmReject) confirmReject.onclick = async () => {
+    try{
+      await api(`/admin/staff-applications/${state.rejectTargetId}/reject`, { method:'POST' });
+      showToast(T.toastRejected);
+      state.modal = null; state.rejectTargetId = null;
+      await loadApplications();
+    }catch(err){ showToast(err.message); render(); }
+  };
+}
+
+(async function init(){
+  render();
+  if(state.token){
+    try{
+      await loadStats();
+      await loadApplications();
+    }catch(err){
+      localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
+      state.token = null; state.user = null; render();
+    }
+  }
+})();
+</script>
+</body>
+</html>
