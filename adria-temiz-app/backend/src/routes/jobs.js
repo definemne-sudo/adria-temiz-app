@@ -199,8 +199,13 @@ router.post('/:id/accept', (req, res) => {
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
 
+  // NOT: Sipariş Bildirimleri (dağıtım motoru) ertelendiği için
+  // notified_staff_ids şu an hiç doldurulmuyor. Boşsa (bildirim sistemi
+  // devrede değilse) herhangi bir çevrimiçi personelin işi alabilmesine
+  // izin veriyoruz - dolu olduğunda (dağıtım motoru geri gelince) sadece
+  // gerçekten bildirilen personelle sınırlanacak.
   const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
-  if (!notifiedIds.includes(req.user.id)) {
+  if (notifiedIds.length > 0 && !notifiedIds.includes(req.user.id)) {
     return res.status(403).json({ error: 'Bu iş sana bildirilmedi.' });
   }
 
