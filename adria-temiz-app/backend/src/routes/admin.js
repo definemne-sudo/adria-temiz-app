@@ -91,7 +91,7 @@ router.get('/stats', (req, res) => {
   const unreadChats = count(
     `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
      WHERE sender = 'user' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at > cm.created_at
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
      )`
   );
 
@@ -164,6 +164,13 @@ router.get('/dashboard', (req, res) => {
     )
     .all();
 
+  const unreadChats = count(
+    `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
+     WHERE sender = 'user' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
+     )`
+  );
+
   res.json({
     stats: {
       totalBookings: totalJobs,
@@ -174,6 +181,7 @@ router.get('/dashboard', (req, res) => {
       pendingApplications,
       todayRevenue,
       satisfactionPercent,
+      unreadChats,
     },
     workerSummary: { total: totalStaff, online: availableStaff, busy: busyStaff, offline: offlineStaff },
     jobStatusBreakdown: { completed: completedJobs, inProgress: inProgressJobs, assigned: assignedJobs, pending: pendingJobs, total: totalJobs },
@@ -257,6 +265,89 @@ router.get('/customers', (req, res) => {
     .all();
 
   res.json({ customers: rows });
+});
+
+// --- Ciro grafiği -----------------------------------------------------------
+
+// Son N günün günlük cirosu (varsayılan 7 - "Bu Hafta" görünümü).
+router.get('/revenue', (req, res) => {
+  const days = Math.min(90, Math.max(1, parseInt(req.query.days, 10) || 7));
+
+  const rows = db
+    .prepare(
+      `SELECT date(completed_at) AS day, COALESCE(SUM(price), 0) AS total
+       FROM cleaning_jobs
+       WHERE status = 'done' AND completed_at IS NOT NULL
+         AND date(completed_at) >= date('now', ?)
+       GROUP BY date(completed_at)`
+    )
+    .all(`-${days - 1} days`);
+  const byDay = Object.fromEntries(rows.map((r) => [r.day, r.total]));
+
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    series.push({ date: key, total: byDay[key] || 0 });
+  }
+
+  const totalRevenue = series.reduce((sum, s) => sum + s.total, 0);
+
+  const prevRows = db
+    .prepare(
+      `SELECT COALESCE(SUM(price), 0) AS total FROM cleaning_jobs
+       WHERE status = 'done' AND completed_at IS NOT NULL
+         AND date(completed_at) >= date('now', ?) AND date(completed_at) < date('now', ?)`
+    )
+    .get(`-${days * 2 - 1} days`, `-${days - 1} days`);
+  const prevRevenue = prevRows.total;
+  const percentChange = prevRevenue > 0 ? Math.round(((totalRevenue - prevRevenue) / prevRevenue) * 100) : null;
+
+  res.json({ series, totalRevenue, percentChange, days });
+});
+
+// --- Destek sohbetleri --------------------------------------------------------
+
+// Tüm konuşmaları (kullanıcı bazında), son mesaj önizlemesi ve okunmamış
+// bilgisiyle listeler.
+router.get('/chats', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT u.id AS user_id, u.name AS customer_name, u.account_type,
+              (SELECT message FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message,
+              (SELECT created_at FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message_at,
+              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = u.id AND cm.sender = 'user'
+                 AND NOT EXISTS (SELECT 1 FROM chat_messages r WHERE r.user_id = u.id AND r.sender='admin' AND r.created_at >= cm.created_at)
+              ) AS unread_count
+       FROM users u
+       WHERE EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.user_id = u.id)
+       ORDER BY last_message_at DESC`
+    )
+    .all();
+  res.json(rows);
+});
+
+router.get('/chats/:userId/messages', (req, res) => {
+  const rows = db
+    .prepare('SELECT * FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC')
+    .all(req.params.userId);
+  res.json(rows);
+});
+
+router.post('/chats/:userId/messages', (req, res) => {
+  const { message } = req.body;
+  if (!message || !message.trim()) {
+    return res.status(400).json({ error: 'Mesaj boş olamaz.' });
+  }
+  const targetUser = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.userId);
+  if (!targetUser) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+  const id = uuid();
+  db.prepare(
+    `INSERT INTO chat_messages (id, user_id, sender, message) VALUES (?, ?, 'admin', ?)`
+  ).run(id, req.params.userId, message.trim());
+  res.status(201).json(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id));
 });
 
 module.exports = router;
