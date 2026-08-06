@@ -182,4 +182,81 @@ router.get('/dashboard', (req, res) => {
   });
 });
 
+// --- Siparişler (tam liste) ------------------------------------------------
+
+router.get('/bookings', (req, res) => {
+  const status = req.query.status && req.query.status !== 'all' ? req.query.status : null;
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const pageSize = 25;
+  const offset = (page - 1) * pageSize;
+
+  const where = status ? `WHERE j.status = ?` : '';
+  const params = status ? [status] : [];
+
+  const total = db
+    .prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs j ${where}`)
+    .get(...params).c;
+
+  const rows = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
+              p.name AS property_name, p.city AS property_city,
+              u.name AS customer_name, u.account_type AS customer_type,
+              s.name AS staff_name
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       JOIN users u ON u.id = p.owner_id
+       LEFT JOIN users s ON s.id = j.assigned_staff_id
+       ${where}
+       ORDER BY j.checkout_at DESC
+       LIMIT ? OFFSET ?`
+    )
+    .all(...params, pageSize, offset);
+
+  res.json({ bookings: rows, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
+});
+
+// --- Personel (tam liste) --------------------------------------------------
+
+router.get('/workers', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT u.id, u.name, u.phone, u.username, u.is_online, u.current_city,
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'done') AS completed_jobs,
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs,
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating IS NOT NULL) AS total_ratings,
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating = 'like') AS like_ratings
+       FROM users u
+       WHERE u.account_type = 'staff'
+       ORDER BY u.name ASC`
+    )
+    .all();
+
+  const workers = rows.map((r) => ({
+    ...r,
+    isBusy: r.active_jobs > 0,
+    satisfactionPercent: r.total_ratings ? Math.round((r.like_ratings / r.total_ratings) * 100) : null,
+  }));
+
+  res.json({ workers });
+});
+
+// --- Müşteriler (tam liste) -------------------------------------------------
+
+router.get('/customers', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT u.id, u.name, u.phone, u.account_type, u.company_name, u.created_at,
+              (SELECT COUNT(*) FROM properties WHERE owner_id = u.id) AS property_count,
+              (SELECT COUNT(*) FROM cleaning_jobs j JOIN properties p ON p.id = j.property_id WHERE p.owner_id = u.id) AS job_count,
+              (SELECT COALESCE(SUM(j.price),0) FROM cleaning_jobs j JOIN properties p ON p.id = j.property_id WHERE p.owner_id = u.id AND j.status='done') AS total_spent
+       FROM users u
+       WHERE u.account_type IN ('individual','company')
+       ORDER BY u.created_at DESC`
+    )
+    .all();
+
+  res.json({ customers: rows });
+});
+
 module.exports = router;
