@@ -3,6 +3,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
+const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 // NOT: Sipariş Bildirimleri özelliği ertelendi, services/dispatch.js henüz
 // repoda değil. O özelliğe dönünce bu satır ve aşağıdaki 2 çağrı geri açılacak.
 // const { dispatchJob } = require('../services/dispatch');
@@ -38,6 +39,20 @@ function resolveScheduledAt(urgency, scheduledAt) {
 // bina parametreleri artık sipariş anında değil, mülk eklenirken bir kez
 // girilip properties tablosunda saklanıyor - müşteri her siparişte bunları
 // tekrar girmek zorunda kalmıyor, sadece hangi alt hizmeti istediğini seçiyor.
+// Sipariş göndermeden önce müşterinin girdiği kodu doğrulayıp kaç € indirim
+// yapacağını gösterir - "Kod Uygula" butonunun arkasındaki endpoint.
+router.post('/validate-promo', (req, res) => {
+  const { code, propertyId, serviceKey, priceBeforeDiscount } = req.body;
+  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
+    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+  }
+  const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  const result = validatePromoCode({ code, customerId: req.user.id, city: property.city, serviceKey });
+  if (result.error) return res.status(400).json({ error: result.error });
+  const discountAmount = calcDiscount(result.promo, Number(priceBeforeDiscount) || 0);
+  res.json({ valid: true, discountAmount, discountType: result.promo.discount_type, discountValue: result.promo.discount_value });
+});
+
 router.post('/', async (req, res) => {
   const {
     propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
@@ -110,15 +125,31 @@ router.post('/', async (req, res) => {
   const equipmentOk = hasEquipment !== false;
   const chemicalsOk = hasChemicals !== false;
   const suppliesFee = calcSuppliesFee({ hasEquipment: equipmentOk, hasChemicals: chemicalsOk });
-  const price = basePrice + addonsTotal + suppliesFee;
+  const priceBeforeDiscount = basePrice + addonsTotal + suppliesFee;
+
+  let appliedPromo = null;
+  let discountAmount = 0;
+  if (req.body.promoCode) {
+    const result = validatePromoCode({
+      code: req.body.promoCode,
+      customerId: req.user.id,
+      city: property.city,
+      serviceKey,
+    });
+    if (result.error) return res.status(400).json({ error: result.error });
+    appliedPromo = result.promo;
+    discountAmount = calcDiscount(appliedPromo, priceBeforeDiscount);
+  }
+
+  const price = Math.max(0, priceBeforeDiscount - discountAmount);
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
-        urgency, payment_method, checkout_at, status, source, price, payment_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?)`
+        urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -131,8 +162,12 @@ router.post('/', async (req, res) => {
     paymentMethod,
     checkoutAt,
     price,
-    paymentStatus
+    paymentStatus,
+    appliedPromo ? appliedPromo.id : null,
+    discountAmount || null
   );
+
+  if (appliedPromo) redeemPromo(appliedPromo, req.user.id, id, discountAmount);
 
   const createdJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   res.status(201).json(createdJob);
