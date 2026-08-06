@@ -161,6 +161,28 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
 );
 `);
 
+db.exec(`
+-- Hizmet fiyatlandırma parametreleri - MICISTOMan > Hizmetler & Fiyatlandırma
+-- ekranından admin tarafından düzenlenebilir. key formatı: "{hizmet}.{alan}"
+-- (örn. "checkin_checkout.base", "staircase.ratePerFloor"). catalog.js bu
+-- tabloyu her fiyat hesaplamasında canlı okur - sabit kod değeri değil.
+CREATE TABLE IF NOT EXISTS pricing_settings (
+  key TEXT PRIMARY KEY,
+  value REAL NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Her hizmet türü için personelin takip edeceği görev listesi (checklist).
+-- service_key: 'checkin_checkout' | 'deep_clean' | 'office' | 'staircase' | 'corridor' | 'elevator'
+CREATE TABLE IF NOT EXISTS service_checklists (
+  id TEXT PRIMARY KEY,
+  service_key TEXT NOT NULL,
+  item_text TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
+
 module.exports = db;
 
 // --- Güvenli sütun ekleme (migrasyon) ---------------------------------------
@@ -183,3 +205,22 @@ ensureColumn('cleaning_jobs', 'notified_staff_ids', "TEXT NOT NULL DEFAULT '[]'"
 ensureColumn('cleaning_jobs', 'current_candidate_id', 'TEXT');
 ensureColumn('cleaning_jobs', 'notification_sent_at', 'TEXT');
 ensureColumn('cleaning_jobs', 'accepted_at', 'TEXT');
+
+// --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
+// Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
+// panelinde "boş" değil, mevcut gerçek değerlerle karşılaşır. Zaten bir
+// değer varsa (admin daha önce değiştirmişse) dokunulmaz.
+const DEFAULT_PRICING = {
+  'checkin_checkout.base': 20, 'checkin_checkout.rate': 0.28, 'checkin_checkout.min': 30, 'checkin_checkout.estimatedMinutes': 60,
+  'deep_clean.base': 30, 'deep_clean.rate': 0.48, 'deep_clean.min': 45, 'deep_clean.estimatedMinutes': 150,
+  'office.base': 25, 'office.rate': 0.22, 'office.min': 40, 'office.estimatedMinutes': 90,
+  'staircase.base': 15, 'staircase.ratePerFloor': 4, 'staircase.min': 25, 'staircase.estimatedMinutes': 40,
+  'corridor.base': 12, 'corridor.ratePerSqm': 0.3, 'corridor.ratePerFloor': 3, 'corridor.min': 30, 'corridor.estimatedMinutes': 35,
+  'elevator.base': 12, 'elevator.ratePerCapacity': 1.4, 'elevator.min': 20, 'elevator.estimatedMinutes': 20,
+  'carpet.rate': 18, 'upholstery.rate': 22,
+  'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
+};
+const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
+for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
+  seedPricing.run(key, value);
+}
