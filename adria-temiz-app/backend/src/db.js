@@ -25,6 +25,9 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT UNIQUE,
   password_hash TEXT,
   is_online INTEGER NOT NULL DEFAULT 0,
+  current_lat REAL,
+  current_lng REAL,
+  current_city TEXT,
   profile_completed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -50,6 +53,18 @@ CREATE TABLE IF NOT EXISTS otp_requests (
 -- Personel başvuruları: MICISTO'da çalışmak isteyenlerin, hesap açmadan
 -- doldurduğu ön başvuru formu. Admin paneli yazıldığında buradan
 -- onaylanıp gerçek 'staff' hesabına dönüştürülecek (personel app'i o zaman verilir).
+-- Personelin tarayıcısından alınan push abonelikleri - sipariş bildirimleri
+-- bunlar üzerinden gönderiliyor. Bir personelin birden fazla cihazı/tarayıcısı
+-- olabilir, hepsi ayrı satır.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS staff_applications (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -130,6 +145,10 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
     payment_status IN ('unpaid','held','released','refunded')
   ),
   assigned_staff_id TEXT REFERENCES users(id),
+  notified_staff_ids TEXT NOT NULL DEFAULT '[]',
+  current_candidate_id TEXT REFERENCES users(id),
+  notification_sent_at TEXT,
+  accepted_at TEXT,
   notes TEXT,
   service_rating TEXT CHECK (service_rating IS NULL OR service_rating IN ('like','dislike')),
   service_feedback TEXT,
@@ -143,3 +162,24 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
 `);
 
 module.exports = db;
+
+// --- Güvenli sütun ekleme (migrasyon) ---------------------------------------
+// CREATE TABLE IF NOT EXISTS, tablo zaten varsa (canlıda olduğu gibi) yeni
+// eklenen sütunları eklemez. Bu blok, daha önce eklenmemiş olabilecek
+// sütunları var olan tabloya güvenle ekler - sütun zaten varsa SQLite hata
+// verir, o hata yakalanıp yok sayılır (idempotent, defalarca çalıştırılabilir).
+function ensureColumn(table, column, definition) {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  } catch (err) {
+    if (!/duplicate column name/i.test(err.message)) throw err;
+  }
+}
+
+ensureColumn('users', 'current_lat', 'REAL');
+ensureColumn('users', 'current_lng', 'REAL');
+ensureColumn('users', 'current_city', 'TEXT');
+ensureColumn('cleaning_jobs', 'notified_staff_ids', "TEXT NOT NULL DEFAULT '[]'");
+ensureColumn('cleaning_jobs', 'current_candidate_id', 'TEXT');
+ensureColumn('cleaning_jobs', 'notification_sent_at', 'TEXT');
+ensureColumn('cleaning_jobs', 'accepted_at', 'TEXT');
