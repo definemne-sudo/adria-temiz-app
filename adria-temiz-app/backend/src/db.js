@@ -197,6 +197,58 @@ CREATE TABLE IF NOT EXISTS staff_payment_marks (
 );
 `);
 
+db.exec(`
+-- Reklam kampanyası verileri - hangi platforma verilirse verilsin, admin
+-- kendi reklam panelinden (Meta, Google Ads, TikTok vb.) gördüğü rakamları
+-- buraya elle giriyor. Gerçek zamanlı API entegrasyonu yok - hangi platform
+-- kullanılacağı netleşince ayrıca konuşulmalı.
+CREATE TABLE IF NOT EXISTS ad_campaigns (
+  id TEXT PRIMARY KEY,
+  platform TEXT NOT NULL,
+  campaign_name TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT,
+  spend REAL NOT NULL DEFAULT 0,
+  impressions INTEGER NOT NULL DEFAULT 0,
+  clicks INTEGER NOT NULL DEFAULT 0,
+  signups INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Promosyon/indirim kodları - tarih, saat aralığı, şehir ve hizmet türüne
+-- göre kısıtlanabilir. allowed_customer_ids doluysa (sadakat/referans
+-- promosyonları) sadece o listedeki müşteriler kullanabilir.
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  discount_type TEXT NOT NULL CHECK (discount_type IN ('percent','fixed')),
+  discount_value REAL NOT NULL,
+  start_date TEXT,
+  end_date TEXT,
+  start_hour INTEGER,
+  end_hour INTEGER,
+  city TEXT,
+  service_key TEXT,
+  max_uses INTEGER,
+  max_uses_per_customer INTEGER NOT NULL DEFAULT 1,
+  used_count INTEGER NOT NULL DEFAULT 0,
+  allowed_customer_ids TEXT,
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual','loyalty','referral')),
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS promo_code_redemptions (
+  id TEXT PRIMARY KEY,
+  promo_code_id TEXT NOT NULL,
+  customer_id TEXT NOT NULL,
+  job_id TEXT,
+  discount_amount REAL NOT NULL,
+  redeemed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`);
+
 module.exports = db;
 
 // --- Güvenli sütun ekleme (migrasyon) ---------------------------------------
@@ -221,6 +273,10 @@ ensureColumn('cleaning_jobs', 'notification_sent_at', 'TEXT');
 ensureColumn('cleaning_jobs', 'accepted_at', 'TEXT');
 ensureColumn('cleaning_jobs', 'cancelled_at', 'TEXT');
 ensureColumn('cleaning_jobs', 'cancel_reason', 'TEXT');
+ensureColumn('users', 'referral_code', 'TEXT');
+ensureColumn('users', 'referred_by_user_id', 'TEXT');
+ensureColumn('cleaning_jobs', 'promo_code_id', 'TEXT');
+ensureColumn('cleaning_jobs', 'discount_amount', 'REAL');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
