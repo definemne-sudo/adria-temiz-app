@@ -55,39 +55,56 @@
   .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
   .hint{font-size:12px; color:var(--muted); margin-top:14px; line-height:1.5;}
 
-  .sidebar{ width:230px; background:var(--navy); color:#EAF0EE; padding:22px 18px; flex-shrink:0; display:flex; flex-direction:column; }
-  .sidebar .brand{ color:#fff; margin-bottom:26px; }
-  .sidebar .brand h1{ color:#fff; font-size:20px; }
+  .sidebar{ width:190px; background:var(--navy); color:#EAF0EE; padding:20px 14px; flex-shrink:0; display:flex; flex-direction:column; }
+  .sidebar .brand{ color:#fff; margin-bottom:4px; gap:8px; }
+  .sidebar .brand svg{ width:30px; height:30px; }
+  .sidebar .brand h1{ color:#fff; font-size:16px; letter-spacing:.02em; }
+  .brand-tagline{ font-size:8.5px; color:#7FA394; letter-spacing:.08em; text-transform:uppercase; margin:0 0 22px 38px; margin-top:-4px; }
   .nav-item{
-    padding:10px 12px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; color:#C9D6D2; margin-bottom:4px;
-    display:flex; align-items:center; justify-content:space-between;
+    padding:9px 10px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; color:#B7C9C2; margin-bottom:2px;
+    display:flex; align-items:center; gap:9px;
   }
-  .nav-item.active{ background:rgba(255,255,255,.1); color:#fff; }
-  .nav-item .badge-count{ background:var(--ochre); color:#fff; font-size:10.5px; font-weight:700; border-radius:20px; padding:1px 7px; }
+  .nav-item svg{ width:16px; height:16px; flex-shrink:0; opacity:.85; }
+  .nav-item.active{ background:rgba(255,255,255,.12); color:#fff; }
+  .nav-item.active svg{ opacity:1; }
+  .nav-item .badge-count{ background:var(--ochre); color:#fff; font-size:9.5px; font-weight:700; border-radius:20px; padding:1px 6px; margin-left:auto; }
   .sidebar .spacer{flex:1;}
-  .who{font-size:12px; color:#9FB3AE; line-height:1.5; margin-bottom:10px;}
-  .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline;}
+  .who{font-size:11px; color:#9FB3AE; line-height:1.5; margin-bottom:8px; padding-left:2px;}
+  .logout{font-size:11px; color:#E7B98C; cursor:pointer; text-decoration:underline; padding-left:2px;}
+  .sidebar-footer{ display:flex; align-items:center; gap:6px; margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.08); }
+  .sidebar-footer svg{ width:16px; height:16px; }
+  .sidebar-footer .footer-text{ font-size:10px; color:#7FA394; }
 
-  .main{flex:1; padding:32px 40px; max-width:1200px;}
-  .page-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:24px;}
+  .main{flex:1; padding:24px 28px; min-width:0;}
+  .topbar-row{ display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+  .topbar-row .spacer{ flex:1; }
+  .topbar-bell{ position:relative; width:36px; height:36px; border-radius:50%; background:var(--panel); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; cursor:pointer; }
+  .topbar-bell svg{ width:17px; height:17px; }
+  .topbar-bell-badge{ position:absolute; top:-3px; right:-3px; background:var(--danger); color:#fff; font-size:9px; font-weight:700; border-radius:20px; padding:1px 5px; border:2px solid var(--bg); }
+  .topbar-avatar{ width:34px; height:34px; border-radius:50%; background:var(--sage); color:#fff; font-weight:700; font-size:12.5px; display:flex; align-items:center; justify-content:center; }
+  .page-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:20px;}
   .page-head h2{font-size:24px; color:var(--navy);}
   .page-head p{color:var(--muted); font-size:13px; margin-top:4px;}
 
-  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-bottom:28px; }
-  .stat-card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; }
-  .stat-card .value{ font-family:'Fraunces',serif; font-size:28px; color:var(--navy); }
-  .stat-card .label{ font-size:12px; color:var(--muted); margin-top:4px; }
-  .stat-card .sub-label{ font-size:11px; color:var(--sage-dark); margin-top:6px; font-weight:600; }
+  .stat-grid{ display:grid; grid-template-columns:repeat(6, 1fr); gap:12px; margin-bottom:22px; }
+  .stat-card{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px; min-width:0; }
+  .stat-card .value{ font-family:'Fraunces',serif; font-size:22px; color:var(--navy); line-height:1.15; }
+  .stat-card .label{ font-size:11px; color:var(--muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stat-card .sub-label{ font-size:10px; color:var(--sage-dark); margin-top:5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .stat-icon{
-    width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center;
-    font-size:17px; margin-bottom:10px; background:var(--bg);
+    width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    margin-bottom:8px; background:var(--bg);
   }
+  .stat-icon svg{ width:15px; height:15px; }
   .stat-icon-bookings{ background:#DCE7F5; }
   .stat-icon-completed{ background:#DEEFE0; }
   .stat-icon-workers{ background:#E4E0F5; }
   .stat-icon-revenue{ background:#DEEFE0; }
   .stat-icon-satisfaction{ background:#F6EBD2; }
   .stat-icon-pending{ background:#F2DADA; }
+
+  @media (max-width:1100px){ .stat-grid{ grid-template-columns:repeat(3, 1fr); } }
+  @media (max-width:640px){ .stat-grid{ grid-template-columns:repeat(2, 1fr); } }
 
   .dash-grid{ display:grid; grid-template-columns:1.6fr 1fr 1fr; gap:16px; align-items:start; }
   @media (max-width:1000px){ .dash-grid{ grid-template-columns:1fr; } }
@@ -136,7 +153,10 @@
     .sidebar .brand{ margin-bottom:0; }
     .sidebar .spacer{ display:none; }
     .sidebar .who{ display:none; }
+    .brand-tagline{ display:none; }
+    .sidebar-footer{ display:none; }
     .main{ padding:20px; }
+    .topbar-row .who-name{ display:none; }
   }
 </style>
 </head>
@@ -329,27 +349,45 @@ function renderAuth(){
   </div>`;
 }
 
+const NAV_ICONS = {
+  dashboard: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  bookings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>`,
+  workers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></svg>`,
+  customers: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.5 14.2c2.7.3 4.5 2.4 4.5 5.8"/></svg>`,
+  support: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 16 0v5a2 2 0 0 1-2 2h-1v-6h3M4 17v-5h3v6H5a2 2 0 0 1-1-1.7"/></svg>`,
+  applications: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M9 12l2 2 4-4"/></svg>`,
+};
+
+function navItem(page, icon, label, badgeCount){
+  return `
+  <div class="nav-item ${state.page===page?'active':''}" data-page="${page}">
+    ${NAV_ICONS[icon]}
+    <span>${label}</span>
+    ${badgeCount ? `<span class="badge-count">${badgeCount}</span>` : ''}
+  </div>`;
+}
+
 function renderPanel(){
   return `
   <div class="sidebar">
-    <div class="brand">${BRAND_MARK}<h1>MICISTOMan</h1></div>
-    <div class="nav-item ${state.page==='dashboard'?'active':''}" data-page="dashboard">${T.navDashboard}</div>
-    <div class="nav-item ${state.page==='bookings'?'active':''}" data-page="bookings">${T.navBookings}</div>
-    <div class="nav-item ${state.page==='workers'?'active':''}" data-page="workers">${T.navWorkers}</div>
-    <div class="nav-item ${state.page==='customers'?'active':''}" data-page="customers">${T.navCustomers}</div>
-    <div class="nav-item ${state.page==='support'?'active':''}" data-page="support">
-      ${T.navSupport}
-      ${state.dashboard && state.dashboard.stats.unreadChats ? `<span class="badge-count">${state.dashboard.stats.unreadChats}</span>` : ''}
-    </div>
-    <div class="nav-item ${state.page==='applications'?'active':''}" data-page="applications">
-      ${T.navApplications}
-      ${state.dashboard && state.dashboard.stats.pendingApplications ? `<span class="badge-count">${state.dashboard.stats.pendingApplications}</span>` : ''}
-    </div>
+    <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="30" height="30" ')}<h1>MICISTO</h1></div>
+    <div class="brand-tagline">Man · Cleaning on Demand</div>
+    ${navItem('dashboard', 'dashboard', T.navDashboard)}
+    ${navItem('bookings', 'bookings', T.navBookings)}
+    ${navItem('workers', 'workers', T.navWorkers)}
+    ${navItem('customers', 'customers', T.navCustomers)}
+    ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
+    ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
     <div class="spacer"></div>
     <div class="who">${state.user.name}</div>
     <div class="logout" id="logout">${T.logout}</div>
+    <div class="sidebar-footer">
+      ${BRAND_MARK.replace('<svg ', '<svg width="16" height="16" ')}
+      <span class="footer-text">MICISTOMan v1.0</span>
+    </div>
   </div>
   <div class="main">
+    ${renderTopbar()}
     ${state.page==='dashboard' ? renderDashboard()
       : state.page==='bookings' ? renderBookings()
       : state.page==='workers' ? renderWorkers()
@@ -363,9 +401,14 @@ function renderPanel(){
 
 function statIcon(kind){
   const icons = {
-    bookings: '📋', completed: '✅', workers: '🧑‍🔧', revenue: '💶', satisfaction: '⭐', pending: '⏳',
+    bookings: `<svg viewBox="0 0 24 24" fill="none" stroke="#2C5C8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>`,
+    completed: `<svg viewBox="0 0 24 24" fill="none" stroke="#2E7D46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`,
+    workers: `<svg viewBox="0 0 24 24" fill="none" stroke="#5B3F9E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></svg>`,
+    revenue: `<svg viewBox="0 0 24 24" fill="none" stroke="#2E7D46" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6.5c0-2-2.2-3-5-3s-5 1.2-5 3.2 2.2 2.8 5 3.3 5 1.3 5 3.3-2.2 3.2-5 3.2-5-1-5-3"/></svg>`,
+    satisfaction: `<svg viewBox="0 0 24 24" fill="#C98A3E" stroke="#C98A3E" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2.5l3 6.1 6.7.9-4.9 4.7 1.2 6.6L12 17.7l-6 3.1 1.2-6.6-4.9-4.7 6.7-.9z"/></svg>`,
+    pending: `<svg viewBox="0 0 24 24" fill="none" stroke="#A13A3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`,
   };
-  return icons[kind] || '•';
+  return icons[kind] || '';
 }
 
 function renderRevenuePanel(){
@@ -407,6 +450,24 @@ function renderRevenuePanel(){
       ${points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="#0F3D2E" />`).join('')}
       ${points.map(p => `<text x="${p.x.toFixed(1)}" y="${h-4}" font-size="10" fill="#5B7A6C" text-anchor="middle">${new Date(p.s.date).toLocaleDateString('sr-Latn-ME',{weekday:'short'})}</text>`).join('')}
     </svg>
+  </div>`;
+}
+
+function renderTopbar(){
+  const totalAlerts = (state.dashboard ? (state.dashboard.stats.unreadChats||0) + (state.dashboard.stats.pendingApplications||0) : 0);
+  const initials = (state.user.name||'?').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  return `
+  <div class="topbar-row">
+    <div class="spacer"></div>
+    <div class="topbar-bell" id="topbar-bell" title="${T.navSupport}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5B7A6C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 5-2 6-2 6h16s-2-1-2-6"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      ${totalAlerts ? `<span class="topbar-bell-badge">${totalAlerts}</span>` : ''}
+    </div>
+    <div class="topbar-avatar">${initials}</div>
+    <div>
+      <div style="font-size:12.5px; font-weight:700; color:var(--navy);">${state.user.name}</div>
+      <div style="font-size:10.5px; color:var(--muted);">Admin</div>
+    </div>
   </div>`;
 }
 
@@ -833,6 +894,12 @@ function attachHandlers(){
   if(bookingPrev) bookingPrev.onclick = async () => { await loadBookings(state.bookings.page - 1); };
   const bookingNext = document.getElementById('booking-next-page');
   if(bookingNext) bookingNext.onclick = async () => { await loadBookings(state.bookings.page + 1); };
+
+  const topbarBell = document.getElementById('topbar-bell');
+  if(topbarBell) topbarBell.onclick = async () => {
+    state.page = 'support'; render();
+    await loadChats();
+  };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
