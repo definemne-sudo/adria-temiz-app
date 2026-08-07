@@ -70,6 +70,11 @@
 
   /* Masaüstünde: sol yarıda kocaman marka/slogan (sabit, tam yükseklik),
      form + dil seçici sağ yarıda ortalanır. */
+  @media (max-width:959px){
+    .auth-wrap.hide-hero-mobile{ justify-content:center; }
+    .auth-wrap.hide-hero-mobile .auth-left{ display:none; }
+  }
+
   @media (min-width:960px){
     .auth-wrap{ flex-direction:row; align-items:stretch; padding:0; }
     .auth-left{
@@ -185,6 +190,13 @@
   .property-avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
   .row-actions{display:flex; gap:8px;}
   .btn-sm{padding:7px 12px; font-size:12.5px; border-radius:6px;}
+  .room-stepper-btn{
+    width:28px; height:28px; border-radius:50%; border:1.5px solid var(--line); background:var(--panel);
+    color:var(--navy); font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    padding:0; line-height:1; font-family:inherit;
+  }
+  .room-stepper-btn:hover{ border-color:var(--sage); }
+  .room-stepper-btn:disabled{ opacity:.35; cursor:not-allowed; }
 
   table{width:100%; border-collapse:collapse; background:var(--panel); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
   th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:12px 14px; background:#F5F8F6; border-bottom:1px solid var(--line);}
@@ -421,6 +433,9 @@ const TRANSLATIONS = {
     authDemoModeHint: "Demo modu — gerçek SMS servisi henüz bağlı değil, kodun: <strong>{{code}}</strong>",
     authChangeNumber: "Numarayı değiştir",
     authProfileTagline: "Son bir adım — seni tanıyalım.",
+    authAddressTagline: "Mülkünü haritada işaretleyelim.",
+    bedroomCountLabel: "Yatak odası",
+    bathroomCountLabel: "Banyo",
     accountIndividual: "Bireysel<br/>ev sahibi",
     accountCompany: "Yönetim<br/>şirketi",
     staffRegisterLink: "Personel misiniz? Buradan kayıt olun",
@@ -647,6 +662,9 @@ const TRANSLATIONS = {
     authDemoModeHint: "Demo mode — a real SMS service isn't connected yet, your code: <strong>{{code}}</strong>",
     authChangeNumber: "Change number",
     authProfileTagline: "One last step — tell us about yourself.",
+    authAddressTagline: "Let's pin your property on the map.",
+    bedroomCountLabel: "Bedrooms",
+    bathroomCountLabel: "Bathrooms",
     accountIndividual: "Individual<br/>owner",
     accountCompany: "Management<br/>company",
     staffRegisterLink: "Are you a staff member? Register here",
@@ -873,6 +891,9 @@ const TRANSLATIONS = {
     authDemoModeHint: "Demo režim — prava SMS usluga još nije povezana, tvoj kod: <strong>{{code}}</strong>",
     authChangeNumber: "Promijeni broj",
     authProfileTagline: "Još jedan korak — da te upoznamo.",
+    authAddressTagline: "Označimo tvoju nekretninu na mapi.",
+    bedroomCountLabel: "Spavaće sobe",
+    bathroomCountLabel: "Kupatila",
     accountIndividual: "Individualni<br/>vlasnik",
     accountCompany: "Menadžment<br/>kompanija",
     staffRegisterLink: "Da li ste član osoblja? Registrujte se ovdje",
@@ -1176,6 +1197,26 @@ function commonAreaSubLabel(key){
   return s ? (s[state.lang]?.name || s.tr.name) : key;
 }
 const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+const BEDROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v2M21 18v2M3 12V8a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v2M13 12V9a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v3"/></svg>';
+const BATHROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 3.2-1.6M9 8.5V6"/><path d="M6 19v2M16 19v2"/></svg>';
+
+// Kayıt akışında yatak odası/banyo sayısını artı-eksi ile seçtiren satır.
+function renderRoomStepper(type, label, count){
+  const icon = type === 'bedroom' ? BEDROOM_ICON_SVG : BATHROOM_ICON_SVG;
+  return `
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:11px 2px; border-bottom:1px solid var(--line); margin-bottom:2px;">
+    <div style="display:flex; align-items:center; gap:10px; color:var(--text);">
+      <span style="color:var(--sage-dark); flex-shrink:0;">${icon}</span>
+      <span style="font-size:13.5px;">${label}</span>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <button type="button" class="room-stepper-btn" data-room-stepper="${type}" data-dir="down" ${count<=0?'disabled':''}>−</button>
+      <span style="font-size:15px; font-weight:700; color:var(--navy); min-width:14px; text-align:center;">${count}</span>
+      <button type="button" class="room-stepper-btn" data-room-stepper="${type}" data-dir="up">+</button>
+    </div>
+  </div>`;
+}
 function commonAreaSubIcon(key){
   return (COMMON_AREA_SUB_I18N[key] && COMMON_AREA_SUB_I18N[key].icon) || FALLBACK_PLUS_ICON;
 }
@@ -1270,6 +1311,11 @@ let state = {
   devCode: '',
   accountTypeChoice: 'individual',
   propertyCategory: 'apartment',
+  regStep: 'details',
+  regName: '',
+  regSizeSqm: '',
+  regBedroomCount: 1,
+  regBathroomCount: 1,
   regPropertyName: '',
   regPropertyCity: '',
   regPropertyAddress: '',
@@ -1435,62 +1481,66 @@ function renderAuth(){
   }
 
   if(state.authStep === 'profile'){
-    inner = `
-      <div class="tagline">${t('authProfileTagline')}</div>
-      <div class="account-type-choice">
-        <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">${t('accountIndividual')}</div>
-        <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">${t('accountCompany')}</div>
-      </div>
-      <form id="profile-form">
-        ${state.accountTypeChoice==='individual' ? `
-          <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
-          <div class="option-row">
-            <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
-            <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
-            <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
-          </div>
-        ` : ''}
-        <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
-        ${state.accountTypeChoice==='company' ? `
-          <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
-          <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;">${t('billingSectionHeading')}</div>
-            <div class="hint" style="margin:0 0 12px;">${t('billingSectionHint')}</div>
-            <div class="field"><label>${t('taxNumberLabel')}</label><input name="taxNumber" required /></div>
-            <div class="field"><label>${t('billingAddressLabel')}</label><input name="billingAddress" required /></div>
-          </div>
-          <div class="hint" style="margin:0 0 14px;">${t('profileCompanyHint')}</div>
-        ` : ''}
-        ${state.accountTypeChoice==='individual' ? `
-          <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
-            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">
-              ${t('propertyHeading')}
+    // Bireysel hesaplarda mülk bilgisi de toplandığı için akış 2 ekrana
+    // bölündü: 1) kişi/mülk temel bilgileri  2) açık adres + harita.
+    // Şirket hesabında mülk adımı hiç yok, tek ekranda kalıyor.
+    if(state.accountTypeChoice === 'company' || state.regStep === 'details'){
+      inner = `
+        <div class="tagline">${t('authProfileTagline')}</div>
+        <div class="account-type-choice">
+          <div class="choice ${state.accountTypeChoice==='individual'?'selected':''}" data-choice="individual">${t('accountIndividual')}</div>
+          <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">${t('accountCompany')}</div>
+        </div>
+        <form id="profile-details-form">
+          <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus value="${state.regName}" /></div>
+          ${state.accountTypeChoice==='individual' ? `
+            <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
+            <div class="option-row">
+              <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
+              <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
+              <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
             </div>
-            <div class="field"><label>${t('propertyNameLabel')}</label><input id="reg-property-name" name="propertyName" required placeholder="${t('propertyNamePlaceholder')}" value="${state.regPropertyName}" /></div>
-            <div class="field"><label>${t('propertyCityLabel')}</label><input id="reg-property-city" name="propertyCity" required placeholder="${t('propertyCityPlaceholder')}" value="${state.regPropertyCity}" /></div>
-            <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" /></div>
-            <div class="field">
-              <label>${t('icalOptionalLabel')}</label>
-              <input id="reg-property-ical" name="propertyIcalUrl" placeholder="${t('icalUrlPlaceholder')}" value="${state.regPropertyIcalUrl}" />
+            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
+            ${renderRoomStepper('bedroom', t('bedroomCountLabel'), state.regBedroomCount)}
+            ${renderRoomStepper('bathroom', t('bathroomCountLabel'), state.regBathroomCount)}
+          ` : `
+            <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
+            <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
+              <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;">${t('billingSectionHeading')}</div>
+              <div class="hint" style="margin:0 0 12px;">${t('billingSectionHint')}</div>
+              <div class="field"><label>${t('taxNumberLabel')}</label><input name="taxNumber" required /></div>
+              <div class="field"><label>${t('billingAddressLabel')}</label><input name="billingAddress" required /></div>
             </div>
-            <div class="hint" style="margin:-8px 0 14px;">${t('icalRegHint')}</div>
-            <div class="field">
-              <label>${t('propertyLocationLabel')}</label>
-              <div id="reg-map" class="mini-map"></div>
-              <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
-            </div>
-            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" /></div>
+            <div class="hint" style="margin:0 0 14px;">${t('profileCompanyHint')}</div>
+            <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
+          `}
+          ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+          <button class="btn ochre" type="submit">${state.accountTypeChoice==='individual' ? t('continueBtn') : t('enterPanel')}</button>
+        </form>
+      `;
+    } else {
+      // regStep === 'address' (yalnızca bireysel hesap)
+      inner = `
+        <button type="button" id="back-to-details" class="hint" style="background:none; border:none; padding:0; margin-bottom:16px; cursor:pointer; color:var(--sage-dark); font-weight:600;">‹ ${t('backBtn')}</button>
+        <div class="tagline">${t('authAddressTagline')}</div>
+        <form id="profile-address-form">
+          <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" required placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+          <div class="field"><label>${t('propertyCityLabel')}</label><input id="reg-property-city" name="propertyCity" required placeholder="${t('propertyCityPlaceholder')}" value="${state.regPropertyCity}" /></div>
+          <div class="field">
+            <label>${t('propertyLocationLabel')}</label>
+            <div id="reg-map" class="mini-map"></div>
+            <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
           </div>
-        ` : ''}
-        <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
-        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${t('enterPanel')}</button>
-      </form>
-    `;
+          <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
+          ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
+          <button class="btn ochre" type="submit">${t('enterPanel')}</button>
+        </form>
+      `;
+    }
   }
 
   return `
-  <div class="auth-wrap">
+  <div class="auth-wrap ${state.authStep==='profile' ? 'hide-hero-mobile' : ''}">
     ${AUTH_BG_MOTIF}
     <div class="auth-left">
       <div class="brand">${BRAND_MARK}<h1>MICISTO</h1></div>
@@ -2614,7 +2664,7 @@ function attachHandlers(){
   });
 
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
-    state.accountTypeChoice = el.dataset.choice; render();
+    state.accountTypeChoice = el.dataset.choice; state.regStep = 'details'; render();
   });
 
   document.querySelectorAll('[data-property-category]').forEach(el => el.onclick = () => {
@@ -2723,27 +2773,26 @@ function attachHandlers(){
   const changePhone = document.getElementById('change-phone');
   if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
 
-  const profileForm = document.getElementById('profile-form');
-  if(profileForm) profileForm.onsubmit = async (e) => {
+  const profileDetailsForm = document.getElementById('profile-details-form');
+  if(profileDetailsForm) profileDetailsForm.onsubmit = async (e) => {
     e.preventDefault();
-    const fd = Object.fromEntries(new FormData(profileForm));
+    const fd = Object.fromEntries(new FormData(profileDetailsForm));
+    if(state.accountTypeChoice === 'individual'){
+      // Bireysel: 1. ekran tamamlandı, 2. ekrana (adres+harita) geç -
+      // henüz sunucuya bir şey göndermiyoruz.
+      state.regName = fd.name;
+      state.regSizeSqm = fd.sizeSqm;
+      state.authError = '';
+      state.regStep = 'address';
+      render();
+      return;
+    }
+    // Şirket: mülk adımı hiç yok, tek ekranda tamamlanıp doğrudan gönderiliyor.
     const body = {
-      name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName,
+      name: fd.name, accountType: 'company', companyName: fd.companyName,
       taxNumber: fd.taxNumber, billingAddress: fd.billingAddress,
       referredByCode: fd.referredByCode ? fd.referredByCode.trim() : null,
     };
-    if(state.accountTypeChoice === 'individual' && (fd.propertyCity || fd.sizeSqm || fd.propertyName)){
-      body.property = {
-        name: fd.propertyName || 'Evim',
-        city: fd.propertyCity || null,
-        address: fd.propertyAddress || null,
-        category: state.propertyCategory,
-        sizeSqm: fd.sizeSqm || null,
-        latitude: state.regLat,
-        longitude: state.regLng,
-        icalUrl: fd.propertyIcalUrl || null,
-      };
-    }
     try{
       const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify(body) });
       state.token = data.token; state.user = data.user;
@@ -2751,11 +2800,50 @@ function attachHandlers(){
       localStorage.setItem('user', JSON.stringify(data.user));
       state.authError = '';
       state.page = 'services';
-      state.regLat = null; state.regLng = null;
+      await loadAll();
+    }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const backToDetails = document.getElementById('back-to-details');
+  if(backToDetails) backToDetails.onclick = () => { state.regStep = 'details'; state.authError = ''; render(); };
+
+  document.querySelectorAll('[data-room-stepper]').forEach(el => el.onclick = () => {
+    const type = el.dataset.roomStepper;
+    const key = type === 'bedroom' ? 'regBedroomCount' : 'regBathroomCount';
+    const delta = el.dataset.dir === 'up' ? 1 : -1;
+    state[key] = Math.max(0, (state[key] || 0) + delta);
+    render();
+  });
+
+  const profileAddressForm = document.getElementById('profile-address-form');
+  if(profileAddressForm) profileAddressForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(profileAddressForm));
+    const body = {
+      name: state.regName, accountType: 'individual',
+      referredByCode: fd.referredByCode ? fd.referredByCode.trim() : null,
+      property: {
+        name: t('category' + state.propertyCategory.charAt(0).toUpperCase() + state.propertyCategory.slice(1)) || 'Evim',
+        city: fd.propertyCity || null,
+        address: fd.propertyAddress || null,
+        category: state.propertyCategory,
+        sizeSqm: state.regSizeSqm || null,
+        bedroomCount: state.regBedroomCount || null,
+        bathroomCount: state.regBathroomCount || null,
+        latitude: state.regLat,
+        longitude: state.regLng,
+      },
+    };
+    try{
+      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify(body) });
+      state.token = data.token; state.user = data.user;
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      state.authError = '';
+      state.page = 'services';
+      state.regLat = null; state.regLng = null; state.regStep = 'details';
       state.regPropertyName = ''; state.regPropertyCity = ''; state.regPropertyAddress = ''; state.regPropertyIcalUrl = '';
-      if(data.property && !data.syncResult) showToast(t('toastWelcomeProperty', { name: data.property.name }));
-      if(data.syncResult && !data.syncResult.error) showToast(t('toastAutoSyncDone', { count: data.syncResult.created }));
-      if(data.syncResult && data.syncResult.error) showToast(t('toastAutoSyncFailed'));
+      if(data.property) showToast(t('toastWelcomeProperty', { name: data.property.name }));
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
   };
