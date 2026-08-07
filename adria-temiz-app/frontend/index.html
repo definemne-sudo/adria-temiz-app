@@ -492,7 +492,6 @@ const TRANSLATIONS = {
     ordersSubtitle: "Aldığın hizmetler ve durumları.",
     ordersEmptyState: "Henüz sipariş yok. \"Hizmetler\" sekmesinden bir sipariş oluştur.",
     colProperty: "Mülk", colService: "Hizmet", colWhen: "Zaman", colStatus: "Durum", colPrice: "Fiyat",
-    markDoneBtn: "Tamamlandı olarak işaretle",
     paidBadge: "✓ Ödendi",
     settlingBadge: "Ödeme sonuçlanıyor…",
     cardPaidNote: "💳 Kart · ödeme alındı, tamamlanınca serbest kalır",
@@ -693,7 +692,6 @@ const TRANSLATIONS = {
     ordersSubtitle: "The services you've booked and their status.",
     ordersEmptyState: "No orders yet. Create one from the \"Services\" tab.",
     colProperty: "Property", colService: "Service", colWhen: "When", colStatus: "Status", colPrice: "Price",
-    markDoneBtn: "Mark as completed",
     paidBadge: "✓ Paid",
     settlingBadge: "Settling payment…",
     cardPaidNote: "💳 Card · charged, released once completed",
@@ -894,7 +892,6 @@ const TRANSLATIONS = {
     ordersSubtitle: "Usluge koje si naručio/la i njihov status.",
     ordersEmptyState: "Još nema narudžbi. Napravi jednu iz kartice \"Usluge\".",
     colProperty: "Nekretnina", colService: "Usluga", colWhen: "Termin", colStatus: "Status", colPrice: "Cijena",
-    markDoneBtn: "Označi kao završeno",
     paidBadge: "✓ Plaćeno",
     settlingBadge: "Plaćanje se obrađuje…",
     cardPaidNote: "💳 Kartica · naplaćeno, oslobađa se po završetku",
@@ -1957,7 +1954,7 @@ function renderJobAction(j){
   }
   if(!['done','confirmed'].includes(j.status)){
     return `
-      <button class="btn ghost btn-sm" data-mark-done="${j.id}">${t('markDoneBtn')}</button>
+      <span class="pay-badge" style="background:var(--bg); color:var(--muted);">${statusLabel(j.status)}</span>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">${paymentNote(j.payment_method)}</div>
     `;
   }
@@ -2813,12 +2810,6 @@ function attachHandlers(){
   });
   // GEÇİCİ: personel paneli yazılana kadar müşteri kendi siparişini test
   // amaçlı tamamlandı işaretleyebiliyor.
-  document.querySelectorAll('[data-mark-done]').forEach(el => el.onclick = async () => {
-    try{
-      await api(`/jobs/${el.dataset.markDone}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
-      await loadAll();
-    }catch(err){ showToast(err.message); }
-  });
   const ratingServiceFeedback = document.getElementById('rating-service-feedback');
   if(ratingServiceFeedback) ratingServiceFeedback.oninput = () => { state.ratingServiceFeedback = ratingServiceFeedback.value; };
   const ratingStaffFeedback = document.getElementById('rating-staff-feedback');
