@@ -287,6 +287,8 @@ ensureColumn('users', 'referral_code', 'TEXT');
 ensureColumn('users', 'referred_by_user_id', 'TEXT');
 ensureColumn('cleaning_jobs', 'promo_code_id', 'TEXT');
 ensureColumn('cleaning_jobs', 'discount_amount', 'REAL');
+ensureColumn('properties', 'bedroom_count', 'INTEGER');
+ensureColumn('properties', 'bathroom_count', 'INTEGER');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
