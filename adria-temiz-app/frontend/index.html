@@ -39,8 +39,8 @@
   .app{display:flex; min-height:100vh;}
 
   .auth-wrap{
-    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-    width:100%; min-height:100vh; padding:0; overflow:hidden;
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%; min-height:100vh; padding:24px 0; overflow:hidden;
     background:
       radial-gradient(circle at 20% 15%, rgba(29,158,115,.16), transparent 50%),
       radial-gradient(circle at 88% 78%, rgba(201,138,62,.13), transparent 45%),
@@ -49,17 +49,17 @@
   .auth-bg-motif{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
   .auth-left{
     position:relative; z-index:1; width:100%; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; padding:52px 24px 34px; flex:1;
+    align-items:center; justify-content:center; padding:4px 24px; flex:none;
   }
-  .auth-left .brand{ display:flex; flex-direction:column; align-items:center; gap:14px; margin-bottom:16px; }
-  .auth-left .brand svg{ width:64px; height:64px; display:block; }
-  .auth-left .brand h1{ font-size:28px; color:#fff; letter-spacing:0.04em; }
+  .auth-left .brand{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:8px; }
+  .auth-left .brand svg{ width:44px; height:44px; display:block; }
+  .auth-left .brand h1{ font-size:22px; color:#fff; letter-spacing:0.04em; }
   .auth-left .auth-headline{
-    font-family:'Fraunces',serif; font-weight:500; font-style:italic; font-size:16px;
-    color:rgba(255,255,255,.88); text-align:center; max-width:300px; line-height:1.4;
+    font-family:'Fraunces',serif; font-weight:500; font-style:italic; font-size:13.5px;
+    color:rgba(255,255,255,.88); text-align:center; max-width:280px; line-height:1.4;
   }
-  .auth-left .auth-accent-rule{ background:linear-gradient(90deg, var(--sage), var(--ochre)); width:52px; height:3px; border-radius:3px; margin:16px auto 0; }
-  .auth-right{ position:relative; z-index:1; width:100%; display:flex; justify-content:center; padding:0 20px 32px; }
+  .auth-left .auth-accent-rule{ background:linear-gradient(90deg, var(--sage), var(--ochre)); width:40px; height:3px; border-radius:3px; margin:10px auto 0; }
+  .auth-right{ position:relative; z-index:1; width:100%; display:flex; justify-content:center; padding:14px 20px 4px; }
   .auth-panel-stack{ width:100%; max-width:420px; }
   .auth-lang-above{ display:flex; justify-content:center; margin-bottom:14px; }
   .auth-lang-above .lang-switch{ margin-bottom:0; justify-content:center; }
@@ -71,7 +71,7 @@
   /* Masaüstünde: sol yarıda kocaman marka/slogan (sabit, tam yükseklik),
      form + dil seçici sağ yarıda ortalanır. */
   @media (min-width:960px){
-    .auth-wrap{ flex-direction:row; align-items:stretch; }
+    .auth-wrap{ flex-direction:row; align-items:stretch; padding:0; }
     .auth-left{
       position:absolute; inset:0; width:52%; flex:none; padding:40px;
     }
@@ -292,12 +292,6 @@
       max-width:100%; width:100%; border-radius:16px 16px 0 0;
       max-height:88vh; overflow-y:auto; padding:22px 20px calc(22px + env(safe-area-inset-bottom));
     }
-
-    .auth-left{ padding:36px 20px 22px; }
-    .auth-left .brand svg{ width:52px; height:52px; }
-    .auth-left .brand h1{ font-size:23px; }
-    .auth-left .auth-headline{ font-size:14.5px; }
-    .auth-card{ padding:26px 20px 24px; }
 
     .row-actions{ flex-wrap:wrap; }
     .row-actions .btn-sm{ flex:1; min-width:120px; }
@@ -638,7 +632,7 @@ const TRANSLATIONS = {
     authPhoneLabel: "Phone number",
     authSendCode: "Send code",
     authPhoneHint: "Fast sign-up via SMS with just your mobile number — no e-mail or lengthy registration needed!",
-    joinTeamLink: "Become a MICISTORad, earn money whenever you want!",
+    joinTeamLink: "Become a MICISTORad, work whenever you want!",
     joinTeamModalTitle: "Staff Application",
     joinTeamModalHint: "Leave your details and our team will get in touch.",
     joinTeamNameLabel: "Full name",
