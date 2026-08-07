@@ -247,6 +247,16 @@ CREATE TABLE IF NOT EXISTS promo_code_redemptions (
   discount_amount REAL NOT NULL,
   redeemed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Coverage: hizmet verdiğimiz şehirler/bölgeler listesi. is_active=0 olan
+-- bir şehir "artık hizmet vermiyoruz" anlamına gelir (kayıt silinmez,
+-- geçmiş için durum korunur).
+CREATE TABLE IF NOT EXISTS service_areas (
+  id TEXT PRIMARY KEY,
+  city TEXT NOT NULL UNIQUE,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 module.exports = db;
