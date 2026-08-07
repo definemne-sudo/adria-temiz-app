@@ -5,6 +5,7 @@ const { requireAuth } = require('../middleware/auth');
 const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
+const { sendPushToUser } = require('../services/push');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -182,9 +183,10 @@ router.get('/', (req, res) => {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db
     .prepare(
-      `SELECT j.*, p.name AS property_name, p.city AS property_city
+      `SELECT j.*, p.name AS property_name, p.city AS property_city, s.name AS staff_name
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
+       LEFT JOIN users s ON s.id = j.assigned_staff_id
        WHERE j.property_id IN (${placeholders})
        ORDER BY j.checkout_at DESC`
     )
@@ -247,8 +249,34 @@ router.post('/:id/accept', (req, res) => {
   if (result.changes === 0) {
     return res.status(409).json({ error: 'Bu iş başka bir personel tarafından zaten alınmış.' });
   }
-  res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+
+  const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  res.json(updatedJob);
+
+  // Müşteriye "siparişin onaylandı, şu personel şu saatte gelecek" bildirimi
+  // - yanıtı bekletmeden arka planda gönderiliyor.
+  notifyCustomerOfAcceptance(updatedJob).catch((err) => console.error('Müşteri bildirimi hata:', err));
 });
+
+async function notifyCustomerOfAcceptance(job) {
+  const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(job.property_id);
+  if (!property) return;
+  const staff = db.prepare('SELECT name FROM users WHERE id = ?').get(job.assigned_staff_id);
+  const staffName = staff ? staff.name : 'Personelimiz';
+
+  let whenText = 'en kısa sürede';
+  if (job.urgency === 'scheduled' && job.checkout_at) {
+    const dt = new Date(job.checkout_at);
+    whenText = dt.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+  }
+
+  await sendPushToUser(property.owner_id, {
+    title: 'Siparişin onaylandı! 🎉',
+    body: `${staffName}, ${property.name} için ${whenText} gelecek.`,
+    jobId: job.id,
+    type: 'job_accepted',
+  });
+}
 
 // Personel bir iş teklifini reddeder. Acil olmayan siparişlerde bu, sırayı
 // bir sonraki en yakın adaya devreder. Acil (herkese aynı anda bildirilen)
