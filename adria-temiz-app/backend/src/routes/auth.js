@@ -174,8 +174,8 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
     const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
     const category = ['apartment', 'house', 'office', 'common_area'].includes(property.category) ? property.category : 'apartment';
     db.prepare(
-      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url, bedroom_count, bathroom_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       propertyId,
       req.user.id,
@@ -186,7 +186,9 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
       property.latitude ? Number(property.latitude) : null,
       property.longitude ? Number(property.longitude) : null,
       sizeSqm,
-      property.icalUrl || null
+      property.icalUrl || null,
+      property.bedroomCount ? Number(property.bedroomCount) : null,
+      property.bathroomCount ? Number(property.bathroomCount) : null
     );
     createdProperty = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
 
