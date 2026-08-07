@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -39,17 +39,30 @@
   .app{display:flex; min-height:100vh;}
 
   .auth-wrap{
-    display:flex; align-items:center; justify-content:center;
-    width:100%; min-height:100vh; padding:24px;
+    position:relative; display:flex; align-items:center; justify-content:center;
+    width:100%; min-height:100vh; padding:24px; overflow:hidden;
     background:
-      radial-gradient(circle at 15% 20%, rgba(124,156,130,.25), transparent 45%),
-      radial-gradient(circle at 85% 80%, rgba(201,138,62,.18), transparent 45%),
+      radial-gradient(circle at 20% 15%, rgba(29,158,115,.16), transparent 50%),
+      radial-gradient(circle at 88% 78%, rgba(201,138,62,.13), transparent 45%),
       var(--navy);
   }
+  .auth-bg-motif{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  .auth-lang-corner{ position:absolute; top:22px; right:24px; z-index:2; }
+  .auth-lang-corner .lang-switch{ margin-bottom:0; }
   .auth-card{
+    position:relative; z-index:1;
     width:100%; max-width:420px; background:var(--panel);
-    border-radius:16px; padding:36px 32px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+    border-radius:18px; padding:38px 34px 32px; box-shadow:0 24px 70px rgba(5,20,15,.45);
   }
+  .auth-brand-block{ text-align:center; margin-bottom:26px; }
+  .auth-brand-block .brand{ display:inline-flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .auth-brand-block .brand svg{ width:38px; height:38px; display:block; flex-shrink:0; }
+  .auth-brand-block .brand h1{ font-size:24px; color:var(--navy); letter-spacing:0.03em; }
+  .auth-brand-block .auth-headline{
+    font-family:'Fraunces',serif; font-weight:600; font-style:italic; font-size:19px;
+    color:var(--sage-dark); line-height:1.35; margin:0 auto;
+  }
+  .auth-accent-rule{ width:44px; height:3px; border-radius:3px; margin:16px auto 0; background:linear-gradient(90deg, var(--sage), var(--ochre)); }
   .brand{display:flex; align-items:center; gap:10px; margin-bottom:6px;}
   .brand svg{width:40px; height:40px; display:block; flex-shrink:0;}
   .brand h1{font-size:27px; color:var(--navy); letter-spacing:0.03em;}
@@ -102,6 +115,8 @@
   .lang-switch button.active{background:var(--navy); color:#fff; border-color:var(--navy);}
   .sidebar .lang-switch button{border-color:rgba(255,255,255,.25); color:#C9D6D2;}
   .sidebar .lang-switch button.active{background:var(--ochre); border-color:var(--ochre); color:#fff;}
+  .auth-lang-corner .lang-switch button{border-color:rgba(255,255,255,.3); color:rgba(255,255,255,.75);}
+  .auth-lang-corner .lang-switch button.active{background:var(--ochre); border-color:var(--ochre); color:#fff;}
 
   .sidebar{
     width:230px; background:var(--navy); color:#EAF0EE; padding:22px 18px; flex-shrink:0;
@@ -255,10 +270,11 @@
     }
 
     .auth-wrap{ padding:16px; }
-    .auth-card{ padding:26px 22px; }
-    .auth-card .brand svg{ width:32px; height:32px; }
-    .auth-card .brand h1{ font-size:22px; }
-    .auth-card .header-row{ gap:8px; }
+    .auth-card{ padding:30px 22px 26px; }
+    .auth-brand-block .brand svg{ width:32px; height:32px; }
+    .auth-brand-block .brand h1{ font-size:21px; }
+    .auth-brand-block .auth-headline{ font-size:16px; }
+    .auth-lang-corner{ top:16px; right:16px; }
 
     .row-actions{ flex-wrap:wrap; }
     .row-actions .btn-sm{ flex:1; min-width:120px; }
@@ -289,6 +305,37 @@ const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="htt
   <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
   <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
   <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>`;
+
+// Auth ekranı arka planındaki imza motif: Karadağ kıyı şeridini anımsatan
+// yalın bir bina silüeti (alt) + "temizlik/parıltı" temasını temsil eden
+// birkaç ışıltı (üst) - jenerik gradient yerine markaya ve konuya özgü,
+// çok düşük opasiteli bir doku.
+const AUTH_BG_MOTIF = `<svg class="auth-bg-motif" viewBox="0 0 800 600" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#ffffff" opacity="0.05">
+    <rect x="-10" y="470" width="90" height="130" rx="2"/>
+    <rect x="70" y="430" width="70" height="170" rx="2"/>
+    <polygon points="140,430 175,395 210,430 210,470 140,470"/>
+    <rect x="150" y="470" width="60" height="130" rx="2"/>
+    <rect x="210" y="450" width="55" height="150" rx="2"/>
+    <rect x="265" y="405" width="80" height="195" rx="2"/>
+    <polygon points="345,405 385,365 425,405 425,440 345,440"/>
+    <rect x="355" y="440" width="70" height="160" rx="2"/>
+    <rect x="425" y="460" width="60" height="140" rx="2"/>
+    <rect x="485" y="420" width="75" height="180" rx="2"/>
+    <polygon points="560,420 600,380 640,420 640,455 560,455"/>
+    <rect x="570" y="455" width="70" height="145" rx="2"/>
+    <rect x="640" y="440" width="65" height="160" rx="2"/>
+    <rect x="705" y="470" width="105" height="130" rx="2"/>
+  </g>
+  <g fill="#1D9E73" opacity="0.4">
+    <path d="M120 95 l5 15 15 5 -15 5 -5 15 -5 -15 -15 -5 15 -5z"/>
+    <path d="M660 60 l4 12 12 4 -12 4 -4 12 -4 -12 -12 -4 12 -4z"/>
+    <path d="M640 170 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z"/>
+  </g>
+  <g fill="#C98A3E" opacity="0.35">
+    <path d="M85 150 l3.5 10.5 10.5 3.5 -10.5 3.5 -3.5 10.5 -3.5 -10.5 -10.5 -3.5 10.5 -3.5z"/>
+  </g>
 </svg>`;
 
 const THUMB_UP_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" width="30" height="30"><path d="M2 21h4V9H2v12zM22 10c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L12.17 1 6.59 6.59C6.22 6.95 6 7.45 6 8v11c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z"/></svg>`;
@@ -1331,7 +1378,6 @@ function renderAuth(){
 
   if(state.authStep === 'phone'){
     inner = `
-      <div class="tagline">${t('tagline')}</div>
       <form id="phone-form">
         <div class="field">
           <label>${t('authPhoneLabel')}</label>
@@ -1430,10 +1476,13 @@ function renderAuth(){
 
   return `
   <div class="auth-wrap">
+    ${AUTH_BG_MOTIF}
+    <div class="auth-lang-corner">${langSwitch()}</div>
     <div class="auth-card">
-      <div class="header-row">
+      <div class="auth-brand-block">
         <div class="brand">${BRAND_MARK}<h1>MICISTO</h1></div>
-        ${langSwitch()}
+        <p class="auth-headline">${t('tagline')}</p>
+        <div class="auth-accent-rule"></div>
       </div>
       ${inner}
     </div>
