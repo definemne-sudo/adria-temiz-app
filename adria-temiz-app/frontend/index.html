@@ -505,6 +505,7 @@ const TRANSLATIONS = {
     propertyNamePlaceholder: "örn. Budva Sahil Daire",
     propertyCityLabel: "Şehir",
     propertyCityPlaceholder: "örn. Budva, Kotor, Tivat...",
+    selectCityPlaceholder: "Şehir seç",
     propertyAddressLabel: "Açık adres",
     propertyAddressPlaceholder: "örn. Njegoseva 12",
     propertyLocationLabel: "Konum — haritada işaretle",
@@ -734,6 +735,7 @@ const TRANSLATIONS = {
     propertyNamePlaceholder: "e.g. Budva Seaside Apartment",
     propertyCityLabel: "City",
     propertyCityPlaceholder: "e.g. Budva, Kotor, Tivat...",
+    selectCityPlaceholder: "Select a city",
     propertyAddressLabel: "Street address",
     propertyAddressPlaceholder: "e.g. Njegoseva 12",
     propertyLocationLabel: "Location — pin it on the map",
@@ -963,6 +965,7 @@ const TRANSLATIONS = {
     propertyNamePlaceholder: "npr. Apartman Budva more",
     propertyCityLabel: "Grad",
     propertyCityPlaceholder: "npr. Budva, Kotor, Tivat...",
+    selectCityPlaceholder: "Izaberi grad",
     propertyAddressLabel: "Adresa",
     propertyAddressPlaceholder: "npr. Njegoševa 12",
     propertyLocationLabel: "Lokacija — označi na mapi",
@@ -1197,6 +1200,38 @@ function commonAreaSubLabel(key){
   return s ? (s[state.lang]?.name || s.tr.name) : key;
 }
 const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+// Karadağ'ın başlıca belediye/şehirleri - kayıt akışında şehir artık elle
+// yazılmıyor, bu listeden seçiliyor. Koordinatlar, harita üzerinde o şehri
+// otomatik ortalamak için kullanılıyor (şehir merkezine yakın bir nokta).
+const MONTENEGRO_CITIES = [
+  { name: 'Podgorica', lat: 42.4304, lng: 19.2594 },
+  { name: 'Nikšić', lat: 42.7731, lng: 18.9447 },
+  { name: 'Herceg Novi', lat: 42.4531, lng: 18.5375 },
+  { name: 'Budva', lat: 42.2864, lng: 18.8400 },
+  { name: 'Bar', lat: 42.0930, lng: 19.0904 },
+  { name: 'Cetinje', lat: 42.3906, lng: 18.9243 },
+  { name: 'Bijelo Polje', lat: 43.0367, lng: 19.7475 },
+  { name: 'Kotor', lat: 42.4247, lng: 18.7712 },
+  { name: 'Tivat', lat: 42.4364, lng: 18.6961 },
+  { name: 'Ulcinj', lat: 41.9297, lng: 19.2044 },
+  { name: 'Rožaje', lat: 42.8408, lng: 20.1667 },
+  { name: 'Pljevlja', lat: 43.3567, lng: 19.3583 },
+  { name: 'Danilovgrad', lat: 42.5539, lng: 19.1064 },
+  { name: 'Berane', lat: 42.8461, lng: 19.8681 },
+  { name: 'Kolašin', lat: 42.8236, lng: 19.5203 },
+  { name: 'Mojkovac', lat: 42.9611, lng: 19.5836 },
+  { name: 'Plav', lat: 42.5972, lng: 19.9433 },
+  { name: 'Žabljak', lat: 43.1544, lng: 19.1225 },
+  { name: 'Petnjica', lat: 42.9006, lng: 19.9078 },
+  { name: 'Gusinje', lat: 42.5578, lng: 19.8339 },
+  { name: 'Plužine', lat: 43.1533, lng: 18.8467 },
+  { name: 'Šavnik', lat: 42.9578, lng: 19.0967 },
+  { name: 'Andrijevica', lat: 42.7358, lng: 19.7897 },
+];
+function montenegroCityCoords(name){
+  return MONTENEGRO_CITIES.find(c => c.name === name);
+}
 
 const BEDROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v2M21 18v2M3 12V8a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v2M13 12V9a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v3"/></svg>';
 const BATHROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 3.2-1.6M9 8.5V6"/><path d="M6 19v2M16 19v2"/></svg>';
@@ -1525,7 +1560,13 @@ function renderAuth(){
         <div class="tagline">${t('authAddressTagline')}</div>
         <form id="profile-address-form">
           <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" required placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
-          <div class="field"><label>${t('propertyCityLabel')}</label><input id="reg-property-city" name="propertyCity" required placeholder="${t('propertyCityPlaceholder')}" value="${state.regPropertyCity}" /></div>
+          <div class="field">
+            <label>${t('propertyCityLabel')}</label>
+            <select id="reg-property-city" name="propertyCity" required>
+              <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
+              ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
+            </select>
+          </div>
           <div class="field">
             <label>${t('propertyLocationLabel')}</label>
             <div id="reg-map" class="mini-map"></div>
@@ -2578,6 +2619,21 @@ async function loadAll(){
   render();
 }
 
+// Kayıt sırasında haritayı varsayılan olarak müşterinin telefon konumuna
+// ortalamak için kullanılıyor. İzin verilmezse/başarısız olursa sessizce
+// null döner - harita o zaman Karadağ geneline (varsayılan görünüme) açılır,
+// müşteri şehir seçince ya da elle tıklayınca konumlanır.
+function attemptPhoneGeolocation(){
+  return new Promise((resolve) => {
+    if(!navigator.geolocation){ resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { timeout: 6000, maximumAge: 60000 }
+    );
+  });
+}
+
 function urlBase64ToUint8Array(base64String){
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -2677,7 +2733,15 @@ function attachHandlers(){
   const regPropName = document.getElementById('reg-property-name');
   if(regPropName) regPropName.oninput = () => { state.regPropertyName = regPropName.value; };
   const regPropCity = document.getElementById('reg-property-city');
-  if(regPropCity) regPropCity.oninput = () => { state.regPropertyCity = regPropCity.value; };
+  if(regPropCity) regPropCity.onchange = () => {
+    state.regPropertyCity = regPropCity.value;
+    // Şehir seçilince/değişince, personel telefon konumundan gelen ya da
+    // önceki pin'i, seçilen şehrin merkezine göre güncelliyoruz - müşteri
+    // dilerse haritadan elle ince ayar yapabilir.
+    const cityCoords = montenegroCityCoords(regPropCity.value);
+    if(cityCoords){ state.regLat = cityCoords.lat; state.regLng = cityCoords.lng; }
+    render();
+  };
   const regPropAddress = document.getElementById('reg-property-address');
   if(regPropAddress) regPropAddress.oninput = () => { state.regPropertyAddress = regPropAddress.value; };
   const regPropIcal = document.getElementById('reg-property-ical');
@@ -2785,6 +2849,17 @@ function attachHandlers(){
       state.authError = '';
       state.regStep = 'address';
       render();
+      // Harita varsayılan olarak müşterinin telefon konumuna açılsın -
+      // izin verilmezse (ya da desteklenmiyorsa) sessizce geçiyoruz, harita
+      // genel görünümde açılır, müşteri şehir seçince ya da elle tıklayınca
+      // konumlanır.
+      if(!state.regLat){
+        const loc = await attemptPhoneGeolocation();
+        if(loc && state.regStep === 'address' && !state.regLat){
+          state.regLat = loc.lat; state.regLng = loc.lng;
+          render();
+        }
+      }
       return;
     }
     // Şirket: mülk adımı hiç yok, tek ekranda tamamlanıp doğrudan gönderiliyor.
