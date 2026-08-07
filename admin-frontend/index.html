@@ -1925,12 +1925,16 @@ function attachHandlers(){
       localStorage.setItem('adminToken', data.token);
       localStorage.setItem('adminUser', JSON.stringify(data.user));
       state.authError = '';
-      await loadDashboard();
-      await loadRevenue();
-      await loadLiveLocations();
-      startLiveMapPolling();
-      await loadApplications();
-    }catch(err){ state.authError = err.message; render(); }
+    }catch(err){ state.authError = err.message; render(); return; }
+    // Giriş başarılı - panel artık gösterilmeli. Bundan sonraki veri
+    // yüklemelerinden biri başarısız olsa bile (örn. backend'in en son hali
+    // henüz deploy edilmediyse) kullanıcı panelde kalmalı, girişe geri
+    // atılmamalı.
+    render();
+    try{ await loadDashboard(); }catch(err){ console.error('loadDashboard hata:', err); }
+    try{ await loadRevenue(); }catch(err){ console.error('loadRevenue hata:', err); }
+    try{ await loadLiveLocations(); startLiveMapPolling(); }catch(err){ console.error('loadLiveLocations hata:', err); }
+    try{ await loadApplications(); }catch(err){ console.error('loadApplications hata:', err); }
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
@@ -2322,14 +2326,19 @@ function attachHandlers(){
   if(state.token){
     try{
       await loadDashboard();
-      await loadRevenue();
-      await loadLiveLocations();
-      startLiveMapPolling();
-      await loadApplications();
     }catch(err){
+      // loadDashboard başarısız oluyorsa token muhtemelen geçersiz/süresi dolmuş -
+      // gerçekten çıkış yapılmalı.
       localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
       state.token = null; state.user = null; render();
+      return;
     }
+    // Bunlardan biri başarısız olsa bile (örn. backend'in en son hali henüz
+    // deploy edilmediyse) oturum KAPANMAMALI - sadece o bölüm boş/yüklenemedi
+    // görünür. Her biri kendi try/catch'inde, birbirini etkilemesin.
+    try{ await loadRevenue(); }catch(err){ console.error('loadRevenue hata:', err); }
+    try{ await loadLiveLocations(); startLiveMapPolling(); }catch(err){ console.error('loadLiveLocations hata:', err); }
+    try{ await loadApplications(); }catch(err){ console.error('loadApplications hata:', err); }
   }
 })();
 </script>
