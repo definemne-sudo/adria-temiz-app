@@ -215,6 +215,11 @@ const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg
   <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
 
+// Dağıtım motoru şehir eşleşmesiyle çalışıyor - personelin hangi şehirde
+// çalıştığını seçmesi gerekiyor (otomatik ters coğrafi kodlama için ücretli
+// bir harita API'si gerekir, şimdilik personel kendi seçiyor).
+const MONTENEGRO_CITIES = ['Podgorica','Budva','Kotor','Tivat','Bar','Herceg Novi','Nikšić','Cetinje','Ulcinj','Igalo'];
+
 const COUNTRY_CODES = [
   { flag:'🇲🇪', name:'Crna Gora', code:'+382' },
   { flag:'🇷🇸', name:'Srbija', code:'+381' },
@@ -309,6 +314,24 @@ const TRANSLATIONS = {
     payHeld: "Ödendi (emanette)",
     payReleased: "Ödendi ve serbest bırakıldı",
     closeBtn: "Kapat",
+    offerTitle: "Yeni İş Teklifi",
+    checkOffersBtn: "🔄 Teklifleri Kontrol Et",
+    toastNoOffers: "Şu an bekleyen teklifin yok.",
+    offerHint: "Bu iş sana özel olarak sunuldu.",
+    offerUrgentHint: "Acil sipariş — ilk kabul eden alır.",
+    offerEarningLabel: "Senin kazancın",
+    acceptBtn: "Kabul Et",
+    rejectBtn: "Reddet",
+    offerGoneTitle: "Bu iş artık uygun değil",
+    offerGoneHint: "Başka bir personel tarafından alınmış ya da süresi dolmuş olabilir.",
+    cityPickerTitle: "Hangi şehirde çalışıyorsun?",
+    cityPickerHint: "Sana yakın işleri gösterebilmemiz için şehrini seç.",
+    cityLabel: "Şehir",
+    confirmCityBtn: "Onayla ve Çevrimiçi Ol",
+    toastOfferAccepted: "İşi kabul ettin!",
+    toastOfferRejected: "İş reddedildi.",
+    toastAcceptFailed: "Bu iş başka bir personel tarafından zaten alındı.",
+    toastLocationNeeded: "Çevrimiçi olmak için konum izni vermen gerekiyor.",
   },
   en: {
     tagline: "Pick a job, start earning.",
@@ -391,6 +414,24 @@ const TRANSLATIONS = {
     payHeld: "Paid (held in escrow)",
     payReleased: "Paid and released",
     closeBtn: "Close",
+    offerTitle: "New Job Offer",
+    checkOffersBtn: "🔄 Check for Offers",
+    toastNoOffers: "No pending offers right now.",
+    offerHint: "This job was offered specifically to you.",
+    offerUrgentHint: "Urgent order — first to accept gets it.",
+    offerEarningLabel: "Your earning",
+    acceptBtn: "Accept",
+    rejectBtn: "Reject",
+    offerGoneTitle: "This job is no longer available",
+    offerGoneHint: "It may have been taken by another staff member or expired.",
+    cityPickerTitle: "Which city do you work in?",
+    cityPickerHint: "Pick your city so we can show you nearby jobs.",
+    cityLabel: "City",
+    confirmCityBtn: "Confirm and Go Online",
+    toastOfferAccepted: "Job accepted!",
+    toastOfferRejected: "Job rejected.",
+    toastAcceptFailed: "This job was already taken by another staff member.",
+    toastLocationNeeded: "You need to allow location access to go online.",
   },
   me: {
     tagline: "Izaberi posao, počni da zarađuješ.",
@@ -473,6 +514,24 @@ const TRANSLATIONS = {
     payHeld: "Plaćeno (na čuvanju)",
     payReleased: "Plaćeno i oslobođeno",
     closeBtn: "Zatvori",
+    offerTitle: "Nova ponuda posla",
+    checkOffersBtn: "🔄 Provjeri ponude",
+    toastNoOffers: "Trenutno nemaš ponuda na čekanju.",
+    offerHint: "Ovaj posao je ponuđen posebno tebi.",
+    offerUrgentHint: "Hitna narudžba — ko prvi prihvati, njegovo je.",
+    offerEarningLabel: "Tvoja zarada",
+    acceptBtn: "Prihvati",
+    rejectBtn: "Odbij",
+    offerGoneTitle: "Ovaj posao više nije dostupan",
+    offerGoneHint: "Možda ga je preuzeo drugi član osoblja ili je istekao.",
+    cityPickerTitle: "U kom gradu radiš?",
+    cityPickerHint: "Izaberi svoj grad da bismo ti mogli prikazati poslove u blizini.",
+    cityLabel: "Grad",
+    confirmCityBtn: "Potvrdi i uključi se na mrežu",
+    toastOfferAccepted: "Posao prihvaćen!",
+    toastOfferRejected: "Posao odbijen.",
+    toastAcceptFailed: "Ovaj posao je već preuzeo drugi član osoblja.",
+    toastLocationNeeded: "Moraš dozvoliti pristup lokaciji da bi se uključio/la na mrežu.",
   },
 };
 
@@ -543,6 +602,10 @@ let state = {
   earningsToday: { jobCount: 0, grossTotal: 0, netTotal: 0, commissionRate: 0.2 },
   serviceCatalog: { services: [], commonAreaSubOptions: [] },
   myLocation: null,
+  offerJob: null,
+  offerError: '',
+  showCityPicker: false,
+  pendingOnlineToggle: false,
   detailJob: null,
   calendarWeekStart: formatDateKey(getMonday(new Date())),
   selectedCalendarDate: formatDateKey(new Date()),
@@ -756,6 +819,8 @@ function renderPanel(){
     ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='ratings' ? renderRatings() : renderMine()}
   </div>
   ${state.detailJob ? renderJobDetailModal() : ''}
+  ${state.offerJob ? renderOfferModal() : ''}
+  ${state.showCityPicker ? renderCityPickerModal() : ''}
   `;
 }
 
@@ -1057,9 +1122,77 @@ function requestMyLocation(){
   });
 }
 
+/* ================== PUSH BİLDİRİMLERİ ================== */
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+// Bildirim izni ister ve push aboneliğini backend'e kaydeder. İzin
+// verilmezse (ya da tarayıcı desteklemiyorsa) sessizce geçer - personel
+// yine de uygulamayı açtığında Home'dan işlerini görebilir, sadece anlık
+// bildirim alamaz.
+async function ensurePushSubscription(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') return false;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      const { publicKey } = await fetch(API + '/push/vapid-public-key').then(r => r.json());
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await api('/push/subscribe', { method:'POST', body: JSON.stringify(sub.toJSON()) });
+    return true;
+  }catch(e){ return false; }
+}
+
+// Çevrimiçi olma akışı: konumu al, push aboneliğini kaydet, sunucuya
+// isOnline+konum+şehir bilgisini gönder. Konum alınamazsa çevrimiçi
+// olmuyoruz (personelin nereye yakın olduğunu bilemeyiz).
+async function goOnlineWithLocation(){
+  const loc = await requestMyLocation();
+  if(!loc){
+    showToast(t('toastLocationNeeded'));
+    render();
+    return;
+  }
+  state.myLocation = loc;
+  await ensurePushSubscription();
+  try{
+    await api('/auth/staff-status', { method:'PATCH', body: JSON.stringify({
+      isOnline: true, lat: loc.lat, lng: loc.lng, city: state.user.city,
+    })});
+    state.user.isOnline = true;
+    storeSession(state.token, state.user, state.keepSignedIn);
+    await loadAll();
+  }catch(err){ showToast(err.message); render(); }
+}
+
+// Bir iş teklifini (bildirime tıklanınca ya da uygulama açıkken gelen push'ta)
+// yükler ve teklif ekranını gösterir.
+async function loadOffer(jobId){
+  try{
+    const job = await api(`/jobs/${jobId}/offer-detail`);
+    state.offerJob = job;
+    state.offerError = '';
+    render();
+  }catch(err){ /* is artik yok/erisilemiyor - sessizce yoksay */ }
+}
+
 function renderHome(){
   return `
-  <h2 style="font-size:21px; margin-bottom:18px;">${t('greeting', { name: state.user.name })}</h2>
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px;">
+    <h2 style="font-size:21px;">${t('greeting', { name: state.user.name })}</h2>
+    <button type="button" class="btn ghost btn-sm" id="check-offers-btn" style="width:auto; padding:8px 12px; white-space:nowrap; flex-shrink:0;">${t('checkOffersBtn')}</button>
+  </div>
   <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${t('todaysJobsTitle')}</div>
   ${state.homeJobs.length === 0 ? `<div class="empty-state" style="margin-bottom:22px;">${t('emptyToday')}</div>` : state.homeJobs.map(j => renderHomeJobCard(j)).join('')}
   ${renderEarningsCard()}
@@ -1126,6 +1259,65 @@ function renderJobDetailModal(){
       <div class="detail-row" style="border-bottom:none;"><span>${t('detailPaymentStatus')}</span><strong>${payLabel}</strong></div>
       <a class="btn ghost btn-sm" style="width:100%; text-align:center; text-decoration:none; margin-top:6px;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
       <button class="btn ochre" id="close-detail" style="margin-top:10px;">${t('closeBtn')}</button>
+    </div>
+  </div>`;
+}
+
+function renderOfferModal(){
+  const j = state.offerJob;
+  const icon = serviceIconSrc(j.service_key);
+  let travelHtml = t('detailTravelTimeUnknown');
+  if(state.myLocation && j.property_latitude && j.property_longitude){
+    const mins = estimateTravelMinutes(state.myLocation.lat, state.myLocation.lng, j.property_latitude, j.property_longitude);
+    travelHtml = `${t('minutesShort', { count: mins })} <span style="color:var(--muted); font-size:11px;">${t('travelEstimateNote')}</span>`;
+  }
+  const payLabel = j.payment_method === 'card' ? t('cardBadge') : j.payment_method === 'invoice' ? t('invoiceBadge') : t('cashBadge');
+
+  if(!j.canRespond){
+    return `
+    <div class="modal-backdrop" id="offer-backdrop">
+      <div class="modal" style="text-align:center;">
+        <h3 style="margin-bottom:10px;">${t('offerGoneTitle')}</h3>
+        <div class="hint" style="margin:0 0 16px;">${t('offerGoneHint')}</div>
+        <button class="btn ochre" id="close-offer">${t('closeBtn')}</button>
+      </div>
+    </div>`;
+  }
+
+  return `
+  <div class="modal-backdrop" id="offer-backdrop">
+    <div class="modal">
+      <h3 style="margin-bottom:4px;">${t('offerTitle')}</h3>
+      <div class="hint" style="margin:0 0 16px;">${j.urgency==='urgent' ? t('offerUrgentHint') : t('offerHint')}</div>
+      <div class="job-icon" style="width:56px; height:56px; margin-bottom:14px;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:26px;">🧹</span>`}</div>
+      <div class="detail-row"><span>${t('detailServiceType')}</span><strong>${jobServiceLabel(j)}</strong></div>
+      <div class="detail-row"><span>${t('detailLocation')}</span><strong>${j.property_address || ''}${j.property_city ? ', ' + j.property_city : ''}</strong></div>
+      <div class="detail-row"><span>${t('detailTravelTime')}</span><strong>${travelHtml}</strong></div>
+      <div class="detail-row"><span>${t('detailAvgDuration')}</span><strong>${t('minutesShort', { count: j.estimatedMinutes || 0 })}</strong></div>
+      <div class="detail-row"><span>${t('detailPaymentStatus')}</span><strong>${payLabel}</strong></div>
+      <div class="detail-row" style="border-bottom:none;"><span>${t('offerEarningLabel')}</span><strong style="color:var(--ochre); font-family:'Fraunces',serif; font-size:17px;">${j.netEarning} €</strong></div>
+      ${state.offerError ? `<div class="error-msg" style="margin-top:10px;">${state.offerError}</div>` : ''}
+      <div class="job-actions" style="margin-top:16px;">
+        <button class="btn ghost" id="reject-offer">${t('rejectBtn')}</button>
+        <button class="btn ochre" id="accept-offer">${t('acceptBtn')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderCityPickerModal(){
+  return `
+  <div class="modal-backdrop" id="city-backdrop">
+    <div class="modal">
+      <h3 style="margin-bottom:6px;">${t('cityPickerTitle')}</h3>
+      <div class="hint" style="margin:0 0 16px;">${t('cityPickerHint')}</div>
+      <div class="field">
+        <label>${t('cityLabel')}</label>
+        <select id="city-select">
+          ${MONTENEGRO_CITIES.map(c => `<option value="${c}" ${c===(state.user.city||'')?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn ochre" id="confirm-city">${t('confirmCityBtn')}</button>
     </div>
   </div>`;
 }
@@ -1271,14 +1463,74 @@ function attachHandlers(){
 
   const onlineToggle = document.getElementById('online-toggle');
   if(onlineToggle) onlineToggle.onchange = async () => {
-    const isOnline = onlineToggle.checked;
-    try{
-      await api('/auth/staff-status', { method:'PATCH', body: JSON.stringify({ isOnline }) });
-      state.user.isOnline = isOnline;
-      storeSession(state.token, state.user, state.keepSignedIn);
-      await loadAll();
-    }catch(err){ showToast(err.message); render(); }
+    const wantsOnline = onlineToggle.checked;
+    if(!wantsOnline){
+      try{
+        await api('/auth/staff-status', { method:'PATCH', body: JSON.stringify({ isOnline:false }) });
+        state.user.isOnline = false;
+        storeSession(state.token, state.user, state.keepSignedIn);
+        await loadAll();
+      }catch(err){ showToast(err.message); render(); }
+      return;
+    }
+    // Çevrimiçi olmak icin: sehir bilinmiyorsa once sec, sonra konum al,
+    // push aboneligini kaydet, en son sunucuya bildir.
+    if(!state.user.city){
+      onlineToggle.checked = false; // secim onaylanana kadar anahtari geri al
+      state.showCityPicker = true;
+      render();
+      return;
+    }
+    await goOnlineWithLocation();
   };
+
+  const confirmCity = document.getElementById('confirm-city');
+  if(confirmCity) confirmCity.onclick = async () => {
+    const city = document.getElementById('city-select').value;
+    state.user.city = city;
+    storeSession(state.token, state.user, state.keepSignedIn);
+    state.showCityPicker = false;
+    await goOnlineWithLocation();
+  };
+  const cityBackdrop = document.getElementById('city-backdrop');
+  if(cityBackdrop) cityBackdrop.onclick = (e) => { if(e.target===cityBackdrop){ state.showCityPicker=false; render(); } };
+
+  const checkOffersBtn = document.getElementById('check-offers-btn');
+  if(checkOffersBtn) checkOffersBtn.onclick = async () => {
+    checkOffersBtn.disabled = true;
+    try{
+      const data = await api('/jobs/my-pending-offer');
+      if(data.jobId) await loadOffer(data.jobId);
+      else showToast(t('toastNoOffers'));
+    }catch(err){ showToast(err.message); }
+    checkOffersBtn.disabled = false;
+  };
+
+  const acceptOffer = document.getElementById('accept-offer');
+  if(acceptOffer) acceptOffer.onclick = async () => {
+    try{
+      await api(`/jobs/${state.offerJob.id}/accept`, { method:'POST' });
+      showToast(t('toastOfferAccepted'));
+      state.offerJob = null; state.offerError = '';
+      await loadAll();
+    }catch(err){ state.offerError = err.message; render(); }
+  };
+
+  const rejectOffer = document.getElementById('reject-offer');
+  if(rejectOffer) rejectOffer.onclick = async () => {
+    try{
+      await api(`/jobs/${state.offerJob.id}/reject`, { method:'POST' });
+      showToast(t('toastOfferRejected'));
+    }catch(err){ /* onemli degil, yine de kapat */ }
+    state.offerJob = null; state.offerError = '';
+    render();
+  };
+
+  const closeOffer = document.getElementById('close-offer');
+  if(closeOffer) closeOffer.onclick = () => { state.offerJob = null; state.offerError = ''; render(); };
+
+  const offerBackdrop = document.getElementById('offer-backdrop');
+  if(offerBackdrop) offerBackdrop.onclick = (e) => { if(e.target===offerBackdrop){ state.offerJob = null; render(); } };
 
   document.querySelectorAll('[data-cal-date]').forEach(el => el.onclick = () => {
     state.selectedCalendarDate = el.dataset.calDate; render();
@@ -1325,13 +1577,30 @@ function attachHandlers(){
 }
 
 /* ================== INIT ================== */
+// Bildirime tıklandığında (uygulama zaten açıksa) service worker'dan gelen
+// mesajı dinleyip ilgili iş teklifini açar.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if(event.data && event.data.type === 'OPEN_OFFER' && event.data.jobId && state.token){
+      loadOffer(event.data.jobId);
+    }
+  });
+}
+
 (async function init(){
   if(state.token && !state.user){
     clearSession(); state.token = null;
   }
   render();
   if(state.token){
-    try{ await loadAll(); } catch(err){
+    try{
+      await loadAll();
+      // Bildirime tıklanıp uygulama kapalıyken açıldıysa (?offerJobId=...)
+      // ilgili teklifi göster.
+      const params = new URLSearchParams(location.search);
+      const offerJobId = params.get('offerJobId');
+      if(offerJobId) await loadOffer(offerJobId);
+    } catch(err){
       clearSession();
       state.token = null; state.user = null; render();
     }
