@@ -1527,7 +1527,7 @@ function renderAuth(){
           <div class="choice ${state.accountTypeChoice==='company'?'selected':''}" data-choice="company">${t('accountCompany')}</div>
         </div>
         <form id="profile-details-form">
-          <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus value="${state.regName}" /></div>
+          <div class="field"><label>${t('profileNameLabel')}</label><input id="reg-name-input" name="name" required autofocus value="${state.regName}" /></div>
           ${state.accountTypeChoice==='individual' ? `
             <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
             <div class="option-row">
@@ -1535,7 +1535,7 @@ function renderAuth(){
               <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
               <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
             </div>
-            <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
+            <div class="field"><label>${t('propertySizeLabel')}</label><input id="reg-size-input" name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
             ${renderRoomStepper('bedroom', t('bedroomCountLabel'), state.regBedroomCount)}
             ${renderRoomStepper('bathroom', t('bathroomCountLabel'), state.regBathroomCount)}
           ` : `
@@ -2836,6 +2836,15 @@ function attachHandlers(){
 
   const changePhone = document.getElementById('change-phone');
   if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
+
+  // 1. ekranda konut tipi/yatak/banyo seçimleri her tıklamada ekranı
+  // yeniden çiziyor (render) - isim ve m² alanları state'e canlı
+  // yazılmazsa, henüz forma submit edilmeden bu render'lar onları
+  // sıfırlardı. Bu yüzden her tuş vuruşunda state'e kaydediyoruz.
+  const regNameInput = document.getElementById('reg-name-input');
+  if(regNameInput) regNameInput.oninput = () => { state.regName = regNameInput.value; };
+  const regSizeInput = document.getElementById('reg-size-input');
+  if(regSizeInput) regSizeInput.oninput = () => { state.regSizeSqm = regSizeInput.value; };
 
   const profileDetailsForm = document.getElementById('profile-details-form');
   if(profileDetailsForm) profileDetailsForm.onsubmit = async (e) => {
