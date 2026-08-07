@@ -516,6 +516,41 @@ router.get('/ratings', (req, res) => {
 // ikinci bir "öde" adımı çıkarmıyoruz: kart zaten sipariş anında emanete
 // alınmıştı (held), burada personelin/sistemin tamamlama onayıyla serbest
 // bırakılır; nakitte de personel tahsilatı bu onayla eş zamanlı sayılır.
+// Müşteri kendi siparişini iptal eder. Personel henüz işe BAŞLAMADIYSA
+// (pending/assigned) iptal edilebilir - 'in_progress' olduktan sonra
+// personel zaten mülkte/işe başlamış demektir, bu noktada müşteri kendi
+// kendine iptal edemez (destek/admin üzerinden çözülmeli).
+router.post('/:id/cancel', (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (!accessiblePropertyIds(req.user.id).includes(job.property_id)) {
+    return res.status(403).json({ error: 'Bu siparişe erişim yetkiniz yok.' });
+  }
+  if (!['pending', 'assigned'].includes(job.status)) {
+    return res.status(409).json({ error: 'Personel işe başladıktan sonra sipariş iptal edilemez - lütfen destek ile iletişime geç.' });
+  }
+
+  const newPaymentStatus = job.payment_status === 'held' ? 'refunded' : job.payment_status;
+  db.prepare(
+    `UPDATE cleaning_jobs SET status = 'cancelled', cancelled_at = datetime('now'), cancel_reason = ?, payment_status = ? WHERE id = ?`
+  ).run(req.body.reason || null, newPaymentStatus, id);
+
+  const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  res.json(updatedJob);
+
+  // İş zaten bir personele atanmışsa (assigned), o personele "bu iş iptal
+  // edildi, gitmene gerek yok" bildirimi gönderiyoruz.
+  if (job.assigned_staff_id) {
+    sendPushToUser(job.assigned_staff_id, {
+      title: 'Sipariş iptal edildi',
+      body: 'Müşteri bu siparişi iptal etti - bu işe gitmene gerek yok.',
+      jobId: id,
+      type: 'job_cancelled',
+    }).catch((err) => console.error('Personel iptal bildirimi hata:', err));
+  }
+});
+
 router.patch('/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
