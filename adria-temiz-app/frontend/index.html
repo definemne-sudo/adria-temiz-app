@@ -511,6 +511,14 @@ const TRANSLATIONS = {
     ordersEmptyState: "Henüz sipariş yok. \"Hizmetler\" sekmesinden bir sipariş oluştur.",
     colProperty: "Mülk", colService: "Hizmet", colWhen: "Zaman", colStatus: "Durum", colStaff: "Personel", colPrice: "Fiyat",
     staffNotAssignedYet: "Henüz atanmadı",
+    cancelOrderBtn: "İptal Et",
+    cancelOrderModalTitle: "Siparişi iptal et",
+    cancelOrderModalHint: "Bu işlem geri alınamaz. Emin misin?",
+    cancelReasonLabel: "İptal nedeni (opsiyonel)",
+    cancelReasonPlaceholder: "Neden iptal ediyorsun?",
+    keepOrderBtn: "Vazgeç",
+    toastOrderCancelled: "Sipariş iptal edildi.",
+    activeOrderBadge: "Şu An Temizleniyor",
     paidBadge: "✓ Ödendi",
     settlingBadge: "Ödeme sonuçlanıyor…",
     cardPaidNote: "💳 Kart · ödeme alındı, tamamlanınca serbest kalır",
@@ -729,6 +737,14 @@ const TRANSLATIONS = {
     ordersEmptyState: "No orders yet. Create one from the \"Services\" tab.",
     colProperty: "Property", colService: "Service", colWhen: "When", colStatus: "Status", colStaff: "Staff", colPrice: "Price",
     staffNotAssignedYet: "Not assigned yet",
+    cancelOrderBtn: "Cancel",
+    cancelOrderModalTitle: "Cancel order",
+    cancelOrderModalHint: "This can't be undone. Are you sure?",
+    cancelReasonLabel: "Reason (optional)",
+    cancelReasonPlaceholder: "Why are you cancelling?",
+    keepOrderBtn: "Never mind",
+    toastOrderCancelled: "Order cancelled.",
+    activeOrderBadge: "Cleaning in Progress",
     paidBadge: "✓ Paid",
     settlingBadge: "Settling payment…",
     cardPaidNote: "💳 Card · charged, released once completed",
@@ -947,6 +963,14 @@ const TRANSLATIONS = {
     ordersEmptyState: "Još nema narudžbi. Napravi jednu iz kartice \"Usluge\".",
     colProperty: "Nekretnina", colService: "Usluga", colWhen: "Termin", colStatus: "Status", colStaff: "Osoblje", colPrice: "Cijena",
     staffNotAssignedYet: "Još nije dodijeljeno",
+    cancelOrderBtn: "Otkaži",
+    cancelOrderModalTitle: "Otkaži narudžbu",
+    cancelOrderModalHint: "Ovo se ne može poništiti. Jesi li siguran?",
+    cancelReasonLabel: "Razlog (opciono)",
+    cancelReasonPlaceholder: "Zašto otkazuješ?",
+    keepOrderBtn: "Odustani",
+    toastOrderCancelled: "Narudžba otkazana.",
+    activeOrderBadge: "Čišćenje u toku",
     paidBadge: "✓ Plaćeno",
     settlingBadge: "Plaćanje se obrađuje…",
     cardPaidNote: "💳 Kartica · naplaćeno, oslobađa se po završetku",
@@ -1167,6 +1191,7 @@ let state = {
   syncUseDemo: false,
   syncPaymentMethod: 'cash',
   pendingSyncPropertyId: null,
+  cancelJobTargetId: null,
   bulkRows: [],
   bulkBuildingName: '',
   bulkPickingRow: null,
@@ -1572,6 +1597,34 @@ function visibleServices(){
   return state.services.filter(s => !s.accountTypes || s.accountTypes.includes(accountType));
 }
 
+// Personel bir işe "Başla" dediğinde (status='in_progress'), müşterinin
+// hizmetleri görmeden önce bunu fark etmesi için üstte bir kart gösteriyoruz.
+// Aktif iş yoksa kart hiç render edilmiyor.
+function renderActiveOrderCard(){
+  const activeJob = (state.jobs || []).find(j => j.status === 'in_progress');
+  if(!activeJob) return '';
+
+  const initial = activeJob.staff_name ? activeJob.staff_name.charAt(0).toUpperCase() : '?';
+  return `
+  <div style="border:1.5px solid var(--sage); border-radius:12px; padding:16px 18px; margin-bottom:20px; background:var(--bg); cursor:pointer;" data-goto-active-job="${activeJob.id}">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+      <span style="width:9px; height:9px; border-radius:50%; background:var(--sage); flex-shrink:0;"></span>
+      <span style="font-size:11px; font-weight:700; color:var(--sage-dark); text-transform:uppercase; letter-spacing:.03em;">${t('activeOrderBadge')}</span>
+    </div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-weight:700; color:var(--navy); font-size:15px;">${activeJob.building_name || activeJob.property_name}</div>
+        <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">${activeJob.service_key==='common_area' ? serviceName('common_area') : serviceName(activeJob.service_key)}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+        <span style="width:26px; height:26px; border-radius:50%; background:var(--sage); color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center;">${initial}</span>
+        <span style="font-size:13px; color:var(--navy);">${activeJob.staff_name || ''}</span>
+      </div>
+    </div>
+  </div>
+  `;
+}
+
 function renderServices(){
   const props = [...state.properties.owned, ...state.properties.delegated];
   const selectedProperty = props.find(p => p.id === state.bookingPropertyId) || props[0];
@@ -1593,6 +1646,7 @@ function renderServices(){
       <p>${t('servicesSubtitle')}</p>
     </div>
   </div>
+  ${renderActiveOrderCard()}
   <div class="grid">
     ${services.map(s => {
       const label = serviceLabel(s.key);
@@ -2115,6 +2169,7 @@ function renderJobAction(j){
     return `
       <span class="pay-badge" style="background:var(--bg); color:var(--muted);">${statusLabel(j.status)}</span>
       <div style="font-size:11px; color:var(--muted); margin-top:4px;">${paymentNote(j.payment_method)}</div>
+      ${['pending','assigned'].includes(j.status) ? `<button type="button" class="btn ghost btn-sm" style="width:auto; margin-top:6px; padding:5px 10px; font-size:11px; color:var(--danger); border-color:#e6c3b3;" data-cancel-job="${j.id}">${t('cancelOrderBtn')}</button>` : ''}
     `;
   }
   return `<span class="pay-badge held">${t('settlingBadge')}</span>`;
@@ -2136,6 +2191,20 @@ function renderAddonsSummary(addonsJson){
 }
 
 function renderModal(){
+  if(state.modal === 'cancel-order'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${t('cancelOrderModalTitle')}</h3>
+        <div class="hint" style="margin:-8px 0 16px;">${t('cancelOrderModalHint')}</div>
+        <div class="field"><label>${t('cancelReasonLabel')}</label><textarea id="cancel-order-reason" rows="2" placeholder="${t('cancelReasonPlaceholder')}" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;"></textarea></div>
+        <div style="display:flex; gap:10px; margin-top:6px;">
+          <button type="button" class="btn ghost" id="modal-cancel" style="flex:1;">${t('keepOrderBtn')}</button>
+          <button type="button" class="btn ochre" id="cancel-order-confirm" style="flex:1; background:var(--danger);">${t('cancelOrderBtn')}</button>
+        </div>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'join-team'){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -2627,6 +2696,9 @@ function attachHandlers(){
     state.page = el.dataset.page; await loadAll();
   });
 
+  const activeOrderCard = document.querySelector('[data-goto-active-job]');
+  if(activeOrderCard) activeOrderCard.onclick = () => { state.page = 'jobs'; render(); };
+
   const copyReferralBtn = document.getElementById('copy-referral-code');
   if(copyReferralBtn) copyReferralBtn.onclick = async () => {
     try{
@@ -2911,11 +2983,29 @@ function attachHandlers(){
     state.promoValidation = null;
   };
 
+  document.querySelectorAll('[data-cancel-job]').forEach(el => el.onclick = () => {
+    state.cancelJobTargetId = el.dataset.cancelJob;
+    state.modal = 'cancel-order';
+    render();
+  });
+
+  const cancelOrderConfirm = document.getElementById('cancel-order-confirm');
+  if(cancelOrderConfirm) cancelOrderConfirm.onclick = async () => {
+    const reasonInput = document.getElementById('cancel-order-reason');
+    try{
+      await api(`/jobs/${state.cancelJobTargetId}/cancel`, { method:'POST', body: JSON.stringify({ reason: reasonInput ? reasonInput.value : '' }) });
+      state.modal = null; state.cancelJobTargetId = null;
+      showToast(t('toastOrderCancelled'));
+      await loadAll();
+    }catch(err){ showToast(err.message); state.modal = null; state.cancelJobTargetId = null; render(); }
+  };
+
   const modalCancel = document.getElementById('modal-cancel');
   if(modalCancel) modalCancel.onclick = () => {
     state.modal = null; state.regLat = null; state.regLng = null;
     state.pendingBooking = null; state.pendingSyncPropertyId = null;
     state.syncPropertyId = null; state.syncStep = 'url'; state.syncIcalUrl = ''; state.syncUseDemo = false;
+    state.cancelJobTargetId = null;
     state.authError=''; render();
   };
 
