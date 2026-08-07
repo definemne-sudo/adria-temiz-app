@@ -230,7 +230,7 @@ router.get('/bookings', (req, res) => {
 router.get('/workers', (req, res) => {
   const rows = db
     .prepare(
-      `SELECT u.id, u.name, u.phone, u.username, u.is_online, u.current_city,
+      `SELECT u.id, u.name, u.phone, u.username, u.is_online, u.current_city, u.current_lat, u.current_lng,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'done') AS completed_jobs,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating IS NOT NULL) AS total_ratings,
@@ -248,6 +248,22 @@ router.get('/workers', (req, res) => {
   }));
 
   res.json({ workers });
+});
+
+// Canlı harita için hafif endpoint - sadece konumu bilinen ÇEVRİMİÇİ
+// personeli döner (Dashboard'daki Live Map, sık yenilense bile diğer
+// istatistikleri tekrar çekmesin diye ayrı tutuldu).
+router.get('/workers/live-locations', (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT u.id, u.name, u.current_city, u.current_lat, u.current_lng,
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs
+       FROM users u
+       WHERE u.account_type = 'staff' AND u.is_online = 1
+         AND u.current_lat IS NOT NULL AND u.current_lng IS NOT NULL`
+    )
+    .all();
+  res.json({ workers: rows.map((r) => ({ ...r, isBusy: r.active_jobs > 0 })) });
 });
 
 // --- Müşteriler (tam liste) -------------------------------------------------
