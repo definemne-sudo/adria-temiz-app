@@ -435,6 +435,15 @@ const TRANSLATIONS = {
     navServices: "Hizmetler",
     navProperties: "Mülklerim",
     navOrders: "Siparişlerim",
+    navProfile: "Profil",
+    accountInfoTitle: "Hesap Bilgileri",
+    referralTitle: "Arkadaşını Davet Et",
+    referralHint: "Bu kodu paylaş, arkadaşın kayıt olurken girsin - ikiniz de kazanın!",
+    copyBtn: "Kopyala",
+    copiedToast: "Kopyalandı!",
+    languageTitle: "Dil",
+    referredByCodeLabel: "Davet kodu (varsa)",
+    referredByCodePlaceholder: "Bir arkadaşının kodu varsa gir",
     accountBadgeCompany: "Yönetim Şirketi",
     accountBadgeIndividual: "Bireysel Ev Sahibi",
     logout: "Çıkış yap",
@@ -635,6 +644,15 @@ const TRANSLATIONS = {
     navServices: "Services",
     navProperties: "My Properties",
     navOrders: "My Orders",
+    navProfile: "Profile",
+    accountInfoTitle: "Account Info",
+    referralTitle: "Invite a Friend",
+    referralHint: "Share this code - when a friend signs up with it, you both benefit!",
+    copyBtn: "Copy",
+    copiedToast: "Copied!",
+    languageTitle: "Language",
+    referredByCodeLabel: "Referral code (optional)",
+    referredByCodePlaceholder: "Enter a friend's code if you have one",
     accountBadgeCompany: "Management Company",
     accountBadgeIndividual: "Individual Owner",
     logout: "Log out",
@@ -835,6 +853,15 @@ const TRANSLATIONS = {
     navServices: "Usluge",
     navProperties: "Moje nekretnine",
     navOrders: "Moje narudžbe",
+    navProfile: "Profil",
+    accountInfoTitle: "Podaci o nalogu",
+    referralTitle: "Pozovi prijatelja",
+    referralHint: "Podijeli ovaj kod - kada ga prijatelj unese pri registraciji, oboje dobijate pogodnost!",
+    copyBtn: "Kopiraj",
+    copiedToast: "Kopirano!",
+    languageTitle: "Jezik",
+    referredByCodeLabel: "Kod za preporuku (opciono)",
+    referredByCodePlaceholder: "Unesi kod prijatelja ako ga imaš",
     accountBadgeCompany: "Menadžment kompanija",
     accountBadgeIndividual: "Individualni vlasnik",
     logout: "Odjavi se",
@@ -1339,6 +1366,7 @@ function renderAuth(){
             <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" required placeholder="75" /></div>
           </div>
         ` : ''}
+        <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
         <button class="btn ochre" type="submit">${t('enterPanel')}</button>
       </form>
@@ -1426,7 +1454,7 @@ function renderChatWidget(){
 
 function renderPanel(){
   const isCompany = state.user.accountType === 'company';
-  const NAV_ICONS = { services:'🧹', properties:'🏠', jobs:'🧾' };
+  const NAV_ICONS = { services:'🧹', properties:'🏠', jobs:'🧾', profile:'👤' };
   const navItem = (page, label) => `<div class="nav-item ${state.page===page?'active':''}" data-page="${page}">${label}</div>`;
   const bottomNavItem = (page, label) => `
     <div class="nav-item-mobile ${state.page===page?'active':''}" data-page="${page}">
@@ -1441,18 +1469,17 @@ function renderPanel(){
     ${navItem('services', t('navServices'))}
     ${navItem('properties', t('navProperties'))}
     ${navItem('jobs', t('navOrders'))}
+    ${navItem('profile', t('navProfile'))}
     <div class="spacer"></div>
-    ${langSwitch()}
-    <div class="who">${state.user.companyName || state.user.name}<br/>${state.user.phone}</div>
-    <div class="logout" id="logout">${t('logout')}</div>
   </div>
   <nav class="bottom-nav">
     ${bottomNavItem('services', t('navServices'))}
     ${bottomNavItem('properties', t('navProperties'))}
     ${bottomNavItem('jobs', t('navOrders'))}
+    ${bottomNavItem('profile', t('navProfile'))}
   </nav>
   <div class="main">
-    ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : renderJobs()}
+    ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : state.page==='profile' ? renderProfile() : renderJobs()}
   </div>
   ${state.modal ? renderModal() : ''}
   ${renderChatWidget()}
@@ -1912,6 +1939,38 @@ function categoryLabel(cat){
 
 function serviceName(key){
   return serviceLabel(key).name;
+}
+
+function renderProfile(){
+  const isCompany = state.user.accountType === 'company';
+  return `
+  <h2 style="font-size:21px; margin-bottom:18px;">${t('navProfile')}</h2>
+
+  <div style="border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; background:var(--panel);">
+    <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${t('accountInfoTitle')}</div>
+    <div style="font-size:16px; font-weight:700; color:var(--navy); margin-bottom:2px;">${state.user.companyName || state.user.name}</div>
+    <div style="font-size:13px; color:var(--muted);">${state.user.phone}</div>
+    <div class="account-badge" style="margin-top:10px; display:inline-block;">${isCompany ? t('accountBadgeCompany') : t('accountBadgeIndividual')}</div>
+  </div>
+
+  ${state.user.referralCode ? `
+    <div style="border:1.5px dashed var(--sage); border-radius:12px; padding:18px; margin-bottom:16px; background:var(--bg);">
+      <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px;">${t('referralTitle')}</div>
+      <div style="font-size:13px; color:var(--text); margin-bottom:12px;">${t('referralHint')}</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div style="flex:1; font-family:monospace; font-size:18px; font-weight:700; color:var(--navy); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; letter-spacing:.05em;">${state.user.referralCode}</div>
+        <button type="button" class="btn ochre btn-sm" id="copy-referral-code" style="width:auto; padding:10px 16px; flex-shrink:0;">${t('copyBtn')}</button>
+      </div>
+    </div>
+  ` : ''}
+
+  <div style="border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:16px; background:var(--panel);">
+    <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${t('languageTitle')}</div>
+    ${langSwitch()}
+  </div>
+
+  <button class="btn ghost btn-sm" id="logout" style="width:100%; color:var(--danger);">${t('logout')}</button>
+  `;
 }
 
 function renderJobs(){
@@ -2399,6 +2458,7 @@ function attachHandlers(){
     const body = {
       name: fd.name, accountType: state.accountTypeChoice, companyName: fd.companyName,
       taxNumber: fd.taxNumber, billingAddress: fd.billingAddress,
+      referredByCode: fd.referredByCode ? fd.referredByCode.trim() : null,
     };
     if(state.accountTypeChoice === 'individual' && (fd.propertyCity || fd.sizeSqm || fd.propertyName)){
       body.property = {
@@ -2431,6 +2491,17 @@ function attachHandlers(){
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; await loadAll();
   });
+
+  const copyReferralBtn = document.getElementById('copy-referral-code');
+  if(copyReferralBtn) copyReferralBtn.onclick = async () => {
+    try{
+      await navigator.clipboard.writeText(state.user.referralCode);
+      showToast(t('copiedToast'));
+    }catch(err){
+      // Panoya erişim engellenmişse (izin, http vb.) sessizce yoksay -
+      // kod zaten ekranda seçilebilir halde duruyor.
+    }
+  };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
