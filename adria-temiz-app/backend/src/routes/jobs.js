@@ -4,9 +4,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
-// NOT: Sipariş Bildirimleri özelliği ertelendi, services/dispatch.js henüz
-// repoda değil. O özelliğe dönünce bu satır ve aşağıdaki 2 çağrı geri açılacak.
-// const { dispatchJob } = require('../services/dispatch');
+const { dispatchJob } = require('../services/dispatch');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -172,8 +170,7 @@ router.post('/', async (req, res) => {
   const createdJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   res.status(201).json(createdJob);
 
-  // NOT: Sipariş Bildirimleri ertelendi - services/dispatch.js eklenince geri açılacak.
-  // dispatchJob(id).catch((err) => console.error('dispatchJob hata:', err));
+  dispatchJob(id).catch((err) => console.error('dispatchJob hata:', err));
 });
 
 // Kullanıcının (bireysel ev sahibi veya yönetim şirketi) erişebildiği
@@ -268,14 +265,33 @@ router.post('/:id/reject', async (req, res) => {
   }
   if (job.urgency !== 'urgent' && job.current_candidate_id === req.user.id) {
     db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE id = ?`).run(id);
-    // NOT: Sipariş Bildirimleri ertelendi - services/dispatch.js eklenince geri açılacak.
-    // await dispatchJob(id);
+    await dispatchJob(id);
   }
   res.json({ message: 'Reddedildi.' });
 });
 
 // Bildirime tıklayınca açılacak iş teklifi kartı için detay - fiyat, konum,
 // ortalama süre, ödeme tipi ve personelin net kazancı dahil.
+// Push bildirimi gelmediyse/kaçırıldıysa personelin elle "bekleyen bir
+// teklifim var mı?" diye kontrol edebilmesi için yedek endpoint. Kendisine
+// bildirilmiş (notified_staff_ids içinde), hâlâ 'pending' olan en eski işi
+// döner - varsa jobId, yoksa null.
+router.get('/my-pending-offer', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
+  const pendingJobs = db
+    .prepare(`SELECT id, notified_staff_ids, notification_sent_at FROM cleaning_jobs WHERE status = 'pending' AND notified_staff_ids IS NOT NULL AND notified_staff_ids != '[]'`)
+    .all();
+  const mine = pendingJobs
+    .filter((j) => {
+      try { return JSON.parse(j.notified_staff_ids).includes(req.user.id); }
+      catch (e) { return false; }
+    })
+    .sort((a, b) => new Date(a.notification_sent_at || 0) - new Date(b.notification_sent_at || 0));
+  res.json({ jobId: mine.length ? mine[0].id : null });
+});
+
 router.get('/:id/offer-detail', (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
