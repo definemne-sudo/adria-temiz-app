@@ -192,6 +192,41 @@ const T = {
   navServices: "Hizmetler & Fiyatlandırma",
   navFinance: "Finans",
   navMarketing: "Marketing",
+  navAnalytics: "Analytics",
+  navCoverage: "Coverage",
+  analyticsTitle: "Analytics",
+  analyticsSubtitle: "Hizmet popülerliği, müşteri elde tutma, şehir talebi ve personel trendleri.",
+  servicesPopularityTitle: "En Çok Satılan Hizmetler",
+  retentionTitle: "Müşteri Elde Tutma",
+  retentionTotalCustomers: "Toplam Müşteri",
+  retentionWithOrders: "Sipariş Vermiş",
+  retentionRepeatRate: "Tekrar Sipariş Oranı",
+  retentionAvgOrders: "Müşteri Başına Ort. Sipariş",
+  retentionLoyalCustomers: "5+ Sipariş Veren",
+  cityDemandTitle: "Şehir Bazlı Talep",
+  staffTrendTitle: "Personel Performans Trendi",
+  staffLeaderboardTitle: "Personel Sıralaması",
+  colTotalJobs: "Toplam İş",
+  colSatisfaction: "Memnuniyet",
+  emptyAnalyticsData: "Bu dönemde veri yok.",
+  coverageTitle: "Coverage",
+  coverageSubtitle: "Hizmet bölgeleri ve şehir başına personel/talep dengesi.",
+  serviceAreasTitle: "Hizmet Bölgelerimiz",
+  addAreaPlaceholder: "Şehir adı ekle…",
+  addAreaBtn: "Ekle",
+  emptyAreas: "Henüz bölge eklenmedi.",
+  areaActiveLabel: "Aktif",
+  areaInactiveLabel: "Pasif",
+  balanceTitle: "Şehir Bazlı Personel/Talep Dengesi",
+  balanceSubtitle: "Çevrimiçi personel başına bekleyen iş oranı 5'i geçerse \"yetersiz personel\" olarak işaretlenir.",
+  colCity: "Şehir",
+  colOnlineStaff: "Çevrimiçi Personel",
+  colPendingJobsCol: "Bekleyen İş",
+  colRatio: "Oran",
+  colStatus: "Durum",
+  statusOk: "Yeterli",
+  statusUnderstaffed: "Yetersiz Personel",
+  emptyBalance: "Henüz veri yok.",
   marketingTitle: "Marketing",
   marketingSubtitle: "Reklam kampanyaları, promosyon kodları ve sadakat/referans hedefleme.",
   marketingSubAds: "Reklam Kampanyaları",
@@ -494,6 +529,12 @@ let state = {
   loyaltyMinOrders: 5,
   loyaltyCustomers: null,
   topReferrers: null,
+  servicesPopularity: null,
+  retention: null,
+  cityDemand: null,
+  staffTrend: null,
+  serviceAreas: null,
+  coverageBalance: null,
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -554,6 +595,8 @@ const NAV_ICONS = {
   finance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 6.5c0-2-2.2-3-5-3s-5 1.2-5 3.2 2.2 2.8 5 3.3 5 1.3 5 3.3-2.2 3.2-5 3.2-5-1-5-3"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
   marketing: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>`,
+  analytics: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>`,
+  coverage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>`,
 };
 
 function navItem(page, icon, label, badgeCount){
@@ -577,6 +620,8 @@ function renderPanel(){
     ${navItem('services', 'services', T.navServices)}
     ${navItem('finance', 'finance', T.navFinance)}
     ${navItem('marketing', 'marketing', T.navMarketing)}
+    ${navItem('analytics', 'analytics', T.navAnalytics)}
+    ${navItem('coverage', 'coverage', T.navCoverage)}
     ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
@@ -597,6 +642,8 @@ function renderPanel(){
       : state.page==='services' ? renderServicesPricing()
       : state.page==='finance' ? renderFinance()
       : state.page==='marketing' ? renderMarketing()
+      : state.page==='analytics' ? renderAnalytics()
+      : state.page==='coverage' ? renderCoverage()
       : state.page==='settings' ? renderSettings()
       : state.page==='support' ? renderSupport()
       : renderApplications()}
@@ -1323,6 +1370,122 @@ function renderLoyaltyReferral(){
   `;
 }
 
+function renderAnalytics(){
+  const sp = state.servicesPopularity, ret = state.retention, cd = state.cityDemand, st = state.staffTrend;
+  return `
+  <div class="page-head"><div><h2>${T.analyticsTitle}</h2><p>${T.analyticsSubtitle}</p></div></div>
+
+  <div class="dash-grid" style="margin-bottom:16px;">
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.servicesPopularityTitle}</h3></div>
+      ${!sp ? `<div class="empty-state" style="margin:0;">…</div>` : sp.services.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyAnalyticsData}</div>` : sp.services.map(s => renderBreakdownRow(s.serviceName, s.jobCount, sp.totalJobs, 'var(--sage)')).join('')}
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.retentionTitle}</h3></div>
+      ${!ret ? `<div class="empty-state" style="margin:0;">…</div>` : `
+        <div style="font-family:'Fraunces',serif; font-size:30px; color:var(--navy);">%${ret.repeatRate}</div>
+        <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">${T.retentionRepeatRate}</div>
+        <div style="display:flex; flex-direction:column; gap:6px; font-size:12.5px;">
+          <div style="display:flex; justify-content:space-between;"><span>${T.retentionTotalCustomers}</span><strong>${ret.totalCustomers}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span>${T.retentionWithOrders}</span><strong>${ret.withOrders}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span>${T.retentionAvgOrders}</span><strong>${ret.avgOrdersPerCustomer}</strong></div>
+          <div style="display:flex; justify-content:space-between;"><span>${T.retentionLoyalCustomers}</span><strong>${ret.loyalCustomers}</strong></div>
+        </div>
+      `}
+    </div>
+
+    <div class="panel-card">
+      <div class="panel-head"><h3>${T.cityDemandTitle}</h3></div>
+      ${!cd ? `<div class="empty-state" style="margin:0;">…</div>` : cd.cities.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyAnalyticsData}</div>` : (() => {
+        const max = Math.max(1, ...cd.cities.map(c => c.jobCount));
+        return cd.cities.map(c => renderBreakdownRow(c.city, c.jobCount, max, 'var(--ochre)')).join('');
+      })()}
+    </div>
+  </div>
+
+  <div class="panel-card" style="margin-bottom:16px;">
+    <div class="panel-head"><h3>${T.staffTrendTitle}</h3></div>
+    ${!st ? `<div class="empty-state" style="margin:0;">…</div>` : renderStaffTrendChart(st)}
+  </div>
+
+  <div class="panel-card">
+    <div class="panel-head"><h3>${T.staffLeaderboardTitle}</h3></div>
+    ${!st || st.leaderboard.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyAnalyticsData}</div>` : `
+      <table>
+        <thead><tr><th>${T.colName}</th><th>${T.colTotalJobs}</th><th>${T.colSatisfaction}</th></tr></thead>
+        <tbody>
+          ${st.leaderboard.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.totalJobs}</td><td>${s.satisfactionPercent!==null ? '%'+s.satisfactionPercent : '—'}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `}
+  </div>
+  `;
+}
+
+function renderStaffTrendChart(st){
+  const w = 700, h = 160, padX = 24, padY = 16;
+  const max = Math.max(1, ...st.series.map(s => s.jobs));
+  const stepX = (w - padX*2) / Math.max(1, st.series.length - 1);
+  const points = st.series.map((s,i) => ({ x: padX+i*stepX, y: h-padY-(s.jobs/max)*(h-padY*2), s }));
+  const linePath = points.map((p,i) => `${i===0?'M':'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  return `
+  <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto;">
+    <path d="${linePath}" fill="none" stroke="#5B3F9E" stroke-width="2.5" />
+    ${points.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#0F3D2E" />`).join('')}
+    ${points.map((p,i) => i % Math.ceil(points.length/8||1) === 0 ? `<text x="${p.x.toFixed(1)}" y="${h-2}" font-size="9" fill="#5B7A6C" text-anchor="middle">${p.s.label.slice(5)}</text>` : '').join('')}
+  </svg>`;
+}
+
+function renderCoverage(){
+  const areas = state.serviceAreas;
+  const balance = state.coverageBalance;
+  return `
+  <div class="page-head"><div><h2>${T.coverageTitle}</h2><p>${T.coverageSubtitle}</p></div></div>
+
+  <div class="panel-card" style="margin-bottom:16px; max-width:480px;">
+    <div class="panel-head"><h3>${T.serviceAreasTitle}</h3></div>
+    ${!areas ? `<div class="empty-state" style="margin:0 0 14px;">…</div>` : areas.areas.length === 0 ? `<div class="empty-state" style="margin:0 0 14px;">${T.emptyAreas}</div>` : `
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:14px;">
+        ${areas.areas.map(a => `
+          <div style="display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--line); border-radius:8px;">
+            <span style="flex:1; font-weight:600; color:var(--navy);">${a.city}</span>
+            <span class="status-pill ${a.is_active?'status-done':''}" style="${!a.is_active?'background:#EDF0EE; color:#5B7A6C;':''}">${a.is_active ? T.areaActiveLabel : T.areaInactiveLabel}</span>
+            <button type="button" class="btn ghost btn-sm" data-toggle-area="${a.id}">${T.toggleBtn}</button>
+            <button type="button" class="btn danger btn-sm" data-delete-area="${a.id}">${T.deleteBtn}</button>
+          </div>
+        `).join('')}
+      </div>
+    `}
+    <form id="add-area-form" style="display:flex; gap:8px;">
+      <input name="city" placeholder="${T.addAreaPlaceholder}" required style="flex:1; padding:9px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:13.5px;" />
+      <button class="btn ochre btn-sm" type="submit">${T.addAreaBtn}</button>
+    </form>
+  </div>
+
+  <div class="panel-card">
+    <div class="panel-head"><h3>${T.balanceTitle}</h3></div>
+    <div class="hint" style="margin:-6px 0 14px;">${T.balanceSubtitle}</div>
+    ${!balance ? `<div class="empty-state" style="margin:0;">…</div>` : balance.cities.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyBalance}</div>` : `
+      <table>
+        <thead><tr><th>${T.colCity}</th><th>${T.colOnlineStaff}</th><th>${T.colPendingJobsCol}</th><th>${T.colRatio}</th><th>${T.colStatus}</th></tr></thead>
+        <tbody>
+          ${balance.cities.map(c => `
+            <tr>
+              <td><strong>${c.city}</strong></td>
+              <td>${c.onlineStaff} / ${c.totalStaff}</td>
+              <td>${c.pendingJobs}</td>
+              <td>${c.ratio !== null ? c.ratio : '—'}</td>
+              <td>${c.isUnderstaffed ? `<span class="status-pill status-pending">${T.statusUnderstaffed}</span>` : `<span class="status-pill status-done">${T.statusOk}</span>`}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+  </div>
+  `;
+}
+
 function renderSettings(){
   const s = state.settingsData;
   const admins = state.adminsList;
@@ -1649,6 +1812,22 @@ async function loadMarketingSubPage(){
   else { await loadLoyaltyCustomers(); await loadTopReferrers(); }
 }
 
+async function loadAnalytics(){
+  const [sp, ret, cd, st] = await Promise.all([
+    api('/admin/analytics/services-popularity?period=month&offset=0'),
+    api('/admin/analytics/retention'),
+    api('/admin/analytics/city-demand?period=month&offset=0'),
+    api('/admin/analytics/staff-trend?granularity=week&count=8'),
+  ]);
+  state.servicesPopularity = sp; state.retention = ret; state.cityDemand = cd; state.staffTrend = st;
+  render();
+}
+async function loadCoverage(){
+  const [areas, balance] = await Promise.all([api('/admin/coverage/areas'), api('/admin/coverage/balance')]);
+  state.serviceAreas = areas; state.coverageBalance = balance;
+  render();
+}
+
 async function loadSettings(){
   state.settingsData = await api('/admin/settings');
   render();
@@ -1687,6 +1866,8 @@ function attachHandlers(){
     if(state.page === 'finance') await loadFinanceSubPage();
     if(state.page === 'settings'){ await loadSettings(); await loadAdmins(); }
     if(state.page === 'marketing') await loadMarketingSubPage();
+    if(state.page === 'analytics') await loadAnalytics();
+    if(state.page === 'coverage') await loadCoverage();
   });
 
   document.querySelectorAll('[data-finance-subpage]').forEach(el => el.onclick = async () => {
@@ -1898,6 +2079,29 @@ function attachHandlers(){
       await loadPromoCodes();
     }catch(err){ showToast(err.message); }
   };
+
+  const addAreaForm = document.getElementById('add-area-form');
+  if(addAreaForm) addAreaForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(addAreaForm));
+    try{
+      await api('/admin/coverage/areas', { method:'POST', body: JSON.stringify(fd) });
+      addAreaForm.reset();
+      await loadCoverage();
+    }catch(err){ showToast(err.message); }
+  };
+  document.querySelectorAll('[data-toggle-area]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/coverage/areas/${el.dataset.toggleArea}/toggle`, { method:'PUT' });
+      await loadCoverage();
+    }catch(err){ showToast(err.message); }
+  });
+  document.querySelectorAll('[data-delete-area]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/admin/coverage/areas/${el.dataset.deleteArea}`, { method:'DELETE' });
+      await loadCoverage();
+    }catch(err){ showToast(err.message); }
+  });
 
   document.querySelectorAll('[data-open-chat]').forEach(el => el.onclick = async () => {
     await loadChatMessages(el.dataset.openChat);
