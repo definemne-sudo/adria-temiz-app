@@ -13,12 +13,8 @@ const financeRoutes = require('./routes/finance');
 const marketingRoutes = require('./routes/marketing');
 const analyticsRoutes = require('./routes/analytics');
 const coverageRoutes = require('./routes/coverage');
-// NOT: Sipariş Bildirimleri (push + dağıtım motoru) özelliği bilinçli olarak
-// ertelendi - routes/push.js ve services/dispatch.js dosyaları henüz repoya
-// eklenmedi. O özelliğe döndüğümüzde bu iki satırın ve aşağıdaki push route
-// + setInterval bloğunun geri eklenmesi gerekiyor.
-// const pushRoutes = require('./routes/push');
-// const { checkTimeouts } = require('./services/dispatch');
+const pushRoutes = require('./routes/push');
+const { checkTimeouts } = require('./services/dispatch');
 
 const app = express();
 app.use(cors());
@@ -38,7 +34,7 @@ app.use('/api/admin/finance', financeRoutes);
 app.use('/api/admin/marketing', marketingRoutes);
 app.use('/api/admin/analytics', analyticsRoutes);
 app.use('/api/admin/coverage', coverageRoutes);
-// app.use('/api/push', pushRoutes);
+app.use('/api/push', pushRoutes);
 
 // Genel hata yakalayıcı
 app.use((err, req, res, next) => {
@@ -51,6 +47,11 @@ app.listen(PORT, () => {
   console.log(`Backend http://localhost:${PORT} üzerinde çalışıyor`);
 });
 
-// setInterval(() => {
-//   checkTimeouts().catch((err) => console.error('checkTimeouts hata:', err));
-// }, 60 * 1000);
+// Sipariş dağıtımında zaman aşımına uğrayan (kabul edilmemiş ya da kabul
+// edilip başlanmamış) işleri periyodik kontrol edip bir sonraki adaya
+// devreder. NOT: Tek sunucu örneği için uygun basit bir yaklaşım - birden
+// fazla sunucu örneği (yatay ölçekleme) olursa bu iş kuyruğunun Redis/Bull
+// gibi paylaşımlı bir sisteme taşınması gerekir.
+setInterval(() => {
+  checkTimeouts().catch((err) => console.error('checkTimeouts hata:', err));
+}, 60 * 1000);
