@@ -509,7 +509,8 @@ const TRANSLATIONS = {
     ordersTitle: "Siparişlerim",
     ordersSubtitle: "Aldığın hizmetler ve durumları.",
     ordersEmptyState: "Henüz sipariş yok. \"Hizmetler\" sekmesinden bir sipariş oluştur.",
-    colProperty: "Mülk", colService: "Hizmet", colWhen: "Zaman", colStatus: "Durum", colPrice: "Fiyat",
+    colProperty: "Mülk", colService: "Hizmet", colWhen: "Zaman", colStatus: "Durum", colStaff: "Personel", colPrice: "Fiyat",
+    staffNotAssignedYet: "Henüz atanmadı",
     paidBadge: "✓ Ödendi",
     settlingBadge: "Ödeme sonuçlanıyor…",
     cardPaidNote: "💳 Kart · ödeme alındı, tamamlanınca serbest kalır",
@@ -726,7 +727,8 @@ const TRANSLATIONS = {
     ordersTitle: "My Orders",
     ordersSubtitle: "The services you've booked and their status.",
     ordersEmptyState: "No orders yet. Create one from the \"Services\" tab.",
-    colProperty: "Property", colService: "Service", colWhen: "When", colStatus: "Status", colPrice: "Price",
+    colProperty: "Property", colService: "Service", colWhen: "When", colStatus: "Status", colStaff: "Staff", colPrice: "Price",
+    staffNotAssignedYet: "Not assigned yet",
     paidBadge: "✓ Paid",
     settlingBadge: "Settling payment…",
     cardPaidNote: "💳 Card · charged, released once completed",
@@ -943,7 +945,8 @@ const TRANSLATIONS = {
     ordersTitle: "Moje narudžbe",
     ordersSubtitle: "Usluge koje si naručio/la i njihov status.",
     ordersEmptyState: "Još nema narudžbi. Napravi jednu iz kartice \"Usluge\".",
-    colProperty: "Nekretnina", colService: "Usluga", colWhen: "Termin", colStatus: "Status", colPrice: "Cijena",
+    colProperty: "Nekretnina", colService: "Usluga", colWhen: "Termin", colStatus: "Status", colStaff: "Osoblje", colPrice: "Cijena",
+    staffNotAssignedYet: "Još nije dodijeljeno",
     paidBadge: "✓ Plaćeno",
     settlingBadge: "Plaćanje se obrađuje…",
     cardPaidNote: "💳 Kartica · naplaćeno, oslobađa se po završetku",
@@ -2070,7 +2073,7 @@ function renderJobs(){
     <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>${t('colProperty')}</th><th>${t('colService')}</th><th>${t('colWhen')}</th><th>${t('colStatus')}</th><th>${t('colPrice')}</th><th></th>
+        <th>${t('colProperty')}</th><th>${t('colService')}</th><th>${t('colWhen')}</th><th>${t('colStatus')}</th><th>${t('colStaff')}</th><th>${t('colPrice')}</th><th></th>
       </tr></thead>
       <tbody>
         ${state.jobs.map(j => `
@@ -2079,6 +2082,7 @@ function renderJobs(){
             <td>${j.service_key==='common_area' ? renderCommonAreaJobSummary(j) : serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
             <td>${j.urgency==='urgent' ? t('urgent') : j.urgency==='now' ? t('now') : new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</td>
             <td><span class="badge ${j.status}">${statusLabel(j.status)}</span></td>
+            <td>${renderAssignedStaff(j)}</td>
             <td>${j.price} €</td>
             <td>${renderJobAction(j)}</td>
           </tr>
@@ -2087,6 +2091,19 @@ function renderJobs(){
     </table>
     </div>
   `}
+  `;
+}
+
+function renderAssignedStaff(j){
+  if(!j.staff_name){
+    return `<span style="font-size:12px; color:var(--muted);">${t('staffNotAssignedYet')}</span>`;
+  }
+  const initial = j.staff_name.charAt(0).toUpperCase();
+  return `
+    <div style="display:flex; align-items:center; gap:6px;">
+      <span style="width:22px; height:22px; border-radius:50%; background:var(--sage); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initial}</span>
+      <span style="font-size:13px;">${j.staff_name}</span>
+    </div>
   `;
 }
 
@@ -2374,6 +2391,37 @@ async function loadAll(){
   render();
 }
 
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+// Bildirim izni ister ve push aboneliğini backend'e kaydeder - "siparişin
+// onaylandı" gibi bildirimleri alabilmek için. İzin verilmezse (ya da
+// tarayıcı desteklemiyorsa) sessizce geçer, müşteri yine de Siparişlerim
+// sekmesinden durumu takip edebilir.
+async function ensurePushSubscription(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') return false;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      const { publicKey } = await fetch(API + '/push/vapid-public-key').then(r => r.json());
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await api('/push/subscribe', { method:'POST', body: JSON.stringify(sub.toJSON()) });
+    return true;
+  }catch(e){ return false; }
+}
+
 async function submitBooking(draft){
   try{
     await api('/jobs', { method:'POST', body: JSON.stringify(draft) });
@@ -2381,6 +2429,10 @@ async function submitBooking(draft){
     state.page = 'jobs';
     await loadAll();
     showToast(t('toastOrderCreated'));
+    // Siparişin onaylandığını (personel kabul ettiğinde) bildirim olarak
+    // alabilmesi için - ilk siparişte bir kereye mahsus izin isteniyor,
+    // sonraki siparişlerde tarayıcı zaten hatırlıyor.
+    ensurePushSubscription();
   }catch(err){ showToast(err.message); }
 }
 
@@ -3051,13 +3103,29 @@ function attachHandlers(){
   };
 }
 
+// Bildirime tıklanıp uygulama zaten açıksa service worker'dan gelen mesajı
+// dinleyip Siparişlerim sekmesine geçiyor.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if(event.data && event.data.type === 'OPEN_JOBS' && state.token){
+      state.page = 'jobs'; render();
+    }
+  });
+}
+
 (async function init(){
   if(state.token && !state.user){
     localStorage.removeItem('token'); state.token = null;
   }
   render();
   if(state.token){
-    try{ await loadAll(); } catch(err){
+    try{
+      await loadAll();
+      // Bildirime tıklanıp uygulama kapalıyken açıldıysa (?openJobs=1)
+      // doğrudan Siparişlerim sekmesini göster.
+      const params = new URLSearchParams(location.search);
+      if(params.get('openJobs')){ state.page = 'jobs'; render(); }
+    } catch(err){
       localStorage.removeItem('token'); localStorage.removeItem('user');
       state.token = null; render();
     }
