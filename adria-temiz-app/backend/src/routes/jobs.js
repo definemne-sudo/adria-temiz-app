@@ -495,20 +495,14 @@ router.patch('/:id/status', (req, res) => {
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Geçersiz durum.' });
   }
-  // GEÇİCİ: personel paneli henüz yazılmadığı için, test/demo amaçlı mülk
-  // sahibinin de kendi siparişini tamamlandı işaretlemesine izin veriyoruz.
-  // Personel paneli tamamlanınca bu satır kaldırılıp yalnızca staff'a
-  // bırakılacak.
-  if (status === 'done' && req.user.accountType !== 'staff') {
-    if (!accessiblePropertyIds(req.user.id).includes(
-      (db.prepare('SELECT property_id FROM cleaning_jobs WHERE id = ?').get(id) || {}).property_id
-    )) {
-      return res.status(403).json({ error: 'Bu işlemi yalnızca personel veya mülk sahibi yapabilir.' });
-    }
-  }
   // Personel yalnızca kendi aldığı (assigned_staff_id kendisi olan) işi
-  // tamamlandı işaretleyebilir - başkasının işini kapatamaz.
-  if (status === 'done' && req.user.accountType === 'staff') {
+  // tamamlandı işaretleyebilir - başkasının işini kapatamaz. Mülk sahibi
+  // artık işi tamamlandı işaretleyemez - bu, personel paneli tamamlanana
+  // kadar geçici bir izindi (bkz. sürüm geçmişi), kaldırıldı.
+  if (status === 'done') {
+    if (req.user.accountType !== 'staff') {
+      return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+    }
     const jobToCheck = db.prepare('SELECT assigned_staff_id FROM cleaning_jobs WHERE id = ?').get(id);
     if (!jobToCheck || jobToCheck.assigned_staff_id !== req.user.id) {
       return res.status(403).json({ error: 'Bu iş sana atanmamış.' });
