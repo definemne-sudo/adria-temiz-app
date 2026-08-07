@@ -478,6 +478,14 @@ const TRANSLATIONS = {
     notAvailableOpt: "Yok",
     suppliesFeeHint: "\"Yok\" seçilirse ek ücret uygulanır.",
     receiptTitle: "Sipariş özeti",
+    checklistStepTitle: "Bu hizmette neler yapılacak?",
+    extrasStepTitle: "Malzeme ve Ekstra Hizmetler",
+    continueBtn: "Devam Et",
+    pleaseSelectPaymentMethod: "Lütfen bir ödeme yöntemi seç.",
+    checklistStepHint: "Ödemeye geçmeden önce, personelin yapacağı işleri gözden geçir.",
+    checklistEmptyState: "Bu hizmet için henüz bir görev listesi tanımlanmadı.",
+    checklistSectionEmpty: "Bu alt hizmet için henüz görev eklenmedi.",
+    continueToPaymentBtn: "Ödemeye Geç",
     promoDiscountLabel: "Promosyon İndirimi",
     promoCodePlaceholder: "Promosyon kodu",
     applyPromoBtn: "Uygula",
@@ -687,6 +695,14 @@ const TRANSLATIONS = {
     notAvailableOpt: "Not available",
     suppliesFeeHint: "Choosing \"Not available\" adds an extra fee.",
     receiptTitle: "Order summary",
+    checklistStepTitle: "What's included in this service?",
+    extrasStepTitle: "Supplies & Extra Services",
+    continueBtn: "Continue",
+    pleaseSelectPaymentMethod: "Please select a payment method.",
+    checklistStepHint: "Review what our staff will do before continuing to payment.",
+    checklistEmptyState: "No checklist has been set up for this service yet.",
+    checklistSectionEmpty: "No tasks added for this sub-service yet.",
+    continueToPaymentBtn: "Continue to Payment",
     promoDiscountLabel: "Promo Discount",
     promoCodePlaceholder: "Promo code",
     applyPromoBtn: "Apply",
@@ -896,6 +912,14 @@ const TRANSLATIONS = {
     notAvailableOpt: "Nemam",
     suppliesFeeHint: "Ako izabereš \"Nemam\", dodaje se dodatna naknada.",
     receiptTitle: "Pregled narudžbe",
+    checklistStepTitle: "Šta uključuje ova usluga?",
+    extrasStepTitle: "Sredstva i dodatne usluge",
+    continueBtn: "Nastavi",
+    pleaseSelectPaymentMethod: "Molimo izaberi način plaćanja.",
+    checklistStepHint: "Pregledaj šta će naše osoblje uraditi prije nego što nastaviš na plaćanje.",
+    checklistEmptyState: "Za ovu uslugu još nije definisana lista zadataka.",
+    checklistSectionEmpty: "Za ovu stavku još nisu dodati zadaci.",
+    continueToPaymentBtn: "Nastavi na plaćanje",
     promoDiscountLabel: "Promo popust",
     promoCodePlaceholder: "Promo kod",
     applyPromoBtn: "Primijeni",
@@ -1118,7 +1142,7 @@ let state = {
   regLat: null,
   regLng: null,
   bookingService: null,
-  bookingStep: 'config', // 'config' -> 'receipt'
+  bookingStep: 'config', // 'config' -> 'checklist' -> 'receipt'
   bookingPropertyId: null,
   bookingUrgency: 'scheduled',
   bookingScheduledAt: '',
@@ -1621,25 +1645,30 @@ function buildReceiptLines(draft){
 }
 
 function renderBookingPanel(service, props, selectedProperty){
+  if(state.bookingStep === 'checklist' && state.pendingBooking && state.pendingBooking.serviceKey === service.key){
+    return renderChecklistPanel(state.pendingBooking, service);
+  }
   if(state.bookingStep === 'receipt' && state.pendingBooking && state.pendingBooking.serviceKey === service.key){
     return renderReceiptPanel(state.pendingBooking);
   }
+  if(state.bookingStep === 'extras'){
+    return renderExtrasStep(service, props, selectedProperty);
+  }
+  return renderConfigStep(service, props, selectedProperty);
+}
 
+// 1. Ekran: hangi mülk, hangi alt hizmetler (Ortak Alan'da), ne zaman.
+// Malzeme var/yok ve ekstra hizmetler (halı/koltuk) burada SORULMUYOR -
+// bunlar 2. ekrana taşındı.
+function renderConfigStep(service, props, selectedProperty){
   const isGroup = !!service.isGroup;
-  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
-  const isCompany = state.user.accountType === 'company';
 
   if(isGroup){
-    // Ortak Alan Temizliği: sadece kategorisi "Ortak Alan" olan mülkler
-    // seçilebilir. Kat sayısı/kat başına m²/asansör kapasitesi mülk
-    // eklenirken bir kez girildiği için burada tekrar sorulmuyor - sadece
-    // hangi alt hizmetin isteneceği işaretleniyor.
     const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
     if(commonAreaProps.length === 0){
       return `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);"><div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div></div>`;
     }
     const selectedCaProperty = commonAreaProps.find(p => p.id === state.bookingPropertyId) || commonAreaProps[0];
-    const total = commonAreaSelectionsTotal(selectedCaProperty) + suppliesFee;
     const subChecked = (key) => state.bookingCommonAreaSelections[key]?.checked;
 
     return `
@@ -1684,41 +1713,10 @@ function renderBookingPanel(service, props, selectedProperty){
         <div class="field"><label>${t('datetimeLabel')}</label><input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" /></div>
       ` : ''}
 
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
-      <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
-      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noEquipment}€)</div>
-      </div>
-      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
-      </div>
-
-      <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
-
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
-        <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
-        ${isCompany ? `<div class="choice ${state.bookingPaymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
-      </div>
-      ${state.bookingPaymentMethod==='card' && state.savedCard ? `
-        <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
-          <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
-          <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
-        </div>
-      ` : ''}
-      ${state.bookingPaymentMethod==='card' && !state.savedCard ? `<div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>` : ''}
-      <button class="btn ochre btn-sm" style="width:100%;" data-goto-receipt="${service.key}">${t('createOrderBtn')}</button>
+      <button class="btn ochre btn-sm" style="width:100%; margin-top:6px;" data-goto-extras="${service.key}">${t('continueBtn')}</button>
     </div>
     `;
   }
-
-  const addonChecked = (key) => state.bookingAddons[key]?.checked;
-  const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
 
   // Ofis / Dükkan / Çalışma Alanı Temizliği: sadece "Ofis / İşyeri"
   // kategorili mülkler seçilebilir. Hiç yoksa sipariş oluşturulamaz.
@@ -1737,9 +1735,6 @@ function renderBookingPanel(service, props, selectedProperty){
     }
     effectiveSelectedProperty = effectiveProps.find(p => p.id === state.bookingPropertyId) || effectiveProps[0];
   }
-
-  const basePrice = calcPriceClient(service, { sizeSqm: effectiveSelectedProperty?.size_sqm });
-  const total = basePrice + suppliesFee + bookingAddonsTotal();
 
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
@@ -1764,7 +1759,37 @@ function renderBookingPanel(service, props, selectedProperty){
       </div>
     ` : ''}
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
+    <button class="btn ochre btn-sm" style="width:100%; margin-top:6px;" data-goto-extras="${service.key}">${t('continueBtn')}</button>
+  </div>
+  `;
+}
+
+// 2. Ekran: malzeme (ekipman/kimyasal) var/yok + ekstra hizmetler (halı/koltuk
+// yıkama). Buradan "Devam Et" ile checklist adımına geçilir (mevcut
+// data-goto-receipt handler'ı taslağı burada oluşturup checklist'e yönlendiriyor).
+function renderExtrasStep(service, props, selectedProperty){
+  const isGroup = !!service.isGroup;
+  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
+
+  let effectiveSelectedProperty = selectedProperty;
+  let runningTotal;
+  if(isGroup){
+    const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
+    effectiveSelectedProperty = commonAreaProps.find(p => p.id === state.bookingPropertyId) || commonAreaProps[0];
+    runningTotal = commonAreaSelectionsTotal(effectiveSelectedProperty) + suppliesFee;
+  } else {
+    effectiveSelectedProperty = (service.key === 'office' ? props.filter(p => p.category === 'office') : props).find(p => p.id === state.bookingPropertyId) || effectiveSelectedProperty;
+    runningTotal = calcPriceClient(service, { sizeSqm: effectiveSelectedProperty?.size_sqm }) + suppliesFee + bookingAddonsTotal();
+  }
+
+  const addonChecked = (key) => state.bookingAddons[key]?.checked;
+  const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
+
+  return `
+  <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+    <h3 style="font-size:15px; margin-bottom:12px;">${t('extrasStepTitle')}</h3>
+
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;">${t('suppliesLabel')}</div>
     <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
     <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
     <div class="option-row">
@@ -1777,35 +1802,68 @@ function renderBookingPanel(service, props, selectedProperty){
       <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
     </div>
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
-    ${state.addons.map(a => `
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-        <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
-          <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
-          <span style="font-size:16px;">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
-        </label>
-        ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
+    ${!isGroup ? `
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
+      ${state.addons.map(a => `
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
+            <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
+            <span style="font-size:16px;">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
+          </label>
+          ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
+        </div>
+      `).join('')}
+    ` : ''}
+
+    <div class="price" style="margin:14px 0 10px;">${runningTotal} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
+
+    <button class="btn ochre btn-sm" style="width:100%; margin-bottom:8px;" data-goto-receipt="${service.key}">${t('continueBtn')}</button>
+    <button class="btn ghost btn-sm" style="width:100%;" data-back-to-config="true">${t('backBtn')}</button>
+  </div>
+  `;
+}
+
+// Ödemeye geçmeden önce müşteriye "bu hizmette tam olarak ne yapılacak"
+// gösterilen ara adım. Tekli hizmetlerde doğrudan o hizmetin checklist'i,
+// Ortak Alan gibi grup hizmetlerde seçilen tüm alt hizmetlerin checklist'leri
+// birleştirilip gösteriliyor.
+function renderChecklistPanel(draft, service){
+  const isGroup = !!service.isGroup;
+  let sections = [];
+  if(isGroup){
+    const selections = (draft.serviceParams && draft.serviceParams.selections) || [];
+    sections = selections.map(sel => {
+      const sub = state.commonAreaSubOptions.find(s => s.key === sel.key);
+      return sub ? { label: commonAreaSubLabel(sel.key), items: sub.checklist || [] } : null;
+    }).filter(Boolean);
+  } else {
+    sections = [{ label: serviceLabel(draft.serviceKey).name, items: service.checklist || [] }];
+  }
+  const hasAnyItems = sections.some(s => s.items.length > 0);
+
+  return `
+  <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+    <h3 style="font-size:15px; margin-bottom:4px;">${t('checklistStepTitle')}</h3>
+    <div class="hint" style="margin:0 0 14px;">${t('checklistStepHint')}</div>
+
+    ${!hasAnyItems ? `<div class="empty-state" style="margin-bottom:16px;">${t('checklistEmptyState')}</div>` : sections.map(sec => `
+      <div style="border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:12px; background:var(--bg);">
+        ${sections.length > 1 ? `<div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${sec.label}</div>` : ''}
+        ${sec.items.length === 0 ? `<div style="font-size:12.5px; color:var(--muted);">${t('checklistSectionEmpty')}</div>` : `
+          <ul style="margin:0; padding:0; list-style:none;">
+            ${sec.items.map(item => `
+              <li style="display:flex; align-items:flex-start; gap:8px; font-size:13.5px; padding:5px 0;">
+                <span style="color:var(--sage-dark); flex-shrink:0; margin-top:1px;">✓</span>
+                <span>${item.item_text}</span>
+              </li>
+            `).join('')}
+          </ul>
+        `}
       </div>
     `).join('')}
 
-    <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
-
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
-    <div class="option-row">
-      <div class="choice ${state.bookingPaymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
-      <div class="choice ${state.bookingPaymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
-      ${isCompany ? `<div class="choice ${state.bookingPaymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
-    </div>
-    ${state.bookingPaymentMethod==='card' && state.savedCard ? `
-      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
-        <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
-        <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
-      </div>
-    ` : ''}
-    ${state.bookingPaymentMethod==='card' && !state.savedCard ? `
-      <div class="hint" style="margin:0 0 14px;">${t('cardWillAskLater')}</div>
-    ` : ''}
-    <button class="btn ochre btn-sm" style="width:100%;" data-goto-receipt="${service.key}">${t('createOrderBtn')}</button>
+    <button class="btn ochre btn-sm" style="width:100%; margin-bottom:8px;" data-continue-to-payment="true">${t('continueToPaymentBtn')}</button>
+    <button class="btn ghost btn-sm" style="width:100%;" data-back-to-extras="true">${t('backBtn')}</button>
   </div>
   `;
 }
@@ -1815,6 +1873,8 @@ function renderReceiptPanel(draft){
   const promo = state.promoValidation;
   const discountAmount = (promo && promo.discountAmount) ? promo.discountAmount : 0;
   const finalTotal = Math.max(0, Math.round((total - discountAmount) * 100) / 100);
+  const isCompany = state.user.accountType === 'company';
+  const paymentMethod = draft.paymentMethod;
   return `
   <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
     <h3 style="font-size:15px; margin-bottom:12px;">${t('receiptTitle')}</h3>
@@ -1843,11 +1903,22 @@ function renderReceiptPanel(draft){
       ${promo && promo.discountAmount ? `<div style="font-size:12px; color:var(--sage-dark); margin-top:6px;">${t('promoAppliedHint')}</div>` : ''}
     </div>
 
-    <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
-      ${paymentNote(draft.paymentMethod)}
+    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
+    <div class="option-row">
+      <div class="choice ${paymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
+      <div class="choice ${paymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+      ${isCompany ? `<div class="choice ${paymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
     </div>
+    ${paymentMethod==='card' && state.savedCard ? `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
+        <span>${state.savedCard.brand} •••• ${state.savedCard.last4} <span style="color:var(--muted);">(${String(state.savedCard.expMonth).padStart(2,'0')}/${state.savedCard.expYear})</span></span>
+        <span id="change-card" style="font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer;">${t('changeCard')}</span>
+      </div>
+    ` : ''}
+
+    ${paymentMethod ? `<div style="font-size:12px; color:var(--muted); margin-bottom:14px;">${paymentNote(paymentMethod)}</div>` : ''}
     <button class="btn ochre btn-sm" style="width:100%; margin-bottom:8px;" data-confirm-booking="true">${t('confirmPaymentBtn')}</button>
-    <button class="btn ghost btn-sm" style="width:100%;" data-back-to-config="true">${t('backBtn')}</button>
+    <button class="btn ghost btn-sm" style="width:100%;" data-back-to-checklist="true">${t('backBtn')}</button>
   </div>
   `;
 }
@@ -2656,23 +2727,41 @@ function attachHandlers(){
   });
 
   document.querySelectorAll('[data-payment-method]').forEach(el => el.onclick = () => {
-    state.bookingPaymentMethod = el.dataset.paymentMethod; render();
+    const method = el.dataset.paymentMethod;
+    if(method === 'card' && !state.savedCard){
+      state.modal = 'card-form';
+      render();
+      return;
+    }
+    if(state.pendingBooking) state.pendingBooking = { ...state.pendingBooking, paymentMethod: method };
+    else state.bookingPaymentMethod = method;
+    render();
   });
 
-  document.querySelectorAll('[data-goto-receipt]').forEach(el => el.onclick = async () => {
-    const serviceKey = el.dataset.gotoReceipt;
+  document.querySelectorAll('[data-goto-extras]').forEach(el => el.onclick = () => {
+    const serviceKey = el.dataset.gotoExtras;
     const isGroup = serviceKey === 'common_area';
 
     if(state.bookingUrgency === 'scheduled' && !state.bookingScheduledAt){
       showToast(t('pleaseSelectDatetime')); return;
     }
+    if(isGroup){
+      const anySelected = Object.values(state.bookingCommonAreaSelections).some(v => v && v.checked);
+      if(!anySelected){ showToast(t('pleaseSelectSubOption')); return; }
+    }
+    state.bookingStep = 'extras';
+    render();
+  });
+
+  document.querySelectorAll('[data-goto-receipt]').forEach(el => el.onclick = () => {
+    const serviceKey = el.dataset.gotoReceipt;
+    const isGroup = serviceKey === 'common_area';
 
     let draft;
     if(isGroup){
       const selections = Object.entries(state.bookingCommonAreaSelections)
         .filter(([, v]) => v && v.checked)
         .map(([key]) => ({ key }));
-      if(selections.length === 0){ showToast(t('pleaseSelectSubOption')); return; }
       const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
       const propertyId = state.bookingPropertyId || commonAreaProps[0]?.id;
       if(!propertyId) return;
@@ -2684,7 +2773,6 @@ function attachHandlers(){
         hasChemicals: state.bookingHasChemicals,
         addons: [],
         serviceParams: { selections },
-        paymentMethod: state.bookingPaymentMethod,
       };
     } else {
       const props = [...state.properties.owned, ...state.properties.delegated];
@@ -2701,23 +2789,25 @@ function attachHandlers(){
         hasEquipment: state.bookingHasEquipment,
         hasChemicals: state.bookingHasChemicals,
         addons,
-        paymentMethod: state.bookingPaymentMethod,
       };
     }
 
-    if(state.bookingPaymentMethod === 'card' && !state.savedCard){
-      state.pendingBooking = draft;
-      state.modal = 'card-form';
-      render();
-      return;
-    }
     state.pendingBooking = draft;
-    state.bookingStep = 'receipt';
+    state.bookingStep = 'checklist';
     render();
   });
 
   const backToConfig = document.querySelector('[data-back-to-config]');
   if(backToConfig) backToConfig.onclick = () => { state.bookingStep = 'config'; render(); };
+
+  const backToExtras = document.querySelector('[data-back-to-extras]');
+  if(backToExtras) backToExtras.onclick = () => { state.bookingStep = 'extras'; render(); };
+
+  const backToChecklist = document.querySelector('[data-back-to-checklist]');
+  if(backToChecklist) backToChecklist.onclick = () => { state.bookingStep = 'checklist'; render(); };
+
+  const continueToPayment = document.querySelector('[data-continue-to-payment]');
+  if(continueToPayment) continueToPayment.onclick = () => { state.bookingStep = 'receipt'; render(); };
 
   const applyPromoBtn = document.getElementById('apply-promo-btn');
   if(applyPromoBtn) applyPromoBtn.onclick = async () => {
@@ -2742,6 +2832,10 @@ function attachHandlers(){
   const confirmBooking = document.querySelector('[data-confirm-booking]');
   if(confirmBooking) confirmBooking.onclick = async () => {
     if(!state.pendingBooking) return;
+    if(!state.pendingBooking.paymentMethod){
+      showToast(t('pleaseSelectPaymentMethod'));
+      return;
+    }
     const bookingToSubmit = { ...state.pendingBooking };
     if(state.promoValidation && state.promoValidation.discountAmount){
       bookingToSubmit.promoCode = state.promoCodeInput;
@@ -2780,7 +2874,7 @@ function attachHandlers(){
         state.pendingSyncPropertyId = null;
         await performSync(propId, 'card');
       } else if(state.pendingBooking){
-        state.bookingStep = 'receipt';
+        state.pendingBooking = { ...state.pendingBooking, paymentMethod: 'card' };
         render();
       } else {
         showToast(t('toastCardSaved'));
