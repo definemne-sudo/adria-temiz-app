@@ -39,8 +39,8 @@
   .app{display:flex; min-height:100vh;}
 
   .auth-wrap{
-    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    width:100%; min-height:100vh; padding:24px 0; overflow:hidden;
+    position:relative; display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    width:100%; min-height:100vh; padding:0; overflow:hidden;
     background:
       radial-gradient(circle at 20% 15%, rgba(29,158,115,.16), transparent 50%),
       radial-gradient(circle at 88% 78%, rgba(201,138,62,.13), transparent 45%),
@@ -49,17 +49,17 @@
   .auth-bg-motif{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
   .auth-left{
     position:relative; z-index:1; width:100%; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; padding:4px 24px; flex:none;
+    align-items:center; justify-content:center; padding:20px 24px; flex:1;
   }
-  .auth-left .brand{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-bottom:8px; }
-  .auth-left .brand svg{ width:44px; height:44px; display:block; }
-  .auth-left .brand h1{ font-size:22px; color:#fff; letter-spacing:0.04em; }
+  .auth-left .brand{ display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:10px; }
+  .auth-left .brand svg{ width:76px; height:76px; display:block; }
+  .auth-left .brand h1{ font-size:32px; color:#fff; letter-spacing:0.04em; }
   .auth-left .auth-headline{
-    font-family:'Fraunces',serif; font-weight:500; font-style:italic; font-size:13.5px;
-    color:rgba(255,255,255,.88); text-align:center; max-width:280px; line-height:1.4;
+    font-family:'Fraunces',serif; font-weight:500; font-style:italic; font-size:16.5px;
+    color:rgba(255,255,255,.88); text-align:center; max-width:300px; line-height:1.4;
   }
-  .auth-left .auth-accent-rule{ background:linear-gradient(90deg, var(--sage), var(--ochre)); width:40px; height:3px; border-radius:3px; margin:10px auto 0; }
-  .auth-right{ position:relative; z-index:1; width:100%; display:flex; justify-content:center; padding:14px 20px 4px; }
+  .auth-left .auth-accent-rule{ background:linear-gradient(90deg, var(--sage), var(--ochre)); width:48px; height:3px; border-radius:3px; margin:14px auto 0; }
+  .auth-right{ position:relative; z-index:1; width:100%; flex:none; display:flex; justify-content:center; padding:14px 20px 32px; }
   .auth-panel-stack{ width:100%; max-width:420px; }
   .auth-lang-above{ display:flex; justify-content:center; margin-bottom:14px; }
   .auth-lang-above .lang-switch{ margin-bottom:0; justify-content:center; }
