@@ -8,6 +8,8 @@
 <meta name="theme-color" content="#0F3D2E" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
   :root{
     --navy:#0F3D2E;
@@ -421,6 +423,12 @@ const T = {
   emptyBookings: "Sipariş bulunamadı.",
   emptyWorkers: "Personel bulunamadı.",
   emptyCustomers: "Müşteri bulunamadı.",
+  liveMapTitle: "Canlı Harita",
+  refreshBtn: "Yenile",
+  emptyLiveMap: "Şu an çevrimiçi/konumu bilinen personel yok.",
+  legendAvailable: "Müsait",
+  legendBusy: "Meşgul",
+  onlineNowLabel: "{{count}} çevrimiçi",
   revenueOverviewTitle: "Ciro Görünümü (Son 7 Gün)",
   revenueVsPrevious: "önceki döneme göre",
   navSupport: "Destek",
@@ -505,6 +513,7 @@ let state = {
   workers: null,
   customers: null,
   revenue: null,
+  liveLocations: null,
   chats: null,
   servicesData: null,
   editedPricing: {},
@@ -546,6 +555,9 @@ let state = {
 function render(){
   document.getElementById('app').innerHTML = (state.token && state.user) ? renderPanel() : renderAuth();
   attachHandlers();
+  if(state.token && state.page === 'dashboard' && state.liveLocations){
+    initLiveMap(state.liveLocations);
+  }
 }
 
 function showToast(msg){
@@ -664,6 +676,51 @@ function statIcon(kind){
   return icons[kind] || '';
 }
 
+function renderLiveMapPanel(){
+  const workers = state.liveLocations;
+  const onlineCount = workers ? workers.length : 0;
+  return `
+  <div class="panel-card" style="margin-bottom:16px;">
+    <div class="panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+      <h3>${T.liveMapTitle}</h3>
+      <button type="button" class="btn ghost btn-sm" id="refresh-map-btn">${T.refreshBtn}</button>
+    </div>
+    ${!workers ? `<div class="empty-state" style="margin:0;">…</div>` : workers.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyLiveMap}</div>` : ''}
+    <div id="live-map" style="height:340px; border-radius:10px; overflow:hidden; margin-top:${workers && workers.length>0 ? '0':'12px'}; ${workers && workers.length>0 ? '':'display:none;'}"></div>
+    <div style="display:flex; gap:16px; margin-top:12px; font-size:12px; color:var(--muted);">
+      <span><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--sage); margin-right:5px;"></span>${T.legendAvailable}</span>
+      <span><span style="display:inline-block; width:9px; height:9px; border-radius:50%; background:#C98A3E; margin-right:5px;"></span>${T.legendBusy}</span>
+      <span style="margin-left:auto;">${tt('onlineNowLabel',{count:onlineCount})}</span>
+    </div>
+  </div>`;
+}
+
+let liveMapInstance = null;
+function initLiveMap(workers){
+  const container = document.getElementById('live-map');
+  if(!container || typeof L === 'undefined') return;
+  if(liveMapInstance){ try{ liveMapInstance.remove(); }catch(e){} liveMapInstance = null; }
+  if(!workers || workers.length === 0) return;
+
+  const center = [workers[0].current_lat, workers[0].current_lng];
+  const map = L.map('live-map', { zoomControl: true }).setView(center, 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+  const bounds = [];
+  workers.forEach(w => {
+    const color = w.isBusy ? '#C98A3E' : '#1D9E73';
+    const icon = L.divIcon({
+      className: '', html: `<div style="width:16px; height:16px; border-radius:50%; background:${color}; border:2.5px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35);"></div>`,
+      iconSize: [16,16], iconAnchor: [8,8],
+    });
+    L.marker([w.current_lat, w.current_lng], { icon }).addTo(map)
+      .bindPopup(`<strong>${w.name}</strong><br/>${w.current_city||''}<br/>${w.isBusy ? T.legendBusy : T.legendAvailable}`);
+    bounds.push([w.current_lat, w.current_lng]);
+  });
+  if(bounds.length > 1) map.fitBounds(bounds, { padding: [30,30] });
+  liveMapInstance = map;
+}
+
 function renderRevenuePanel(){
   const r = state.revenue;
   if(!r) return `<div class="panel-card" style="margin-bottom:16px;"><div class="empty-state" style="margin:0;">…</div></div>`;
@@ -769,6 +826,7 @@ function renderDashboard(){
     `).join('')}
   </div>
 
+  ${renderLiveMapPanel()}
   ${renderRevenuePanel()}
 
   <div class="dash-grid">
@@ -1744,6 +1802,25 @@ async function loadRevenue(){
   state.revenue = await api('/admin/revenue?days=7');
   render();
 }
+async function loadLiveLocations(){
+  const data = await api('/admin/workers/live-locations');
+  state.liveLocations = data.workers;
+  render();
+}
+
+// WebSocket kurmadan "canlı" hissi vermek için basit periyodik yenileme -
+// yalnızca admin Dashboard'dayken çalışır, başka sayfaya geçince durur
+// (gereksiz istek atmasın diye).
+let liveMapPollInterval = null;
+function startLiveMapPolling(){
+  stopLiveMapPolling();
+  liveMapPollInterval = setInterval(() => {
+    if(state.page === 'dashboard' && state.token) loadLiveLocations().catch(() => {});
+  }, 20000);
+}
+function stopLiveMapPolling(){
+  if(liveMapPollInterval){ clearInterval(liveMapPollInterval); liveMapPollInterval = null; }
+}
 async function loadChats(){
   state.chats = await api('/admin/chats');
   render();
@@ -1850,14 +1927,17 @@ function attachHandlers(){
       state.authError = '';
       await loadDashboard();
       await loadRevenue();
+      await loadLiveLocations();
+      startLiveMapPolling();
       await loadApplications();
     }catch(err){ state.authError = err.message; render(); }
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
     state.page = el.dataset.page; render();
+    if(state.page === 'dashboard'){ await loadDashboard(); await loadRevenue(); await loadLiveLocations(); startLiveMapPolling(); }
+    else stopLiveMapPolling();
     if(state.page === 'applications') await loadApplications();
-    if(state.page === 'dashboard'){ await loadDashboard(); await loadRevenue(); }
     if(state.page === 'bookings') await loadBookings(1);
     if(state.page === 'workers') await loadWorkers();
     if(state.page === 'customers') await loadCustomers();
@@ -1925,6 +2005,9 @@ function attachHandlers(){
   if(cancelPrev) cancelPrev.onclick = async () => { state.financeOffset -= 1; await loadFinanceCancellations(); };
   const cancelNext = document.getElementById('cancel-next');
   if(cancelNext) cancelNext.onclick = async () => { state.financeOffset += 1; await loadFinanceCancellations(); };
+
+  const refreshMapBtn = document.getElementById('refresh-map-btn');
+  if(refreshMapBtn) refreshMapBtn.onclick = async () => { await loadLiveLocations(); };
 
   const financeExportBtn = document.getElementById('finance-export-btn');
   if(financeExportBtn) financeExportBtn.onclick = async () => {
@@ -2196,6 +2279,7 @@ function attachHandlers(){
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
+    stopLiveMapPolling();
     localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
     state.token = null; state.user = null; render();
   };
@@ -2239,6 +2323,8 @@ function attachHandlers(){
     try{
       await loadDashboard();
       await loadRevenue();
+      await loadLiveLocations();
+      startLiveMapPolling();
       await loadApplications();
     }catch(err){
       localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
