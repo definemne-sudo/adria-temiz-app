@@ -240,7 +240,8 @@
       display:flex; flex-direction:column; align-items:center; gap:2px;
       font-size:10.5px; font-weight:700; color:#9FB3AE; padding:5px 16px; border-radius:10px; cursor:pointer;
     }
-    .nav-item-mobile .icon{ font-size:19px; }
+    .nav-item-mobile .icon{ display:flex; }
+    .nav-item-mobile .icon svg{ width:19px; height:19px; }
     .nav-item-mobile.active{ color:#fff; background:rgba(255,255,255,.12); }
 
     .main{ padding:16px; padding-bottom:88px; max-width:100%; }
@@ -1017,27 +1018,27 @@ const SERVICE_I18N = {
 };
 const COMMON_AREA_SUB_I18N = {
   staircase: {
-    icon: '🪜',
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20v-4h4v-4h4v-4h4V4h4"/></svg>',
     tr: { name: "Merdiven Temizliği" },
     en: { name: "Staircase Cleaning" },
     me: { name: "Čišćenje stepeništa" },
   },
   corridor: {
-    icon: '🚪',
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><circle cx="14.3" cy="12" r="1"/></svg>',
     tr: { name: "Kat Koridoru Temizliği" },
     en: { name: "Floor Corridor Cleaning" },
     me: { name: "Čišćenje hodnika" },
   },
   elevator: {
-    icon: '🛗',
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M10 9l2-2 2 2M10 15l2 2 2-2"/></svg>',
     tr: { name: "Asansör Temizliği" },
     en: { name: "Elevator Cleaning" },
     me: { name: "Čišćenje lifta" },
   },
 };
 const ADDON_I18N = {
-  carpet: { icon: '🧶', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
-  upholstery: { icon: '🛋️', tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
+  carpet: { icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M7 5v14M17 5v14M3 10h18M3 14h18"/></svg>', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
+  upholstery: { icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M4 12h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1v1.5a.5.5 0 0 1-1 0V18H6v1.5a.5.5 0 0 1-1 0V18H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z"/></svg>', tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
 };
 // Backend'deki catalog.js'teki SUPPLIES_FEES ile birebir aynı olmalı -
 // burada sadece anlık fiyat önizlemesi için kullanılıyor, gerçek fiyat
@@ -1083,32 +1084,34 @@ function commonAreaSubLabel(key){
   const s = COMMON_AREA_SUB_I18N[key];
   return s ? (s[state.lang]?.name || s.tr.name) : key;
 }
+const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 function commonAreaSubIcon(key){
-  return (COMMON_AREA_SUB_I18N[key] && COMMON_AREA_SUB_I18N[key].icon) || '➕';
+  return (COMMON_AREA_SUB_I18N[key] && COMMON_AREA_SUB_I18N[key].icon) || FALLBACK_PLUS_ICON;
 }
 
 function serviceLabel(key){
   const s = SERVICE_I18N[key];
   return s ? (s[state.lang] || s.tr) : { name:key, description:'' };
 }
+const FALLBACK_SERVICE_ICON_SVG = '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4l-2.7 2.7-2-2z"/></svg>';
 function serviceIcon(key){
   const entry = SERVICE_I18N[key];
-  if(!entry) return { type:'emoji', value:'🧹' };
+  if(!entry) return { type:'svg', value: FALLBACK_SERVICE_ICON_SVG };
   if(entry.iconImg) return { type:'img', value: entry.iconImg };
-  return { type:'emoji', value: entry.icon || '🧹' };
+  return { type:'svg', value: FALLBACK_SERVICE_ICON_SVG };
 }
 function serviceIconHtml(key){
   const icon = serviceIcon(key);
   return icon.type === 'img'
     ? `<img src="${icon.value}" alt="" />`
-    : `<span style="font-size:40px; line-height:1;">${icon.value}</span>`;
+    : `<span style="display:inline-flex; width:40px; height:40px; color:var(--sage-dark);">${icon.value}</span>`;
 }
 function addonLabel(key){
   const a = ADDON_I18N[key];
   return a ? (a[state.lang] || a.tr) : key;
 }
 function addonIcon(key){
-  return (ADDON_I18N[key] && ADDON_I18N[key].icon) || '➕';
+  return (ADDON_I18N[key] && ADDON_I18N[key].icon) || FALLBACK_PLUS_ICON;
 }
 // Her mülk için tutarlı, markaya uygun bir renk üretir - kullanıcı her
 // mülkünü kendine özgü, tanıdık bir renkle görsün diye (gerçek fotoğraf
@@ -1450,7 +1453,10 @@ function renderRatingScreen(){
 
 function renderChatWidget(){
   return `
-  <button class="chat-fab" id="chat-fab" aria-label="${t('chatButtonAria')}">${state.chatOpen ? '✕' : '💬'}</button>
+  <button class="chat-fab" id="chat-fab" aria-label="${t('chatButtonAria')}">${state.chatOpen
+    ? '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.5-4.7L21 4l-1 4.2A8 8 0 1 1 4 12z"/></svg>'
+  }</button>
   ${state.chatOpen ? `
     <div class="chat-panel" id="chat-panel">
       <div class="chat-panel-header">
@@ -1478,7 +1484,12 @@ function renderChatWidget(){
 
 function renderPanel(){
   const isCompany = state.user.accountType === 'company';
-  const NAV_ICONS = { services:'🧹', properties:'🏠', jobs:'🧾', profile:'👤' };
+  const NAV_ICONS = {
+    services: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4l-2.7 2.7-2-2z"/></svg>',
+    properties: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>',
+    jobs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M9 11h6M9 15h6M9 7h1"/></svg>',
+    profile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M5 21c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/></svg>',
+  };
   const navItem = (page, label) => `<div class="nav-item ${state.page===page?'active':''}" data-page="${page}">${label}</div>`;
   const bottomNavItem = (page, label) => `
     <div class="nav-item-mobile ${state.page===page?'active':''}" data-page="${page}">
@@ -1696,7 +1707,7 @@ function renderConfigStep(service, props, selectedProperty){
         <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px; ${disabled?'opacity:.55;':''}">
           <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:${disabled?'not-allowed':'pointer'};">
             <input type="checkbox" data-common-area-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} ${disabled?'disabled':''} />
-            <span style="font-size:16px;">${commonAreaSubIcon(sub.key)}</span>
+            <span style="color:var(--navy);">${commonAreaSubIcon(sub.key)}</span>
             <span style="flex:1;">${commonAreaSubLabel(sub.key)}</span>
             ${preview !== null ? `<span style="color:var(--muted); font-size:12px;">${preview}€</span>` : ''}
           </label>
@@ -1809,7 +1820,7 @@ function renderExtrasStep(service, props, selectedProperty){
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
           <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
             <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
-            <span style="font-size:16px;">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
+            <span style="color:var(--navy);">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
           </label>
           ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
         </div>
