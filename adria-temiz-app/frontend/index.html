@@ -2100,7 +2100,7 @@ function renderExtrasStep(service, props, selectedProperty){
 
     ${!isGroup ? `
       <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
-      ${state.addons.map(a => `
+      ${state.addons.filter(a => service.key !== 'office' || a.key !== 'carpet').map(a => `
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
           <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
             <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
