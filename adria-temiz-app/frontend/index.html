@@ -2665,6 +2665,17 @@ async function loadAll(){
 // ortalamak için kullanılıyor. İzin verilmezse/başarısız olursa sessizce
 // null döner - harita o zaman Karadağ geneline (varsayılan görünüme) açılır,
 // müşteri şehir seçince ya da elle tıklayınca konumlanır.
+// <input type="datetime-local"> ham değeri (örn. "2026-08-15T14:00") hiçbir
+// saat dilimi bilgisi taşımaz - backend'e bu haliyle gönderilirse, sunucu
+// bunu KENDİ saat diliminde (genelde UTC) yorumlar, müşterinin gerçekte
+// seçtiği yerel saatten 1-2 saat kayar. Bu yüzden dönüşümü, müşterinin
+// gerçek yerel saat dilimini bilen TARAYICIDA yapıp, sunucuya her zaman
+// kesin (Z'li) bir UTC zaman damgası gönderiyoruz.
+function localDatetimeToUtcIso(naiveLocalValue){
+  if(!naiveLocalValue) return naiveLocalValue;
+  return new Date(naiveLocalValue).toISOString();
+}
+
 function attemptPhoneGeolocation(){
   return new Promise((resolve) => {
     if(!navigator.geolocation){ resolve(null); return; }
@@ -3205,7 +3216,7 @@ function attachHandlers(){
       draft = {
         propertyId, serviceKey,
         urgency: state.bookingUrgency,
-        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+        scheduledAt: state.bookingUrgency === 'scheduled' ? localDatetimeToUtcIso(state.bookingScheduledAt) : undefined,
         hasEquipment: state.bookingHasEquipment,
         hasChemicals: state.bookingHasChemicals,
         addons: [],
@@ -3222,7 +3233,7 @@ function attachHandlers(){
       draft = {
         propertyId, serviceKey,
         urgency: state.bookingUrgency,
-        scheduledAt: state.bookingUrgency === 'scheduled' ? state.bookingScheduledAt : undefined,
+        scheduledAt: state.bookingUrgency === 'scheduled' ? localDatetimeToUtcIso(state.bookingScheduledAt) : undefined,
         hasEquipment: state.bookingHasEquipment,
         hasChemicals: state.bookingHasChemicals,
         addons,
