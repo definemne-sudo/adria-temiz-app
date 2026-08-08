@@ -68,6 +68,10 @@ async function dispatchJob(jobId) {
     )
     .get(jobId);
   if (!job || job.status !== 'pending') return;
+  if (!job.property_city) {
+    console.error(`dispatchJob: iş ${jobId} için mülkün şehri boş - dağıtım yapılamıyor. Mülk kaydını kontrol et.`);
+    return;
+  }
 
   const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
   const candidates = findEligibleStaff(job.property_city, job.property_latitude, job.property_longitude, notifiedIds);
