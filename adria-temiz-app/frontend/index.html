@@ -605,6 +605,14 @@ const TRANSLATIONS = {
     icalNotLinked: "iCal bağlı değil (demo verisiyle senkronla)",
     requestServiceBtn: "Hizmet talep et",
     syncDemoBtn: "Takvimi senkronla",
+    editBtn: "Düzenle",
+    saveBtn: "Kaydet",
+    editPropertyModalTitle: "Mülkü Düzenle",
+    deletePropertyBtn: "Mülkü Sil",
+    confirmDeletePropertyTitle: "Mülkü sil",
+    confirmDeletePropertyHint: "Bu işlem geri alınamaz. Emin misin?",
+    toastPropertyUpdated: "Mülk güncellendi.",
+    toastPropertyDeleted: "Mülk silindi.",
     statusPending: "Bekliyor", statusAssigned: "Atandı", statusInProgress: "Devam ediyor",
     statusDone: "Tamamlandı", statusConfirmed: "Onaylandı", statusCancelled: "İptal",
     ordersTitle: "Siparişlerim",
@@ -835,6 +843,14 @@ const TRANSLATIONS = {
     icalNotLinked: "iCal not linked (sync with demo data)",
     requestServiceBtn: "Request service",
     syncDemoBtn: "Sync calendar",
+    editBtn: "Edit",
+    saveBtn: "Save",
+    editPropertyModalTitle: "Edit Property",
+    deletePropertyBtn: "Delete Property",
+    confirmDeletePropertyTitle: "Delete property",
+    confirmDeletePropertyHint: "This can't be undone. Are you sure?",
+    toastPropertyUpdated: "Property updated.",
+    toastPropertyDeleted: "Property deleted.",
     statusPending: "Pending", statusAssigned: "Assigned", statusInProgress: "In progress",
     statusDone: "Done", statusConfirmed: "Confirmed", statusCancelled: "Cancelled",
     ordersTitle: "My Orders",
@@ -1065,6 +1081,14 @@ const TRANSLATIONS = {
     icalNotLinked: "iCal nije povezan (sinhronizuj sa demo podacima)",
     requestServiceBtn: "Naruči uslugu",
     syncDemoBtn: "Sinhronizuj kalendar",
+    editBtn: "Izmijeni",
+    saveBtn: "Sačuvaj",
+    editPropertyModalTitle: "Izmijeni nekretninu",
+    deletePropertyBtn: "Obriši nekretninu",
+    confirmDeletePropertyTitle: "Obriši nekretninu",
+    confirmDeletePropertyHint: "Ovo se ne može poništiti. Jesi li siguran?",
+    toastPropertyUpdated: "Nekretnina ažurirana.",
+    toastPropertyDeleted: "Nekretnina obrisana.",
     statusPending: "Na čekanju", statusAssigned: "Dodijeljeno", statusInProgress: "U toku",
     statusDone: "Završeno", statusConfirmed: "Potvrđeno", statusCancelled: "Otkazano",
     ordersTitle: "Moje narudžbe",
@@ -1374,6 +1398,8 @@ let state = {
   regBathroomCount: 1,
   regPropertyName: '',
   regPropertyCity: '',
+  editPropertyId: null,
+  deletePropertyTargetId: null,
   regPropertyAddress: '',
   regPropertyIcalUrl: '',
   authError: '',
@@ -2204,6 +2230,7 @@ function renderPropertyUnitRow(p){
     <div style="display:flex; gap:6px; flex-shrink:0;">
       <button class="btn ochre btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
       ${p.category!=='office' ? `<button class="btn ghost btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
+      <button class="btn ghost btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-edit-property="${p.id}">${t('editBtn')}</button>
     </div>
   </div>`;
 }
@@ -2265,6 +2292,7 @@ function renderProperties(){
           <div class="row-actions">
             <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
             ${p.category!=='office' ? `<button class="btn ghost btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
+            <button class="btn ghost btn-sm" data-edit-property="${p.id}">${t('editBtn')}</button>
           </div>
         </div>
       `).join('')}
@@ -2611,7 +2639,13 @@ function renderModal(){
             <div>
               ${state.propertyCategory==='common_area' ? `
                 <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
-                <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+                <div class="field">
+                  <label>${t('propertyCityLabel')}</label>
+                  <select id="modal-property-city" name="city" required>
+                    <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
+                    ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
+                  </select>
+                </div>
                 <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
                 <div class="hint" style="margin:14px 0 10px;">${t('commonAreaPropertyHint')}</div>
                 <div class="field"><label>${t('floorCountLabel')}</label><input name="floorCount" type="number" min="1" placeholder="5" /></div>
@@ -2620,7 +2654,13 @@ function renderModal(){
               ` : `
                 <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
                 ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
-                <div class="field"><label>${t('propertyCityLabel')}</label><input name="city" placeholder="${t('propertyCityPlaceholder')}" /></div>
+                <div class="field">
+                  <label>${t('propertyCityLabel')}</label>
+                  <select id="modal-property-city" name="city" required>
+                    <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
+                    ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
+                  </select>
+                </div>
                 <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
                 <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
                 ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
@@ -2639,6 +2679,63 @@ function renderModal(){
             <button type="submit" class="btn ochre">${t('addBtn')}</button>
           </div>
         </form>
+      </div>
+    </div>`;
+  }
+  if(state.modal === 'edit-property'){
+    const allProps = [...state.properties.owned, ...state.properties.delegated];
+    const p = allProps.find(x => x.id === state.editPropertyId);
+    if(!p) return '';
+    const isCommonArea = p.category === 'common_area';
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal" style="max-width:700px;">
+        <h3>${t('editPropertyModalTitle')}</h3>
+        <form id="edit-property-form">
+          <div class="two-col">
+            <div>
+              <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required value="${p.name || ''}" /></div>
+              <div class="field">
+                <label>${t('propertyCityLabel')}</label>
+                <select id="edit-property-city" name="city" required>
+                  <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
+                  ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
+                </select>
+              </div>
+              <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" value="${p.address || ''}" /></div>
+              ${!isCommonArea ? `<div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" value="${p.size_sqm || ''}" /></div>` : `
+                <div class="field"><label>${t('floorCountLabel')}</label><input name="floorCount" type="number" min="1" value="${p.floor_count || ''}" /></div>
+                <div class="field"><label>${t('sqmPerFloorLabel')}</label><input name="sqmPerFloor" type="number" min="1" value="${p.sqm_per_floor || ''}" /></div>
+                <div class="field"><label>${t('elevatorCapacityLabel')}</label><input name="elevatorCapacity" type="number" min="1" value="${p.elevator_capacity || ''}" /></div>
+              `}
+            </div>
+            <div>
+              <div class="field">
+                <label>${t('propertyLocationLabel')}</label>
+                <div id="modal-map" class="mini-map" style="height:220px;"></div>
+                <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" class="btn ghost" id="modal-delete-property" style="color:var(--danger); border-color:#e6c3b3;">${t('deletePropertyBtn')}</button>
+            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="submit" class="btn ochre">${t('saveBtn')}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  }
+  if(state.modal === 'confirm-delete-property'){
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal">
+        <h3>${t('confirmDeletePropertyTitle')}</h3>
+        <div class="hint" style="margin:-6px 0 18px;">${t('confirmDeletePropertyHint')}</div>
+        <div class="actions">
+          <button type="button" class="btn ghost" id="modal-cancel-delete">${t('cancelBtn')}</button>
+          <button type="button" class="btn ochre" id="confirm-delete-property-btn" style="background:var(--danger);">${t('deletePropertyBtn')}</button>
+        </div>
       </div>
     </div>`;
   }
@@ -3013,7 +3110,7 @@ function attachHandlers(){
   };
 
   const addPropBtn = document.getElementById('add-property');
-  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; state.propertyCategory = 'apartment'; render(); };
+  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; state.propertyCategory = 'apartment'; state.regPropertyCity = ''; render(); };
 
   const bulkAddOpen = document.getElementById('bulk-add-open');
   if(bulkAddOpen) bulkAddOpen.onclick = () => {
@@ -3318,7 +3415,7 @@ function attachHandlers(){
     state.modal = null; state.regLat = null; state.regLng = null;
     state.pendingBooking = null; state.pendingSyncPropertyId = null;
     state.syncPropertyId = null; state.syncStep = 'url'; state.syncIcalUrl = ''; state.syncUseDemo = false;
-    state.cancelJobTargetId = null;
+    state.cancelJobTargetId = null; state.editPropertyId = null; state.regPropertyCity = '';
     state.authError=''; render();
   };
 
@@ -3349,6 +3446,62 @@ function attachHandlers(){
         render();
       }
     }catch(err){ state.authError = err.message; render(); }
+  };
+
+  const modalPropCity = document.getElementById('modal-property-city');
+  if(modalPropCity) modalPropCity.onchange = () => { state.regPropertyCity = modalPropCity.value; };
+
+  document.querySelectorAll('[data-edit-property]').forEach(el => el.onclick = () => {
+    const allProps = [...state.properties.owned, ...state.properties.delegated];
+    const p = allProps.find(x => x.id === el.dataset.editProperty);
+    if(!p) return;
+    state.editPropertyId = p.id;
+    state.regPropertyCity = p.city || '';
+    state.regLat = p.latitude || null;
+    state.regLng = p.longitude || null;
+    state.modal = 'edit-property';
+    render();
+  });
+
+  const editPropCity = document.getElementById('edit-property-city');
+  if(editPropCity) editPropCity.onchange = () => { state.regPropertyCity = editPropCity.value; };
+
+  const editPropertyForm = document.getElementById('edit-property-form');
+  if(editPropertyForm) editPropertyForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(editPropertyForm));
+    try{
+      await api(`/properties/${state.editPropertyId}`, { method:'PUT', body: JSON.stringify({
+        name: fd.name, city: fd.city, address: fd.address || null,
+        sizeSqm: fd.sizeSqm || null, floorCount: fd.floorCount || null,
+        sqmPerFloor: fd.sqmPerFloor || null, elevatorCapacity: fd.elevatorCapacity || null,
+        latitude: state.regLat, longitude: state.regLng,
+      })});
+      state.modal = null; state.editPropertyId = null;
+      state.regLat = null; state.regLng = null; state.regPropertyCity = '';
+      showToast(t('toastPropertyUpdated'));
+      await loadAll();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const modalDeleteProperty = document.getElementById('modal-delete-property');
+  if(modalDeleteProperty) modalDeleteProperty.onclick = () => { state.modal = 'confirm-delete-property'; render(); };
+
+  const modalCancelDelete = document.getElementById('modal-cancel-delete');
+  if(modalCancelDelete) modalCancelDelete.onclick = () => { state.modal = 'edit-property'; render(); };
+
+  const confirmDeletePropertyBtn = document.getElementById('confirm-delete-property-btn');
+  if(confirmDeletePropertyBtn) confirmDeletePropertyBtn.onclick = async () => {
+    try{
+      await api(`/properties/${state.editPropertyId}`, { method:'DELETE' });
+      state.modal = null; state.editPropertyId = null;
+      state.regLat = null; state.regLng = null; state.regPropertyCity = '';
+      showToast(t('toastPropertyDeleted'));
+      await loadAll();
+    }catch(err){
+      showToast(err.message);
+      state.modal = 'edit-property'; render();
+    }
   };
 
   const propForm = document.getElementById('property-form');
