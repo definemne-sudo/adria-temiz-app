@@ -111,6 +111,61 @@ function canAccessProperty(userId, propertyId) {
   return !!delegated;
 }
 
+// Bir mülkü düzenler - yalnızca SAHİBİ değiştirebilir (delege edilmiş
+// yönetim şirketi mülkün bilgilerini değiştiremez, sadece görebilir).
+// Bu, özellikle şehir gibi kritik alanların yanlış/boş girilmesi durumunda
+// (ki bu, sipariş dağıtımının sessizce hiç kimseye ulaşmamasına yol açar)
+// düzeltme imkânı sağlamak için eklendi.
+router.put('/:id', (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT * FROM properties WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Mülk bulunamadı.' });
+  if (existing.owner_id !== req.user.id) {
+    return res.status(403).json({ error: 'Sadece mülk sahibi düzenleyebilir.' });
+  }
+  const {
+    name, address, city, sizeSqm, latitude, longitude, buildingName,
+    floorCount, sqmPerFloor, elevatorCapacity, bedroomCount, bathroomCount,
+  } = req.body;
+
+  db.prepare(
+    `UPDATE properties SET
+       name = COALESCE(?, name), address = COALESCE(?, address), city = COALESCE(?, city),
+       size_sqm = COALESCE(?, size_sqm), latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
+       building_name = COALESCE(?, building_name), floor_count = COALESCE(?, floor_count),
+       sqm_per_floor = COALESCE(?, sqm_per_floor), elevator_capacity = COALESCE(?, elevator_capacity),
+       bedroom_count = COALESCE(?, bedroom_count), bathroom_count = COALESCE(?, bathroom_count)
+     WHERE id = ?`
+  ).run(
+    name || null, address || null, city || null,
+    sizeSqm ? Number(sizeSqm) : null, latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
+    buildingName || null, floorCount ? Number(floorCount) : null,
+    sqmPerFloor ? Number(sqmPerFloor) : null, elevatorCapacity ? Number(elevatorCapacity) : null,
+    bedroomCount ? Number(bedroomCount) : null, bathroomCount ? Number(bathroomCount) : null,
+    id
+  );
+  res.json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
+});
+
+// Bir mülkü siler - üzerinde AKTİF (tamamlanmamış) siparişi varsa silinemez,
+// veri bütünlüğünü bozmamak için.
+router.delete('/:id', (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT * FROM properties WHERE id = ?').get(id);
+  if (!existing) return res.status(404).json({ error: 'Mülk bulunamadı.' });
+  if (existing.owner_id !== req.user.id) {
+    return res.status(403).json({ error: 'Sadece mülk sahibi silebilir.' });
+  }
+  const activeJobs = db
+    .prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE property_id = ? AND status IN ('pending','assigned','in_progress')`)
+    .get(id).c;
+  if (activeJobs > 0) {
+    return res.status(409).json({ error: 'Bu mülkün aktif/bekleyen siparişleri var, önce onları tamamlat ya da iptal et.' });
+  }
+  db.prepare('DELETE FROM properties WHERE id = ?').run(id);
+  res.json({ message: 'Mülk silindi.' });
+});
+
 // Bir yönetim şirketinin, bireysel ev sahibine ait bir mülke erişim talebi
 // göndermesi (davet linki modelinin backend karşılığı, şablon 7.1).
 router.post('/:id/delegates', (req, res) => {
