@@ -1637,19 +1637,7 @@ function renderServicesPricing(){
   <div class="services-grid">
     ${priceableServices.map(s => renderServiceCard(s, [['base',T.fieldBase],['rate',T.fieldRate],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]])).join('')}
     ${d.commonAreaSubOptions.map(s => renderServiceCard(s, commonAreaFieldsFor(s))).join('')}
-  </div>
-
-  <div class="panel-card" style="margin-top:16px;">
-    <div class="panel-head"><h3>${T.addonsPricingTitle}</h3></div>
-    <form id="addons-pricing-form" style="display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end;">
-      ${d.addons.map(a => `
-        <div class="field" style="margin-bottom:0;">
-          <label>${a.name}</label>
-          <input name="${a.key}" type="number" step="0.5" value="${a.rate}" style="width:100px;" />
-        </div>
-      `).join('')}
-      <button class="btn ochre btn-sm" type="submit">${T.saveBtn}</button>
-    </form>
+    ${d.addons.map(a => renderServiceCard(a, [['rate',T.fieldRate]])).join('')}
   </div>
 
   <div class="panel-card" style="margin-top:16px;">
@@ -2216,19 +2204,6 @@ function attachHandlers(){
       await loadServicesData();
     }catch(err){ showToast(err.message); }
   });
-
-  const addonsPricingForm = document.getElementById('addons-pricing-form');
-  if(addonsPricingForm) addonsPricingForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = Object.fromEntries(new FormData(addonsPricingForm));
-    try{
-      await Promise.all(Object.entries(fd).map(([key, rate]) =>
-        api(`/admin/services/${key}/pricing`, { method:'PUT', body: JSON.stringify({ rate }) })
-      ));
-      showToast(T.savedToast);
-      await loadServicesData();
-    }catch(err){ showToast(err.message); }
-  };
 
   const suppliesPricingForm = document.getElementById('supplies-pricing-form');
   if(suppliesPricingForm) suppliesPricingForm.onsubmit = async (e) => {
