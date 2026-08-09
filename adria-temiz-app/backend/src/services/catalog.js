@@ -82,6 +82,15 @@ function getPricingValue(key, fallback = 0) {
   return row ? row.value : fallback;
 }
 
+// Bir hizmetin görev listesini (checklist) döner - hem admin panelinden
+// yönetiliyor hem artık müşteri uygulamasında "Checklist'i Gör" ekranında
+// gösteriliyor.
+function getChecklist(serviceKey) {
+  return db
+    .prepare('SELECT id, item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
+    .all(serviceKey);
+}
+
 // Yapısal tanımı + canlı fiyatlandırmayı birleştirip tek bir nesne döner.
 function getService(key) {
   const def = SERVICE_DEFS.find((s) => s.key === key);
@@ -93,6 +102,7 @@ function getService(key) {
     rate: getPricingValue(`${key}.rate`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
+    checklist: getChecklist(key),
   };
 }
 
@@ -107,13 +117,14 @@ function getCommonAreaSubOption(key) {
     ratePerCapacity: getPricingValue(`${key}.ratePerCapacity`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
+    checklist: getChecklist(key),
   };
 }
 
 function getAddon(key) {
   const def = ADDON_DEFS.find((a) => a.key === key);
   if (!def) throw new Error('Geçersiz ekstra hizmet.');
-  return { ...def, rate: getPricingValue(`${key}.rate`) };
+  return { ...def, rate: getPricingValue(`${key}.rate`), checklist: getChecklist(key) };
 }
 
 function getAllServices() {
@@ -220,7 +231,7 @@ module.exports = {
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
   getCommissionRate, getPayoutCycleDays,
-  getService, getAddon, getCommonAreaSubOption,
+  getService, getAddon, getCommonAreaSubOption, getChecklist,
   getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
   calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
