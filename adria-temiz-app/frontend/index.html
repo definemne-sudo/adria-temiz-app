@@ -173,6 +173,7 @@
 
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:28px;}
   .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column;}
+  .card-selected{ border-color:var(--sage-dark); border-width:1.5px; background:var(--bg); }
   .card .row-actions{margin-top:auto; padding-top:10px;}
   .card h3{font-size:15px; color:var(--navy); margin-bottom:4px;}
   .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
@@ -213,6 +214,37 @@
   .pay-badge.unpaid{color:var(--muted);}
   .pay-badge.held{color:var(--ochre);}
   .pay-badge.released{color:var(--sage-dark);}
+
+  .icon-btn-sm{
+    width:30px; height:30px; border-radius:50%; border:1px solid var(--line); background:var(--panel);
+    color:var(--muted); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; padding:0;
+  }
+  .icon-btn-sm:hover{ border-color:var(--sage); color:var(--sage-dark); }
+
+  .order-card-list{ display:flex; flex-direction:column; gap:12px; }
+  @media (min-width:820px){
+    .order-card-list{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  }
+  .order-card{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px;
+  }
+  .order-card-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .order-card-service-name{ font-size:14.5px; font-weight:700; color:var(--navy); }
+  .order-card-property{ font-size:12px; color:var(--muted); margin-top:2px; }
+  .order-card-meta{
+    display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; padding:12px 0;
+    border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); margin-bottom:12px;
+  }
+  .order-card-meta-item{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .order-card-meta-label{ font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
+  .order-card-meta-value{ font-size:13px; color:var(--text); display:flex; align-items:center; }
+  .order-card-price{ font-family:'Fraunces',serif; font-weight:600; color:var(--navy); }
+  .order-card-action{ display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+  @media (max-width:520px){
+    .order-card-meta{ grid-template-columns:1fr 1fr; }
+    .order-card-meta-item:last-child{ grid-column:1 / -1; }
+  }
+
   .empty-state{
     border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px; text-align:center; color:var(--muted);
   }
@@ -1246,6 +1278,9 @@ function commonAreaSubLabel(key){
 }
 const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 
+const EDIT_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.5-4.7L21 4l-1 4.2A8 8 0 1 1 4 12z"/></svg>';
+
 // Karadağ'ın başlıca belediye/şehirleri - kayıt akışında şehir artık elle
 // yazılmıyor, bu listeden seçiliyor. Koordinatlar, harita üzerinde o şehri
 // otomatik ortalamak için kullanılıyor (şehir merkezine yakın bir nokta).
@@ -1875,13 +1910,13 @@ function renderServices(){
         : selectedProperty;
       const preview = !isGroup ? calcPriceClient(s, { sizeSqm: previewProperty?.size_sqm }) : null;
       return `
-      <div class="card" style="${isOpen ? 'border-color:var(--sage-dark); border-width:1.5px;' : ''}">
+      <div class="card ${isOpen ? 'card-selected' : ''}">
         <div class="service-icon">${serviceIconHtml(s.key)}</div>
         <h3>${label.name}</h3>
         <div class="meta" style="margin-bottom:10px;">${label.description}</div>
         ${preview !== null ? `<div class="price">${preview} €${previewProperty?.size_sqm ? `<span style="font-size:12px;color:var(--muted);font-family:Inter"> · ${previewProperty.size_sqm} m²</span>` : ''}</div>` : ''}
         <div class="row-actions">
-          <button class="btn ochre btn-sm" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
+          <button class="btn ${isOpen ? 'ghost' : 'ochre'}" style="width:100%;" data-toggle-service="${s.key}">${isOpen ? t('closeBtn') : t('requestBtn')}</button>
         </div>
         ${isOpen ? `
           <div class="booking-panel-mobile-backdrop" data-close-booking-overlay="true"></div>
@@ -2227,10 +2262,10 @@ function renderPropertyUnitRow(p){
       <div style="font-size:13px; font-weight:600;">${p.name}</div>
       <div style="font-size:11.5px; color:var(--muted);">${categoryLabel(p.category)}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.address ? ' · ' + p.address : ''}</div>
     </div>
-    <div style="display:flex; gap:6px; flex-shrink:0;">
-      <button class="btn ochre btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
-      ${p.category!=='office' ? `<button class="btn ghost btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
-      <button class="btn ghost btn-sm" style="width:auto; padding:6px 10px; font-size:11.5px;" data-edit-property="${p.id}">${t('editBtn')}</button>
+    <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+      <button class="btn ochre btn-sm" style="width:auto; padding:6px 12px; font-size:11.5px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
+      ${p.category!=='office' ? `<button type="button" class="icon-btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}" title="${t('syncDemoBtn')}">${SYNC_ICON_SVG}</button>` : ''}
+      <button type="button" class="icon-btn-sm" data-edit-property="${p.id}" title="${t('editBtn')}">${EDIT_ICON_SVG}</button>
     </div>
   </div>`;
 }
@@ -2289,10 +2324,10 @@ function renderProperties(){
           <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
           <h3>${p.name}</h3>
           <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}</div>
-          <div class="row-actions">
-            <button class="btn ochre btn-sm" data-book="${p.id}">${t('requestServiceBtn')}</button>
-            ${p.category!=='office' ? `<button class="btn ghost btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}">${t('syncDemoBtn')}</button>` : ''}
-            <button class="btn ghost btn-sm" data-edit-property="${p.id}">${t('editBtn')}</button>
+          <button class="btn ochre" style="width:100%; margin-bottom:8px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
+          <div style="display:flex; justify-content:center; gap:8px;">
+            ${p.category!=='office' ? `<button type="button" class="icon-btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}" title="${t('syncDemoBtn')}">${SYNC_ICON_SVG}</button>` : ''}
+            <button type="button" class="icon-btn-sm" data-edit-property="${p.id}" title="${t('editBtn')}">${EDIT_ICON_SVG}</button>
           </div>
         </div>
       `).join('')}
@@ -2353,27 +2388,40 @@ function renderJobs(){
   ${state.jobs.length === 0 ? `
     <div class="empty-state">${t('ordersEmptyState')}</div>
   ` : `
-    <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>${t('colProperty')}</th><th>${t('colService')}</th><th>${t('colWhen')}</th><th>${t('colStatus')}</th><th>${t('colStaff')}</th><th>${t('colPrice')}</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${state.jobs.map(j => `
-          <tr>
-            <td><strong>${j.building_name || j.property_name}</strong><br/><span style="color:var(--muted);font-size:12px">${j.property_city||''}</span></td>
-            <td>${j.service_key==='common_area' ? renderCommonAreaJobSummary(j) : serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</td>
-            <td>${j.urgency==='urgent' ? t('urgent') : j.urgency==='now' ? t('now') : new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</td>
-            <td><span class="badge ${j.status}">${statusLabel(j.status)}</span></td>
-            <td>${renderAssignedStaff(j)}</td>
-            <td>${j.price} €</td>
-            <td>${renderJobAction(j)}</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+    <div class="order-card-list">
+      ${state.jobs.map(j => renderOrderCard(j)).join('')}
     </div>
   `}
+  `;
+}
+
+function renderOrderCard(j){
+  const whenText = j.urgency==='urgent' ? t('urgent') : j.urgency==='now' ? t('now') : new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'});
+  return `
+  <div class="order-card">
+    <div class="order-card-top">
+      <div class="order-card-service">
+        <div class="order-card-service-name">${j.service_key==='common_area' ? renderCommonAreaJobSummary(j) : serviceName(j.service_key)}${renderAddonsSummary(j.addons)}</div>
+        <div class="order-card-property">${j.building_name || j.property_name}${j.property_city ? ' · ' + j.property_city : ''}</div>
+      </div>
+      <span class="badge ${j.status}">${statusLabel(j.status)}</span>
+    </div>
+    <div class="order-card-meta">
+      <div class="order-card-meta-item">
+        <span class="order-card-meta-label">${t('colWhen')}</span>
+        <span class="order-card-meta-value">${whenText}</span>
+      </div>
+      <div class="order-card-meta-item">
+        <span class="order-card-meta-label">${t('colStaff')}</span>
+        <span class="order-card-meta-value">${renderAssignedStaff(j)}</span>
+      </div>
+      <div class="order-card-meta-item">
+        <span class="order-card-meta-label">${t('colPrice')}</span>
+        <span class="order-card-meta-value order-card-price">${j.price} €</span>
+      </div>
+    </div>
+    <div class="order-card-action">${renderJobAction(j)}</div>
+  </div>
   `;
 }
 
@@ -2396,9 +2444,8 @@ function renderJobAction(j){
   }
   if(!['done','confirmed'].includes(j.status)){
     return `
-      <span class="pay-badge" style="background:var(--bg); color:var(--muted);">${statusLabel(j.status)}</span>
-      <div style="font-size:11px; color:var(--muted); margin-top:4px;">${paymentNote(j.payment_method)}</div>
-      ${['pending','assigned'].includes(j.status) ? `<button type="button" class="btn ghost btn-sm" style="width:auto; margin-top:6px; padding:5px 10px; font-size:11px; color:var(--danger); border-color:#e6c3b3;" data-cancel-job="${j.id}">${t('cancelOrderBtn')}</button>` : ''}
+      <span style="font-size:11px; color:var(--muted);">${paymentNote(j.payment_method)}</span>
+      ${['pending','assigned'].includes(j.status) ? `<button type="button" class="btn ghost btn-sm" style="width:auto; padding:5px 10px; font-size:11px; color:var(--danger); border-color:#e6c3b3;" data-cancel-job="${j.id}">${t('cancelOrderBtn')}</button>` : ''}
     `;
   }
   return `<span class="pay-badge held">${t('settlingBadge')}</span>`;
