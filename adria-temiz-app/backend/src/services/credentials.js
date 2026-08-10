@@ -30,4 +30,15 @@ function generatePassword() {
   return out;
 }
 
-module.exports = { slugifyName, generateUsername, generatePassword };
+// Onaylanan personel başvurusuna verilen tek kullanımlık aktivasyon kodu -
+// başvuran, MICISTORad'da ilk girişte bu kodu girip kendi kullanıcı
+// adı/şifresini kendisi belirliyor. Karışmasın diye 0/O, 1/I gibi harfler
+// hariç tutuluyor.
+function generateActivationCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 8; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+module.exports = { slugifyName, generateUsername, generatePassword, generateActivationCode };
