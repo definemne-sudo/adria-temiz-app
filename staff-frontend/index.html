@@ -9,6 +9,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -167,12 +169,13 @@
 
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex;
-    align-items:flex-end; justify-content:center; z-index:50;
+    align-items:center; justify-content:center; z-index:50; padding:16px;
   }
   .modal{
-    background:#fff; border-radius:16px 16px 0 0; padding:22px; width:100%; max-width:480px;
+    background:#fff; border-radius:16px; padding:22px; width:100%; max-width:480px;
     max-height:85vh; overflow-y:auto;
   }
+  .mini-map{ width:100%; height:170px; border-radius:10px; overflow:hidden; margin-bottom:14px; background:var(--bg); }
   .detail-row{
     display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
     padding:10px 0; border-bottom:1px solid var(--line); font-size:13.5px;
@@ -222,6 +225,8 @@ const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg
   <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
   <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
+
+const SUPPORT_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M4 12a8 8 0 0 1 14.5-4.7L21 4l-1 4.2A8 8 0 1 1 4 12z"/></svg>';
 
 // Alt navigasyon ikonları - müşteri uygulamasındaki çizim (line icon)
 // stiliyle tutarlı: stroke tabanlı, currentColor, minimal.
@@ -340,6 +345,22 @@ const TRANSLATIONS = {
     detailTravelTimeUnknown: "Konumun alınamadı",
     detailPrice: "Fiyat",
     detailPaymentStatus: "Ödeme durumu",
+    detailScheduledFor: "Planlanan gün/saat",
+    willCollectCashHint: "💵 Bu işte ödemeyi müşteriden sen tahsil edeceksin.",
+    alreadyPaidHint: "✓ Ödeme zaten alınmış, senin tahsil etmene gerek yok.",
+    headOutBtn: "Yola Çık",
+    startJobBtn: "İşe Başla",
+    paymentReceivedCompleteBtn: "Ödeme Alındı, İşi Tamamla",
+    supportBtn: "Destek",
+    supportMessageAdminBtn: "Admin'e Mesaj Gönder",
+    supportReportBtn: "Kötü Davranış Bildir",
+    supportReportHint: "Bu işle ilgili yaşadığın uygunsuz bir durumu admin'e bildir.",
+    supportMessageHint: "Admin'e bu işle ilgili bir mesaj gönder.",
+    supportPlaceholder: "Mesajını yaz...",
+    supportEmptyError: "Lütfen bir mesaj yaz.",
+    toastSupportSent: "Mesajın admin'e iletildi.",
+    toastJobStarted: "İşe başladın.",
+    toastMustBeOnline: "Önce çevrimiçi olmalısın.",
     minutesShort: "{{count}} dk",
     travelEstimateNote: "(tahmini, trafiği hesaba katmaz)",
     payUnpaid: "Henüz tahsil edilmedi",
@@ -453,6 +474,22 @@ const TRANSLATIONS = {
     detailTravelTimeUnknown: "Couldn't get your location",
     detailPrice: "Price",
     detailPaymentStatus: "Payment status",
+    detailScheduledFor: "Scheduled for",
+    willCollectCashHint: "💵 You'll collect payment from the customer for this job.",
+    alreadyPaidHint: "✓ Payment has already been received, no need to collect anything.",
+    headOutBtn: "Head Out",
+    startJobBtn: "Start Job",
+    paymentReceivedCompleteBtn: "Payment Received, Complete Job",
+    supportBtn: "Support",
+    supportMessageAdminBtn: "Message Admin",
+    supportReportBtn: "Report Bad Behavior",
+    supportReportHint: "Report an inappropriate situation you experienced with this job to admin.",
+    supportMessageHint: "Send admin a message about this job.",
+    supportPlaceholder: "Write your message...",
+    supportEmptyError: "Please write a message.",
+    toastSupportSent: "Your message was sent to admin.",
+    toastJobStarted: "You started the job.",
+    toastMustBeOnline: "You need to be online first.",
     minutesShort: "{{count}} min",
     travelEstimateNote: "(estimate, doesn't account for traffic)",
     payUnpaid: "Not collected yet",
@@ -566,6 +603,22 @@ const TRANSLATIONS = {
     detailTravelTimeUnknown: "Nismo mogli dobiti tvoju lokaciju",
     detailPrice: "Cijena",
     detailPaymentStatus: "Status plaćanja",
+    detailScheduledFor: "Zakazano za",
+    willCollectCashHint: "💵 Ti ćeš naplatiti ovaj posao od klijenta.",
+    alreadyPaidHint: "✓ Plaćanje je već primljeno, ne treba ništa da naplaćuješ.",
+    headOutBtn: "Kreni na posao",
+    startJobBtn: "Počni posao",
+    paymentReceivedCompleteBtn: "Plaćanje primljeno, završi posao",
+    supportBtn: "Podrška",
+    supportMessageAdminBtn: "Pošalji poruku adminu",
+    supportReportBtn: "Prijavi loše ponašanje",
+    supportReportHint: "Prijavi adminu neprikladnu situaciju koju si doživio/la na ovom poslu.",
+    supportMessageHint: "Pošalji adminu poruku u vezi ovog posla.",
+    supportPlaceholder: "Napiši svoju poruku...",
+    supportEmptyError: "Molimo napiši poruku.",
+    toastSupportSent: "Tvoja poruka je poslata adminu.",
+    toastJobStarted: "Počeo/la si posao.",
+    toastMustBeOnline: "Prvo moraš biti online.",
     minutesShort: "{{count}} min",
     travelEstimateNote: "(procjena, ne uzima u obzir saobraćaj)",
     payUnpaid: "Još nije naplaćeno",
@@ -663,6 +716,8 @@ let state = {
   offerJob: null,
   offerError: '',
   showCityPicker: false,
+  supportView: null,
+  supportError: '',
   pendingOnlineToggle: false,
   detailJob: null,
   calendarWeekStart: formatDateKey(getMonday(new Date())),
@@ -854,6 +909,7 @@ function renderPanel(){
   ${state.detailJob ? renderJobDetailModal() : ''}
   ${state.offerJob ? renderOfferModal() : ''}
   ${state.showCityPicker ? renderCityPickerModal() : ''}
+  ${state.supportView ? renderSupportModal() : ''}
   `;
 }
 
@@ -868,6 +924,21 @@ function paymentBadgeHtml(j){
   if(j.payment_method === 'invoice') return `<span class="job-badge invoice">${t('invoiceBadge')}</span>`;
   return `<span class="job-badge cash">${t('cashBadge')}</span>`;
 }
+let staffMiniMapInstance = null;
+// İş kartı/teklif ekranındaki küçük haritayı başlatır - müşterinin mülk
+// konumunu tek bir sabit pinle gösterir, personel sürükleyip değiştiremez
+// (sadece nereye gideceğini görmesi için).
+function initStaffMiniMap(containerId, lat, lng){
+  const el = document.getElementById(containerId);
+  if(!el || typeof L === 'undefined' || !lat || !lng) return;
+  if(staffMiniMapInstance){ try{ staffMiniMapInstance.remove(); }catch(e){} staffMiniMapInstance = null; }
+  const map = L.map(containerId, { zoomControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, touchZoom:false }).setView([lat, lng], 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+  L.marker([lat, lng]).addTo(map);
+  staffMiniMapInstance = map;
+  setTimeout(() => map.invalidateSize(), 80);
+}
+
 function mapLink(j){
   if(j.property_latitude && j.property_longitude){
     return `https://www.google.com/maps?q=${j.property_latitude},${j.property_longitude}`;
@@ -879,7 +950,7 @@ function mapLink(j){
 function renderJobCard(j, mode){
   const icon = serviceIconSrc(j.service_key);
   return `
-  <div class="job-card">
+  <div class="job-card" data-open-detail="${j.id}" style="cursor:pointer;">
     <div class="top-row">
       <div class="job-icon">${icon ? `<img src="${icon}" alt="" />` : `<span>🧹</span>`}</div>
       <div style="flex:1; min-width:0;">
@@ -892,10 +963,6 @@ function renderJobCard(j, mode){
     <div style="display:flex; gap:6px; flex-wrap:wrap;">
       ${urgencyBadgeHtml(j)}
       ${paymentBadgeHtml(j)}
-    </div>
-    <div class="job-actions">
-      <a class="btn ghost btn-sm" style="text-align:center; text-decoration:none;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
-      ${mode==='mine' ? `<button class="btn ochre btn-sm" data-complete="${j.id}">${t('completeBtn')}</button>` : ''}
     </div>
   </div>`;
 }
@@ -1271,8 +1338,8 @@ function renderPendingJobCard(j){
   const icon = serviceIconSrc(j.service_key);
   const isOnline = !!state.user.isOnline;
   return `
-  <div class="job-card">
-    <div class="top-row" data-open-detail="${j.id}" style="cursor:pointer;">
+  <div class="job-card" data-open-offer="${j.id}" style="cursor:pointer; ${!isOnline?'opacity:.6;':''}">
+    <div class="top-row">
       <div class="job-icon">${icon ? `<img src="${icon}" alt="" />` : `<span>🧹</span>`}</div>
       <div style="flex:1; min-width:0;">
         <div class="job-title">${jobServiceLabel(j)}</div>
@@ -1280,11 +1347,10 @@ function renderPendingJobCard(j){
       </div>
       <div class="job-price">${j.price} €</div>
     </div>
-    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
       ${urgencyBadgeHtml(j)}
       ${paymentBadgeHtml(j)}
     </div>
-    <button type="button" class="btn ochre btn-sm" style="width:100%;" data-accept-pending="${j.id}" ${!isOnline?'disabled':''}>${t('acceptJobBtn')}</button>
   </div>`;
 }
 
@@ -1316,19 +1382,70 @@ function renderJobDetailModal(){
     travelHtml = `${t('minutesShort', { count: mins })} <span style="color:var(--muted); font-size:11px;">${t('travelEstimateNote')}</span>`;
   }
   const payLabel = j.payment_status==='released' ? t('payReleased') : j.payment_status==='held' ? t('payHeld') : t('payUnpaid');
+  const willCollectCash = j.payment_method === 'cash';
+
+  // İş akışı: assigned -> (Yola Çık, sadece navigasyon açar, durum değişmez)
+  // -> İşe Başla (in_progress) -> İşi Tamamla / nakitse Ödeme Alındı ve
+  // Tamamla (done). İş zaten tamamlanmışsa aksiyon gösterilmiyor.
+  let actionsHtml = '';
+  if(j.status === 'assigned'){
+    actionsHtml = `
+      <a class="btn ghost" style="text-align:center; text-decoration:none;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('headOutBtn')}</a>
+      <button class="btn ochre" data-start-job="${j.id}">${t('startJobBtn')}</button>
+    `;
+  } else if(j.status === 'in_progress'){
+    actionsHtml = `<button class="btn ochre" data-complete="${j.id}">${willCollectCash ? t('paymentReceivedCompleteBtn') : t('completeBtn')}</button>`;
+  }
+
   return `
   <div class="modal-backdrop" id="detail-backdrop">
     <div class="modal">
-      <h3 style="margin-bottom:16px;">${t('jobDetailTitle')}</h3>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:12px;">
+        <h3 style="margin-bottom:0;">${t('jobDetailTitle')}</h3>
+        <button type="button" id="open-support" style="display:flex; align-items:center; gap:5px; background:var(--bg); border:1px solid var(--line); border-radius:20px; padding:6px 12px; font-size:11.5px; font-weight:700; color:var(--navy); cursor:pointer; flex-shrink:0;">${SUPPORT_ICON} ${t('supportBtn')}</button>
+      </div>
+      ${j.property_latitude && j.property_longitude ? `<div id="detail-map" class="mini-map"></div>` : ''}
       <div class="job-icon" style="width:56px; height:56px; margin-bottom:14px;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:26px;">🧹</span>`}</div>
       <div class="detail-row"><span>${t('detailServiceType')}</span><strong>${jobServiceLabel(j)}</strong></div>
       <div class="detail-row"><span>${t('detailLocation')}</span><strong>${j.property_address || ''}${j.property_city ? ', ' + j.property_city : ''}</strong></div>
+      ${j.urgency==='scheduled' ? `<div class="detail-row"><span>${t('detailScheduledFor')}</span><strong>${new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</strong></div>` : ''}
       <div class="detail-row"><span>${t('detailAvgDuration')}</span><strong>${t('minutesShort', { count: estimateJobMinutesClient(j) })}</strong></div>
       <div class="detail-row"><span>${t('detailTravelTime')}</span><strong>${travelHtml}</strong></div>
       <div class="detail-row"><span>${t('detailPrice')}</span><strong>${j.price} €</strong></div>
       <div class="detail-row" style="border-bottom:none;"><span>${t('detailPaymentStatus')}</span><strong>${payLabel}</strong></div>
-      <a class="btn ghost btn-sm" style="width:100%; text-align:center; text-decoration:none; margin-top:6px;" href="${mapLink(j)}" target="_blank" rel="noopener">${t('openMapBtn')}</a>
-      <button class="btn ochre" id="close-detail" style="margin-top:10px;">${t('closeBtn')}</button>
+      ${willCollectCash && j.status !== 'done' ? `<div class="hint" style="margin:2px 0 0; background:var(--bg); border-radius:8px; padding:10px 12px;">${t('willCollectCashHint')}</div>` : ''}
+      ${actionsHtml ? `<div class="job-actions" style="margin-top:16px;">${actionsHtml}</div>` : ''}
+      <button class="btn ghost" id="close-detail" style="margin-top:10px;">${t('closeBtn')}</button>
+    </div>
+  </div>`;
+}
+
+// Destek menüsü: admin'e mesaj gönder / kötü davranış bildir. İkisi de
+// mevcut destek sohbeti kanalına (chat_messages) gidiyor, kötü davranış
+// bildirimi sadece ilgili işin referansıyla etiketleniyor.
+function renderSupportModal(){
+  const j = state.detailJob || state.offerJob;
+  if(state.supportView === 'menu'){
+    return `
+    <div class="modal-backdrop" id="support-backdrop">
+      <div class="modal">
+        <h3 style="margin-bottom:16px;">${t('supportBtn')}</h3>
+        <button type="button" class="btn ghost" id="support-message" style="margin-bottom:10px; text-align:left; padding-left:16px;">💬 ${t('supportMessageAdminBtn')}</button>
+        <button type="button" class="btn ghost" id="support-report" style="text-align:left; padding-left:16px; color:var(--danger);">⚠️ ${t('supportReportBtn')}</button>
+        <button class="btn ghost" id="close-support" style="margin-top:14px;">${t('cancelBtn')}</button>
+      </div>
+    </div>`;
+  }
+  const isReport = state.supportView === 'report';
+  return `
+  <div class="modal-backdrop" id="support-backdrop">
+    <div class="modal">
+      <h3 style="margin-bottom:4px;">${isReport ? t('supportReportBtn') : t('supportMessageAdminBtn')}</h3>
+      <div class="hint" style="margin:0 0 14px;">${isReport ? t('supportReportHint') : t('supportMessageHint')}</div>
+      <textarea id="support-text" rows="4" placeholder="${t('supportPlaceholder')}" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical; margin-bottom:14px;"></textarea>
+      ${state.supportError ? `<div class="error-msg" style="margin-bottom:10px;">${state.supportError}</div>` : ''}
+      <button class="btn ochre" id="send-support">${t('sendBtn')}</button>
+      <button class="btn ghost" id="close-support" style="margin-top:10px;">${t('cancelBtn')}</button>
     </div>
   </div>`;
 }
@@ -1341,6 +1458,9 @@ function renderOfferModal(){
     const mins = estimateTravelMinutes(state.myLocation.lat, state.myLocation.lng, j.property_latitude, j.property_longitude);
     travelHtml = `${t('minutesShort', { count: mins })} <span style="color:var(--muted); font-size:11px;">${t('travelEstimateNote')}</span>`;
   }
+  // Personel nakit işte parayı kendisi tahsil edip bize komisyonu ödeyecek,
+  // kart/fatura işinde ödeme zaten alınmış - bunu net şekilde ayırıyoruz.
+  const willCollectCash = j.payment_method === 'cash';
   const payLabel = j.payment_method === 'card' ? t('cardBadge') : j.payment_method === 'invoice' ? t('invoiceBadge') : t('cashBadge');
 
   if(!j.canRespond){
@@ -1358,14 +1478,17 @@ function renderOfferModal(){
   <div class="modal-backdrop" id="offer-backdrop">
     <div class="modal">
       <h3 style="margin-bottom:4px;">${t('offerTitle')}</h3>
-      <div class="hint" style="margin:0 0 16px;">${j.urgency==='urgent' ? t('offerUrgentHint') : t('offerHint')}</div>
+      <div class="hint" style="margin:0 0 14px;">${j.urgency==='urgent' ? t('offerUrgentHint') : t('offerHint')}</div>
+      ${j.property_latitude && j.property_longitude ? `<div id="offer-map" class="mini-map"></div>` : ''}
       <div class="job-icon" style="width:56px; height:56px; margin-bottom:14px;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:26px;">🧹</span>`}</div>
       <div class="detail-row"><span>${t('detailServiceType')}</span><strong>${jobServiceLabel(j)}</strong></div>
       <div class="detail-row"><span>${t('detailLocation')}</span><strong>${j.property_address || ''}${j.property_city ? ', ' + j.property_city : ''}</strong></div>
+      ${j.urgency==='scheduled' ? `<div class="detail-row"><span>${t('detailScheduledFor')}</span><strong>${new Date(j.checkout_at).toLocaleString(LOCALES[state.lang],{dateStyle:'medium',timeStyle:'short'})}</strong></div>` : ''}
       <div class="detail-row"><span>${t('detailTravelTime')}</span><strong>${travelHtml}</strong></div>
       <div class="detail-row"><span>${t('detailAvgDuration')}</span><strong>${t('minutesShort', { count: j.estimatedMinutes || 0 })}</strong></div>
       <div class="detail-row"><span>${t('detailPaymentStatus')}</span><strong>${payLabel}</strong></div>
       <div class="detail-row" style="border-bottom:none;"><span>${t('offerEarningLabel')}</span><strong style="color:var(--ochre); font-family:'Fraunces',serif; font-size:17px;">${j.netEarning} €</strong></div>
+      ${willCollectCash ? `<div class="hint" style="margin:2px 0 0; background:var(--bg); border-radius:8px; padding:10px 12px;">${t('willCollectCashHint')}</div>` : `<div class="hint" style="margin:2px 0 0; background:var(--bg); border-radius:8px; padding:10px 12px;">${t('alreadyPaidHint')}</div>`}
       ${state.offerError ? `<div class="error-msg" style="margin-top:10px;">${state.offerError}</div>` : ''}
       <div class="job-actions" style="margin-top:16px;">
         <button class="btn ghost" id="reject-offer">${t('rejectBtn')}</button>
@@ -1415,6 +1538,13 @@ async function loadAll(){
 
 /* ================== EVENT HANDLERS ================== */
 function attachHandlers(){
+  if(state.offerJob && state.offerJob.canRespond !== false && state.offerJob.property_latitude && state.offerJob.property_longitude){
+    initStaffMiniMap('offer-map', state.offerJob.property_latitude, state.offerJob.property_longitude);
+  }
+  if(state.detailJob && state.detailJob.property_latitude && state.detailJob.property_longitude){
+    initStaffMiniMap('detail-map', state.detailJob.property_latitude, state.detailJob.property_longitude);
+  }
+
   document.querySelectorAll('[data-lang]').forEach(el => el.onclick = () => {
     state.lang = el.dataset.lang;
     localStorage.setItem('lang', state.lang);
@@ -1546,12 +1676,10 @@ function attachHandlers(){
     checkOffersBtn.disabled = false;
   };
 
-  document.querySelectorAll('[data-accept-pending]').forEach(el => el.onclick = async () => {
-    try{
-      await api(`/jobs/${el.dataset.acceptPending}/accept`, { method:'POST' });
-      showToast(t('toastOfferAccepted'));
-      await loadAll();
-    }catch(err){ showToast(err.message); await loadAll(); }
+  document.querySelectorAll('[data-open-offer]').forEach(el => el.onclick = async () => {
+    if(!state.user.isOnline){ showToast(t('toastMustBeOnline')); return; }
+    if(!state.myLocation){ state.myLocation = await requestMyLocation(); }
+    await loadOffer(el.dataset.openOffer);
   });
 
   const refreshPendingBtn = document.getElementById('refresh-pending-btn');
@@ -1617,11 +1745,51 @@ function attachHandlers(){
   const detailBackdrop = document.getElementById('detail-backdrop');
   if(detailBackdrop) detailBackdrop.onclick = (e) => { if(e.target === detailBackdrop){ state.detailJob = null; render(); } };
 
+  const openSupport = document.getElementById('open-support');
+  if(openSupport) openSupport.onclick = () => { state.supportView = 'menu'; state.supportError = ''; render(); };
+
+  const supportMessage = document.getElementById('support-message');
+  if(supportMessage) supportMessage.onclick = () => { state.supportView = 'message'; render(); };
+
+  const supportReport = document.getElementById('support-report');
+  if(supportReport) supportReport.onclick = () => { state.supportView = 'report'; render(); };
+
+  const closeSupport = document.getElementById('close-support');
+  if(closeSupport) closeSupport.onclick = () => { state.supportView = null; state.supportError = ''; render(); };
+  const supportBackdrop = document.getElementById('support-backdrop');
+  if(supportBackdrop) supportBackdrop.onclick = (e) => { if(e.target === supportBackdrop){ state.supportView = null; render(); } };
+
+  const sendSupport = document.getElementById('send-support');
+  if(sendSupport) sendSupport.onclick = async () => {
+    const textEl = document.getElementById('support-text');
+    const text = textEl ? textEl.value.trim() : '';
+    if(!text){ state.supportError = t('supportEmptyError'); render(); return; }
+    const j = state.detailJob || state.offerJob;
+    const isReport = state.supportView === 'report';
+    const jobRef = j ? ` (${t('jobDetailTitle')}: ${jobServiceLabel(j)} - ${j.property_address || j.property_name || ''})` : '';
+    const finalMessage = (isReport ? `[${t('supportReportBtn')}]${jobRef}\n` : '') + text;
+    try{
+      await api('/chat/messages', { method:'POST', body: JSON.stringify({ message: finalMessage }) });
+      state.supportView = null; state.supportError = '';
+      showToast(t('toastSupportSent'));
+      render();
+    }catch(err){ state.supportError = err.message; render(); }
+  };
+
+  document.querySelectorAll('[data-start-job]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/jobs/${el.dataset.startJob}/status`, { method:'PATCH', body: JSON.stringify({ status:'in_progress' }) });
+      showToast(t('toastJobStarted'));
+      state.detailJob = null;
+      await loadAll();
+    }catch(err){ showToast(err.message); }
+  });
 
   document.querySelectorAll('[data-complete]').forEach(el => el.onclick = async () => {
     try{
       await api(`/jobs/${el.dataset.complete}/status`, { method:'PATCH', body: JSON.stringify({ status:'done' }) });
       showToast(t('toastCompleted'));
+      state.detailJob = null;
       await loadAll();
     }catch(err){ showToast(err.message); }
   });
