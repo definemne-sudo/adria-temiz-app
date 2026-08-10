@@ -366,6 +366,12 @@ router.patch('/staff-status', requireAuth, (req, res) => {
     `UPDATE users SET is_online = ?, current_lat = COALESCE(?, current_lat), current_lng = COALESCE(?, current_lng), current_city = COALESCE(?, current_city) WHERE id = ?`
   ).run(isOnline ? 1 : 0, lat != null ? Number(lat) : null, lng != null ? Number(lng) : null, city || null, req.user.id);
   const user = db.prepare('SELECT is_online, current_lat, current_lng, current_city FROM users WHERE id = ?').get(req.user.id);
+  // Token geçerli ama bu kullanıcı artık veritabanında yok (örn. veritabanı
+  // sıfırlanmış olabilir) - çökmek yerine anlamlı bir hata dönüyoruz, istemci
+  // bunu görüp oturumu kapatıp yeniden giriş istesin.
+  if (!user) {
+    return res.status(401).json({ error: 'Hesabın bulunamadı, lütfen tekrar giriş yap.' });
+  }
   res.json({ isOnline: !!user.is_online, city: user.current_city, lat: user.current_lat, lng: user.current_lng });
 });
 
