@@ -1999,7 +1999,13 @@ function renderConfigStep(service, props, selectedProperty){
   if(isGroup){
     const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
     if(commonAreaProps.length === 0){
-      return `<div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);"><div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div></div>`;
+      return `
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); text-align:center;">
+        <div class="property-avatar" style="margin:0 auto 12px;"><img src="${categoryIconSrc('common_area')}" alt="" /></div>
+        <div class="hint" style="margin:0;">${t('noBuildingGroupsHint')}</div>
+        <button type="button" class="btn ochre btn-sm" id="goto-add-property-common-area" style="width:auto; margin-top:14px;">${t('addPropertyCta')}</button>
+      </div>
+      `;
     }
     const selectedCaProperty = commonAreaProps.find(p => p.id === state.bookingPropertyId) || commonAreaProps[0];
     const subChecked = (key) => state.bookingCommonAreaSelections[key]?.checked;
@@ -3219,6 +3225,13 @@ function attachHandlers(){
   const gotoAddPropertyOffice = document.getElementById('goto-add-property-office');
   if(gotoAddPropertyOffice) gotoAddPropertyOffice.onclick = () => {
     state.propertyCategory = 'office'; state.regLat = null; state.regLng = null;
+    state.modal = 'add-property'; render();
+  };
+
+  const gotoAddPropertyCommonArea = document.getElementById('goto-add-property-common-area');
+  if(gotoAddPropertyCommonArea) gotoAddPropertyCommonArea.onclick = () => {
+    state.propertyCategory = 'common_area'; state.regLat = null; state.regLng = null;
+    state.regPropertyCity = '';
     state.modal = 'add-property'; render();
   };
 
