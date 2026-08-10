@@ -241,7 +241,14 @@ const TRANSLATIONS = {
     loginBtn: "Giriş Yap",
     firstTimeLink: "İlk kez mi giriş yapıyorsun? Telefonunla aktive et",
     backToLoginLink: "Kullanıcı adı/şifre ile giriş yap",
-    firstActivationTagline: "Telefon numaranla kimliğini doğrula, sana özel giriş bilgilerini oluşturalım.",
+    firstActivationTagline: "MICISTO'ya kabul edildiysen, sana ilettiğimiz aktivasyon kodunu gir ve kendi kullanıcı adını/şifreni oluştur.",
+    activationCodeLabel: "Aktivasyon Kodu",
+    activationCodeHint: "Bu kodu, başvurun onaylandığında bizden aldın.",
+    chooseUsernameLabel: "Kullanıcı Adı Seç",
+    choosePasswordLabel: "Şifre Belirle",
+    confirmPasswordLabel: "Şifreyi Tekrar Gir",
+    activateBtn: "Hesabımı Oluştur",
+    passwordMismatchError: "Şifreler eşleşmiyor.",
     credentialsTagline: "Giriş bilgilerin hazır! Bunları not al — bundan sonra hep bunlarla giriş yapacaksın.",
     credentialsHint: "Bu bilgiler bir daha gösterilmeyecek. Unutursan, telefonunla tekrar doğrulayıp yenilerini oluşturabilirsin.",
     credentialsContinueBtn: "Devam Et",
@@ -341,7 +348,14 @@ const TRANSLATIONS = {
     loginBtn: "Log In",
     firstTimeLink: "First time signing in? Activate with your phone",
     backToLoginLink: "Log in with username/password",
-    firstActivationTagline: "Verify your identity with your phone number, and we'll create your personal login details.",
+    firstActivationTagline: "If your MICISTO application was accepted, enter the activation code we gave you and create your own username/password.",
+    activationCodeLabel: "Activation Code",
+    activationCodeHint: "You received this code from us when your application was approved.",
+    chooseUsernameLabel: "Choose a Username",
+    choosePasswordLabel: "Set a Password",
+    confirmPasswordLabel: "Confirm Password",
+    activateBtn: "Create My Account",
+    passwordMismatchError: "Passwords don't match.",
     credentialsTagline: "Your login details are ready! Write them down — you'll use these to log in from now on.",
     credentialsHint: "These won't be shown again. If you forget them, verify with your phone again to generate new ones.",
     credentialsContinueBtn: "Continue",
@@ -441,7 +455,14 @@ const TRANSLATIONS = {
     loginBtn: "Prijavi se",
     firstTimeLink: "Prvi put se prijavljuješ? Aktiviraj se preko telefona",
     backToLoginLink: "Prijavi se korisničkim imenom/šifrom",
-    firstActivationTagline: "Potvrdi identitet brojem telefona, pa ćemo ti napraviti lične podatke za prijavu.",
+    firstActivationTagline: "Ako je tvoja MICISTO prijava prihvaćena, unesi aktivacioni kod koji smo ti poslali i kreiraj sopstveno korisničko ime/šifru.",
+    activationCodeLabel: "Aktivacioni kod",
+    activationCodeHint: "Ovaj kod si dobio/la od nas kada je tvoja prijava odobrena.",
+    chooseUsernameLabel: "Izaberi korisničko ime",
+    choosePasswordLabel: "Postavi šifru",
+    confirmPasswordLabel: "Potvrdi šifru",
+    activateBtn: "Kreiraj moj nalog",
+    passwordMismatchError: "Šifre se ne poklapaju.",
     credentialsTagline: "Tvoji podaci za prijavu su spremni! Zapiši ih — od sada ćeš se prijavljivati sa njima.",
     credentialsHint: "Ovi podaci se neće ponovo prikazati. Ako ih zaboraviš, ponovo se potvrdi telefonom da napraviš nove.",
     credentialsContinueBtn: "Nastavi",
@@ -616,12 +637,12 @@ let state = {
   ratingsOffset: 0,
   ratingsData: null,
   myJobs: [],
-  authStep: 'login', // 'login' (kullanıcı adı/şifre) -> ilk aktivasyon icin 'phone'->'otp'->'profile'->'credentials'
+  authStep: 'login', // 'login' (kullanıcı adı/şifre) <-> 'activate' (aktivasyon kodu + kendi kullanıcı adı/şifresini oluştur)
   keepSignedIn: true,
-  phone: '',
-  countryCode: '+382',
-  devCode: '',
-  newStaffCredentials: null,
+  activationCode: '',
+  activationUsername: '',
+  activationPassword: '',
+  activationPasswordConfirm: '',
   authError: '',
 };
 
@@ -709,70 +730,28 @@ function renderAuth(){
     `;
   }
 
-  if(state.authStep === 'phone'){
+  if(state.authStep === 'activate'){
     inner = `
       <div class="tagline">${t('firstActivationTagline')}</div>
-      <form id="phone-form">
+      <form id="activate-form">
         <div class="field">
-          <label>${t('authPhoneLabel')}</label>
-          <div style="display:flex; gap:8px;">
-            <select id="country-code-select" style="width:112px; flex-shrink:0; padding:10px 6px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit; background:#fbfcfb;">
-              ${COUNTRY_CODES.map((c,i) => `<option value="${i}" ${c.code===state.countryCode?'selected':''}>${c.flag} ${c.code}</option>`).join('')}
-            </select>
-            <input name="phoneLocal" type="tel" placeholder="67 123 456" required autofocus style="flex:1;" />
-          </div>
+          <label>${t('activationCodeLabel')}</label>
+          <input id="activation-code-input" name="code" required autofocus autocapitalize="characters"
+            placeholder="ABCD1234" maxlength="8" value="${state.activationCode}"
+            style="letter-spacing:3px; font-size:18px; text-align:center; text-transform:uppercase; font-family:monospace;" />
         </div>
+        <div class="hint" style="margin:-8px 0 16px;">${t('activationCodeHint')}</div>
+
+        <div class="field"><label>${t('chooseUsernameLabel')}</label><input id="activation-username-input" name="username" required autocapitalize="off" value="${state.activationUsername}" /></div>
+        <div class="field"><label>${t('choosePasswordLabel')}</label><input id="activation-password-input" name="password" type="password" required minlength="6" value="${state.activationPassword}" /></div>
+        <div class="field"><label>${t('confirmPasswordLabel')}</label><input id="activation-password-confirm-input" name="passwordConfirm" type="password" required minlength="6" value="${state.activationPasswordConfirm}" /></div>
+
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${t('authSendCode')}</button>
+        <button class="btn ochre" type="submit">${t('activateBtn')}</button>
       </form>
-      <div class="hint">${t('authPhoneHint')}</div>
       <div style="text-align:center; margin-top:16px;">
         <span id="back-to-login" style="font-size:12.5px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('backToLoginLink')}</span>
       </div>
-    `;
-  }
-
-  if(state.authStep === 'otp'){
-    inner = `
-      <div class="tagline">${t('authOtpTagline', { phone: state.phone })}</div>
-      <form id="otp-form">
-        <div class="field">
-          <label>${t('authOtpLabel')}</label>
-          <input name="code" inputmode="numeric" maxlength="6" placeholder="••••••" required autofocus
-            style="letter-spacing:6px; font-size:20px; text-align:center;" />
-        </div>
-        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${t('authVerify')}</button>
-      </form>
-      <div class="hint">${state.devCode ? t('authDemoModeHint', { code: state.devCode }) : ''}</div>
-      <div style="text-align:center; margin-top:10px;">
-        <span id="change-phone" style="font-size:12px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('authChangeNumber')}</span>
-      </div>
-    `;
-  }
-
-  if(state.authStep === 'profile'){
-    inner = `
-      <div class="tagline">${t('authProfileTagline')}</div>
-      <form id="profile-form">
-        <div class="field"><label>${t('profileNameLabel')}</label><input name="name" required autofocus /></div>
-        ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${t('enterPanel')}</button>
-      </form>
-    `;
-  }
-
-  if(state.authStep === 'credentials' && state.newStaffCredentials){
-    inner = `
-      <div class="tagline">${t('credentialsTagline')}</div>
-      <div style="background:var(--bg); border:1.5px dashed var(--sage); border-radius:10px; padding:16px; margin-bottom:16px;">
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${t('usernameLabel')}</div>
-        <div style="font-size:18px; font-weight:700; color:var(--navy); margin-bottom:12px; font-family:monospace;">${state.newStaffCredentials.username}</div>
-        <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${t('passwordLabel')}</div>
-        <div style="font-size:18px; font-weight:700; color:var(--navy); font-family:monospace;">${state.newStaffCredentials.password}</div>
-      </div>
-      <div class="hint" style="margin-top:0;">${t('credentialsHint')}</div>
-      <button class="btn ochre" id="credentials-continue" style="margin-top:16px;">${t('credentialsContinueBtn')}</button>
     `;
   }
 
@@ -1366,69 +1345,38 @@ function attachHandlers(){
   };
 
   const gotoFirstActivation = document.getElementById('goto-first-activation');
-  if(gotoFirstActivation) gotoFirstActivation.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
+  if(gotoFirstActivation) gotoFirstActivation.onclick = () => { state.authStep = 'activate'; state.authError = ''; render(); };
 
   const backToLogin = document.getElementById('back-to-login');
   if(backToLogin) backToLogin.onclick = () => { state.authStep = 'login'; state.authError = ''; render(); };
 
-  const countryCodeSelect = document.getElementById('country-code-select');
-  if(countryCodeSelect) countryCodeSelect.onchange = () => {
-    state.countryCode = COUNTRY_CODES[Number(countryCodeSelect.value)].code;
-  };
+  const activationCodeInput = document.getElementById('activation-code-input');
+  if(activationCodeInput) activationCodeInput.oninput = () => { state.activationCode = activationCodeInput.value.toUpperCase(); };
+  const activationUsernameInput = document.getElementById('activation-username-input');
+  if(activationUsernameInput) activationUsernameInput.oninput = () => { state.activationUsername = activationUsernameInput.value; };
+  const activationPasswordInput = document.getElementById('activation-password-input');
+  if(activationPasswordInput) activationPasswordInput.oninput = () => { state.activationPassword = activationPasswordInput.value; };
+  const activationPasswordConfirmInput = document.getElementById('activation-password-confirm-input');
+  if(activationPasswordConfirmInput) activationPasswordConfirmInput.oninput = () => { state.activationPasswordConfirm = activationPasswordConfirmInput.value; };
 
-  const phoneForm = document.getElementById('phone-form');
-  if(phoneForm) phoneForm.onsubmit = async (e) => {
+  const activateForm = document.getElementById('activate-form');
+  if(activateForm) activateForm.onsubmit = async (e) => {
     e.preventDefault();
-    const fd = Object.fromEntries(new FormData(phoneForm));
-    const fullPhone = `${state.countryCode} ${fd.phoneLocal}`.trim();
+    const fd = Object.fromEntries(new FormData(activateForm));
+    if(fd.password !== fd.passwordConfirm){
+      state.authError = t('passwordMismatchError'); render(); return;
+    }
     try{
-      const data = await api('/auth/request-otp', { method:'POST', body: JSON.stringify({ phone: fullPhone }) });
-      state.phone = fullPhone;
-      state.devCode = data.devCode || '';
-      state.authStep = 'otp';
+      const data = await api('/auth/staff-activate', { method:'POST', body: JSON.stringify({
+        code: fd.code, username: fd.username, password: fd.password,
+      })});
+      state.token = data.token; state.user = data.user;
+      storeSession(data.token, data.user, state.keepSignedIn);
+      state.authStep = 'login';
+      state.activationCode = ''; state.activationUsername = ''; state.activationPassword = ''; state.activationPasswordConfirm = '';
       state.authError = '';
-      render();
+      await loadAll();
     }catch(err){ state.authError = err.message; render(); }
-  };
-
-  const otpForm = document.getElementById('otp-form');
-  if(otpForm) otpForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = Object.fromEntries(new FormData(otpForm));
-    try{
-      const data = await api('/auth/verify-otp', { method:'POST', body: JSON.stringify({ phone: state.phone, code: fd.code }) });
-      // Bu geçici token sadece kimlik doğrulamak ve giriş bilgilerini
-      // üretmek için kullanılıyor - kalıcı oturum kullanıcı adı/şifre
-      // ile açılacak (complete-profile sonrası).
-      state.token = data.token;
-      state.authStep = 'profile';
-      state.authError = '';
-      render();
-    }catch(err){ state.authError = err.message; render(); }
-  };
-
-  const changePhone = document.getElementById('change-phone');
-  if(changePhone) changePhone.onclick = () => { state.authStep = 'phone'; state.authError = ''; render(); };
-
-  const profileForm = document.getElementById('profile-form');
-  if(profileForm) profileForm.onsubmit = async (e) => {
-    e.preventDefault();
-    const fd = Object.fromEntries(new FormData(profileForm));
-    try{
-      const data = await api('/auth/complete-profile', { method:'POST', body: JSON.stringify({ name: fd.name, accountType: 'staff' }) });
-      state.newStaffCredentials = data.staffCredentials;
-      state.authStep = 'credentials';
-      state.authError = '';
-      state.token = null; // artık kullanıcı adı/şifre ile tekrar giriş yapacak
-      render();
-    }catch(err){ state.authError = err.message; render(); }
-  };
-
-  const credentialsContinue = document.getElementById('credentials-continue');
-  if(credentialsContinue) credentialsContinue.onclick = () => {
-    state.authStep = 'login';
-    state.newStaffCredentials = null;
-    render();
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
