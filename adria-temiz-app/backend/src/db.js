@@ -295,6 +295,8 @@ ensureColumn('staff_applications', 'birth_date', 'TEXT');
 ensureColumn('staff_applications', 'has_experience', 'INTEGER');
 ensureColumn('staff_applications', 'experience_years', 'INTEGER');
 ensureColumn('staff_applications', 'languages', 'TEXT');
+ensureColumn('staff_applications', 'activation_code', 'TEXT');
+ensureColumn('staff_applications', 'activation_used_at', 'TEXT');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
