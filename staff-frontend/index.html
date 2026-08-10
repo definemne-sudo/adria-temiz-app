@@ -304,6 +304,7 @@ const TRANSLATIONS = {
     toastCompleted: "İş tamamlandı, ödeme sonuçlandı.",
     toastClaimFailed: "Bu iş başka bir personel tarafından zaten alınmış.",
     genericError: "Bir hata oluştu.",
+    sessionExpiredError: "Oturumun sona ermiş, lütfen tekrar giriş yap.",
     onlineLabel: "Çevrimiçi",
     offlineLabel: "Çevrimdışı",
     offlineHint: "Çevrimdışısın — iş almak için çevrimiçi ol.",
@@ -416,6 +417,7 @@ const TRANSLATIONS = {
     toastCompleted: "Job completed, payment settled.",
     toastClaimFailed: "This job was already taken by another staff member.",
     genericError: "Something went wrong.",
+    sessionExpiredError: "Your session has expired, please log in again.",
     onlineLabel: "Online",
     offlineLabel: "Offline",
     offlineHint: "You're offline — go online to take jobs.",
@@ -528,6 +530,7 @@ const TRANSLATIONS = {
     toastCompleted: "Posao završen, plaćanje obrađeno.",
     toastClaimFailed: "Ovaj posao je već preuzeo drugi član osoblja.",
     genericError: "Došlo je do greške.",
+    sessionExpiredError: "Tvoja sesija je istekla, molimo prijavi se ponovo.",
     onlineLabel: "Na mreži",
     offlineLabel: "Van mreže",
     offlineHint: "Van si mreže — uključi se na mrežu da bi preuzimao/la poslove.",
@@ -738,6 +741,16 @@ async function api(path, opts={}){
     },
   });
   const data = await res.json().catch(()=>({}));
+  if(res.status === 401){
+    // Token geçerli görünüyor olabilir ama hesap artık yok/oturum geçersiz -
+    // kullanıcıyı "çevrimiçiyim ama her şey hata veriyor" gibi kafası karışık
+    // bir durumda bırakmak yerine oturumu temizleyip giriş ekranına dönüyoruz.
+    clearSession();
+    state.token = null; state.user = null; state.authStep = 'login'; state.page = 'home';
+    state.authError = t('sessionExpiredError');
+    render();
+    throw new Error(data.error || t('sessionExpiredError'));
+  }
   if(!res.ok) throw new Error(data.error || t('genericError'));
   return data;
 }
