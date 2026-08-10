@@ -126,6 +126,20 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
   if (accountType === 'company' && (!taxNumber || !billingAddress)) {
     return res.status(400).json({ error: 'Yönetim şirketi için vergi numarası ve fatura adresi zorunlu.' });
   }
+  // Personel hesabı bu yoldan İLK KEZ oluşturulamaz - önce "MICISTORad ol"
+  // başvurusu onaylanıp aktivasyon kodu alınmalı, hesap POST /auth/staff-activate
+  // ile açılır. Bu uç nokta, telefonla kimlik doğrulanmış BİR KİŞİNİN zaten
+  // var olan personel hesabının şifresini/kullanıcı adını sıfırlaması için
+  // ("şifremi unuttum" yerine geçiyor) hâlâ kullanılabilir - ama yeni bir
+  // personel hesabı açmak için değil.
+  if (accountType === 'staff') {
+    const existing = db.prepare('SELECT account_type FROM users WHERE id = ?').get(req.user.id);
+    if (!existing || existing.account_type !== 'staff') {
+      return res.status(403).json({
+        error: 'Personel hesabın bulunamadı. İlk kez giriş yapıyorsan, onaylanan başvurunla aldığın aktivasyon kodunu MICISTORad girişindeki "İlk kez giriyorum" bölümünden kullanmalısın.',
+      });
+    }
+  }
 
   db.prepare(
     `UPDATE users SET name = ?, account_type = ?, company_name = ?, tax_number = ?, billing_address = ?, profile_completed = 1
@@ -235,6 +249,59 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
 // Personel girişi - telefon/SMS değil, sabit kullanıcı adı + şifre ile.
 // Kullanıcı adı/şifre complete-profile sırasında bir kez üretilip personele
 // verilir (bkz. yukarısı).
+// Admin bir personel başvurusunu onayladığında hesap HEMEN oluşturulmuyor -
+// sadece tek kullanımlık bir aktivasyon kodu üretiliyor (bkz. admin.js
+// /staff-applications/:id/approve). Başvuran, MICISTORad'da ilk girişte bu
+// kodu girip kendi kullanıcı adını ve şifresini kendisi belirliyor - gerçek
+// 'staff' hesabı burada, bu adımda oluşturuluyor.
+router.post('/staff-activate', (req, res) => {
+  const { code, username, password } = req.body;
+  if (!code || !username || !password) {
+    return res.status(400).json({ error: 'Kod, kullanıcı adı ve şifre zorunlu.' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Şifre en az 6 karakter olmalı.' });
+  }
+  const application = db
+    .prepare(`SELECT * FROM staff_applications WHERE activation_code = ? AND status = 'approved'`)
+    .get(code.trim().toUpperCase());
+  if (!application) {
+    return res.status(404).json({ error: 'Kod geçersiz. Lütfen kodu kontrol et.' });
+  }
+  if (application.activation_used_at) {
+    return res.status(409).json({ error: 'Bu kod zaten kullanılmış.' });
+  }
+  const existingUser = db.prepare('SELECT id FROM users WHERE phone = ?').get(application.phone);
+  if (existingUser) {
+    return res.status(409).json({ error: 'Bu telefon numarasıyla zaten bir hesap var.' });
+  }
+  const existingUsername = db.prepare('SELECT id FROM users WHERE username = ?').get(username.trim());
+  if (existingUsername) {
+    return res.status(409).json({ error: 'Bu kullanıcı adı zaten alınmış, başka bir tane dene.' });
+  }
+
+  const userId = uuid();
+  const passwordHash = bcrypt.hashSync(password, 10);
+  db.prepare(
+    `INSERT INTO users (id, phone, name, account_type, username, password_hash, profile_completed)
+     VALUES (?, ?, ?, 'staff', ?, ?, 1)`
+  ).run(userId, application.phone, application.name, username.trim(), passwordHash);
+  db.prepare(`UPDATE staff_applications SET activation_used_at = datetime('now') WHERE id = ?`).run(application.id);
+
+  const token = jwt.sign(
+    { id: userId, phone: application.phone, accountType: 'staff' },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+  res.json({
+    token,
+    user: {
+      id: userId, phone: application.phone, name: application.name, accountType: 'staff',
+      username: username.trim(), isOnline: false, profileCompleted: true,
+    },
+  });
+});
+
 router.post('/staff-login', (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) {
