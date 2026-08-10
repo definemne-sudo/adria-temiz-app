@@ -492,7 +492,8 @@ tr: {
   rejectBtn: "Reddet",
   emptyApps: "Bekleyen başvuru yok.",
   credentialsModalTitle: "Personel Hesabı Oluşturuldu",
-  credentialsModalHint: "Bu bilgileri işe aldığın kişiye ilet - MICISTORad'a bunlarla giriş yapacak. Bir daha gösterilmeyecek.",
+  credentialsModalHint: "Bu kodu işe aldığın kişiye ilet - MICISTORad'daki \"İlk kez giriyorum\" ekranından bu kodla kendi kullanıcı adını/şifresini oluşturacak. Bir daha gösterilmeyecek.",
+  activationCodeLabel: "Aktivasyon Kodu",
   usernameLabel: "Kullanıcı adı",
   closeBtn: "Kapat",
   confirmRejectTitle: "Başvuruyu reddet",
@@ -804,7 +805,8 @@ en: {
   rejectBtn: "Reject",
   emptyApps: "No pending applications.",
   credentialsModalTitle: "Staff Account Created",
-  credentialsModalHint: "Share these credentials with the person you hired - they'll use them to log into MICISTORad. This won't be shown again.",
+  credentialsModalHint: "Share this code with the person you hired - they'll use it to create their own username/password in the \"First time logging in\" screen of MICISTORad. This won't be shown again.",
+  activationCodeLabel: "Activation Code",
   usernameLabel: "Username",
   closeBtn: "Close",
   confirmRejectTitle: "Reject application",
@@ -1115,7 +1117,8 @@ me: {
   rejectBtn: "Odbij",
   emptyApps: "Nema prijava na čekanju.",
   credentialsModalTitle: "Nalog osoblja kreiran",
-  credentialsModalHint: "Podijeli ove podatke sa osobom koju si zaposlio - koristiće ih za prijavu u MICISTORad. Ovo se neće ponovo prikazati.",
+  credentialsModalHint: "Podijeli ovaj kod sa osobom koju si zaposlio - koristiće ga da kreira sopstveno korisničko ime/šifru u ekranu \"Prvi put se prijavljujem\" u MICISTORad-u. Ovo se neće ponovo prikazati.",
+  activationCodeLabel: "Aktivacioni kod",
   usernameLabel: "Korisničko ime",
   closeBtn: "Zatvori",
   confirmRejectTitle: "Odbij prijavu",
@@ -2376,11 +2379,9 @@ function renderModal(){
       <div class="modal">
         <h3>${T.credentialsModalTitle}</h3>
         <div class="hint" style="margin:-6px 0 16px;">${T.credentialsModalHint}</div>
-        <div style="background:var(--bg); border:1.5px dashed var(--sage); border-radius:10px; padding:16px; margin-bottom:16px;">
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${T.usernameLabel}</div>
-          <div style="font-size:18px; font-weight:700; color:var(--navy); margin-bottom:12px; font-family:monospace;">${state.newCredentials.username}</div>
-          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:2px;">${T.passwordLabel}</div>
-          <div style="font-size:18px; font-weight:700; color:var(--navy); font-family:monospace;">${state.newCredentials.password}</div>
+        <div style="background:var(--bg); border:1.5px dashed var(--sage); border-radius:10px; padding:20px; margin-bottom:16px; text-align:center;">
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); margin-bottom:8px;">${T.activationCodeLabel}</div>
+          <div style="font-size:26px; font-weight:700; color:var(--navy); font-family:monospace; letter-spacing:3px;">${state.newCredentials.activationCode}</div>
         </div>
         <button class="btn ochre full" id="modal-close">${T.closeBtn}</button>
       </div>
@@ -2910,7 +2911,7 @@ function attachHandlers(){
   document.querySelectorAll('[data-approve]').forEach(el => el.onclick = async () => {
     try{
       const result = await api(`/admin/staff-applications/${el.dataset.approve}/approve`, { method:'POST' });
-      state.newCredentials = result.credentials;
+      state.newCredentials = { activationCode: result.activationCode };
       state.modal = 'credentials';
       showToast(T.toastApproved);
       await loadApplications();
