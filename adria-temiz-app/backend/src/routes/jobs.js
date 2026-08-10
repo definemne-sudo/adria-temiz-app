@@ -335,7 +335,10 @@ router.get('/:id/offer-detail', (req, res) => {
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
 
   const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
-  const isCandidate = notifiedIds.includes(req.user.id) || job.assigned_staff_id === req.user.id;
+  // Kendisine özel bildirilmiş bir aday olabilir, kendi aldığı iş olabilir,
+  // ya da "Bekleyen İşler" sekmesinden gezinerek açık bir işe bakıyor
+  // olabilir (bu durumda job hâlâ 'pending' ve herkese açık) - üçü de geçerli.
+  const isCandidate = notifiedIds.includes(req.user.id) || job.assigned_staff_id === req.user.id || job.status === 'pending';
   if (!isCandidate) {
     return res.status(403).json({ error: 'Bu işe erişim yetkiniz yok.' });
   }
