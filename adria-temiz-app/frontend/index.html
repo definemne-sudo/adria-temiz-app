@@ -483,6 +483,10 @@ const TRANSLATIONS = {
     genderMale: "Erkek",
     genderOther: "Belirtmek istemiyorum",
     joinTeamBirthDateLabel: "Doğum Tarihi",
+    dayLabel: "Gün",
+    monthLabel: "Ay",
+    yearLabel: "Yıl",
+    pleaseSelectBirthDate: "Lütfen doğum tarihini eksiksiz seç.",
     joinTeamExperienceLabel: "Temizlik tecrüben var mı?",
     yesOpt: "Evet",
     noOpt: "Hayır",
@@ -733,6 +737,10 @@ const TRANSLATIONS = {
     genderMale: "Male",
     genderOther: "Prefer not to say",
     joinTeamBirthDateLabel: "Date of Birth",
+    dayLabel: "Day",
+    monthLabel: "Month",
+    yearLabel: "Year",
+    pleaseSelectBirthDate: "Please select your full date of birth.",
     joinTeamExperienceLabel: "Do you have cleaning experience?",
     yesOpt: "Yes",
     noOpt: "No",
@@ -983,6 +991,10 @@ const TRANSLATIONS = {
     genderMale: "Muško",
     genderOther: "Ne želim da navedem",
     joinTeamBirthDateLabel: "Datum rođenja",
+    dayLabel: "Dan",
+    monthLabel: "Mjesec",
+    yearLabel: "Godina",
+    pleaseSelectBirthDate: "Molimo izaberi kompletan datum rođenja.",
     joinTeamExperienceLabel: "Imaš li iskustvo u čišćenju?",
     yesOpt: "Da",
     noOpt: "Ne",
@@ -1320,6 +1332,14 @@ const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="non
 // Karadağ'ın başlıca belediye/şehirleri - kayıt akışında şehir artık elle
 // yazılmıyor, bu listeden seçiliyor. Koordinatlar, harita üzerinde o şehri
 // otomatik ortalamak için kullanılıyor (şehir merkezine yakın bir nokta).
+// Doğum tarihi seçiminde ay isimleri (yerel dilde) - takvim widget'ı yerine
+// Gün/Ay/Yıl dropdown kullanıyoruz ki eski yıllara anında atlanabilsin.
+const MONTH_NAMES = {
+  tr: ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'],
+  en: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+  me: ['Januar','Februar','Mart','April','Maj','Jun','Jul','Avgust','Septembar','Oktobar','Novembar','Decembar'],
+};
+
 const MONTENEGRO_CITIES = [
   { name: 'Podgorica', lat: 42.4304, lng: 19.2594 },
   { name: 'Nikšić', lat: 42.7731, lng: 18.9447 },
@@ -1487,7 +1507,9 @@ let state = {
   joinTeamName: '',
   joinTeamNationality: '',
   joinTeamPhoneLocal: '',
-  joinTeamBirthDate: '',
+  joinTeamBirthDay: '',
+  joinTeamBirthMonth: '',
+  joinTeamBirthYear: '',
   joinTeamExperienceYears: '',
   joinTeamMessage: '',
   joinTeamLanguages: [],
@@ -2581,7 +2603,23 @@ function renderModal(){
             </select>
           </div>
 
-          <div class="field"><label>${t('joinTeamBirthDateLabel')}</label><input id="join-team-birthdate" name="birthDate" type="date" required value="${state.joinTeamBirthDate}" /></div>
+          <div class="field">
+            <label>${t('joinTeamBirthDateLabel')}</label>
+            <div style="display:flex; gap:8px;">
+              <select id="join-team-birth-day" style="flex:1;">
+                <option value="" ${!state.joinTeamBirthDay?'selected':''} disabled>${t('dayLabel')}</option>
+                ${Array.from({length:31}, (_,i) => i+1).map(d => `<option value="${d}" ${Number(state.joinTeamBirthDay)===d?'selected':''}>${d}</option>`).join('')}
+              </select>
+              <select id="join-team-birth-month" style="flex:1.4;">
+                <option value="" ${!state.joinTeamBirthMonth?'selected':''} disabled>${t('monthLabel')}</option>
+                ${MONTH_NAMES[state.lang].map((m,i) => `<option value="${i+1}" ${Number(state.joinTeamBirthMonth)===i+1?'selected':''}>${m}</option>`).join('')}
+              </select>
+              <select id="join-team-birth-year" style="flex:1;">
+                <option value="" ${!state.joinTeamBirthYear?'selected':''} disabled>${t('yearLabel')}</option>
+                ${Array.from({length:70}, (_,i) => new Date().getFullYear() - 16 - i).map(y => `<option value="${y}" ${Number(state.joinTeamBirthYear)===y?'selected':''}>${y}</option>`).join('')}
+              </select>
+            </div>
+          </div>
 
           <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('joinTeamExperienceLabel')}</div>
           <div class="option-row" style="margin-bottom:${state.joinTeamHasExperience?'8px':'14px'};">
@@ -3115,7 +3153,8 @@ function attachHandlers(){
   if(joinTeamLink) joinTeamLink.onclick = () => {
     state.modal = 'join-team'; state.authError = '';
     state.joinTeamGender = ''; state.joinTeamHasExperience = null; state.joinTeamCity = '';
-    state.joinTeamName = ''; state.joinTeamNationality = ''; state.joinTeamBirthDate = '';
+    state.joinTeamName = ''; state.joinTeamNationality = '';
+    state.joinTeamBirthDay = ''; state.joinTeamBirthMonth = ''; state.joinTeamBirthYear = '';
     state.joinTeamExperienceYears = ''; state.joinTeamMessage = ''; state.joinTeamLanguages = [];
     render();
   };
@@ -3144,8 +3183,12 @@ function attachHandlers(){
   if(joinTeamNationalityInput) joinTeamNationalityInput.oninput = () => { state.joinTeamNationality = joinTeamNationalityInput.value; };
   const joinTeamPhoneInput = document.getElementById('join-team-phone-local');
   if(joinTeamPhoneInput) joinTeamPhoneInput.oninput = () => { state.joinTeamPhoneLocal = joinTeamPhoneInput.value; };
-  const joinTeamBirthdateInput = document.getElementById('join-team-birthdate');
-  if(joinTeamBirthdateInput) joinTeamBirthdateInput.oninput = () => { state.joinTeamBirthDate = joinTeamBirthdateInput.value; };
+  const joinTeamBirthDay = document.getElementById('join-team-birth-day');
+  if(joinTeamBirthDay) joinTeamBirthDay.onchange = () => { state.joinTeamBirthDay = joinTeamBirthDay.value; };
+  const joinTeamBirthMonth = document.getElementById('join-team-birth-month');
+  if(joinTeamBirthMonth) joinTeamBirthMonth.onchange = () => { state.joinTeamBirthMonth = joinTeamBirthMonth.value; };
+  const joinTeamBirthYear = document.getElementById('join-team-birth-year');
+  if(joinTeamBirthYear) joinTeamBirthYear.onchange = () => { state.joinTeamBirthYear = joinTeamBirthYear.value; };
   const joinTeamExperienceYearsInput = document.getElementById('join-team-experience-years');
   if(joinTeamExperienceYearsInput) joinTeamExperienceYearsInput.oninput = () => { state.joinTeamExperienceYears = joinTeamExperienceYearsInput.value; };
   const joinTeamMessageInput = document.getElementById('join-team-message');
@@ -3156,11 +3199,15 @@ function attachHandlers(){
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(joinTeamForm));
     const phone = `${state.countryCode} ${fd.phoneLocal}`.trim();
+    if(!state.joinTeamBirthDay || !state.joinTeamBirthMonth || !state.joinTeamBirthYear){
+      state.authError = t('pleaseSelectBirthDate'); render(); return;
+    }
+    const birthDate = `${state.joinTeamBirthYear}-${String(state.joinTeamBirthMonth).padStart(2,'0')}-${String(state.joinTeamBirthDay).padStart(2,'0')}`;
     try{
       await api('/staff-applications', { method:'POST', body: JSON.stringify({
         name: fd.name, phone, city: fd.city || null, message: fd.message || null,
         nationality: fd.nationality || null, gender: state.joinTeamGender || null,
-        birthDate: fd.birthDate || null, hasExperience: !!state.joinTeamHasExperience,
+        birthDate, hasExperience: !!state.joinTeamHasExperience,
         experienceYears: fd.experienceYears || null, languages: state.joinTeamLanguages,
       })});
       state.modal = null;
