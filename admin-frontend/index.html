@@ -482,6 +482,10 @@ tr: {
   statRevenue: "Toplam Ciro",
   statUnreadChats: "Yanıt Bekleyen Sohbet",
   appsTitle: "Personel Başvuruları",
+  appsFilterPending: "Bekleyen",
+  appsFilterApproved: "Onaylanan",
+  appsFilterRejected: "Reddedilen",
+  resendCodeBtn: "Kodu Yenile",
   appsSubtitle: "MICISTO'da çalışmak için başvuranlar - onaylarsan otomatik personel hesabı açılır.",
   colName: "Ad Soyad",
   colPhone: "Telefon",
@@ -795,6 +799,10 @@ en: {
   statRevenue: "Total Revenue",
   statUnreadChats: "Awaiting Reply",
   appsTitle: "Staff Applications",
+  appsFilterPending: "Pending",
+  appsFilterApproved: "Approved",
+  appsFilterRejected: "Rejected",
+  resendCodeBtn: "Resend Code",
   appsSubtitle: "People applying to work at MICISTO - approving auto-creates a staff account.",
   colName: "Full Name",
   colPhone: "Phone",
@@ -1107,6 +1115,10 @@ me: {
   statRevenue: "Ukupan prihod",
   statUnreadChats: "Čeka odgovor",
   appsTitle: "Prijave osoblja",
+  appsFilterPending: "Na čekanju",
+  appsFilterApproved: "Odobrene",
+  appsFilterRejected: "Odbijene",
+  resendCodeBtn: "Ponovo pošalji kod",
   appsSubtitle: "Ljudi koji se prijavljuju za rad u MICISTO-u - odobrenje automatski kreira nalog osoblja.",
   colName: "Ime i prezime",
   colPhone: "Telefon",
@@ -1145,6 +1157,7 @@ let state = {
   applications: [],
   bookings: null,
   bookingsFilter: 'all',
+  applicationsFilter: 'pending',
   workers: null,
   customers: null,
   revenue: null,
@@ -2341,9 +2354,15 @@ function renderSupport(){
 }
 
 function renderApplications(){
+  const filter = state.applicationsFilter || 'pending';
   return `
   <div class="page-head">
     <div><h2>${T.appsTitle}</h2><p>${T.appsSubtitle}</p></div>
+  </div>
+  <div class="row-actions" style="margin-bottom:16px;">
+    <button class="btn ${filter==='pending'?'ochre':'ghost'} btn-sm" data-apps-filter="pending">${T.appsFilterPending}</button>
+    <button class="btn ${filter==='approved'?'ochre':'ghost'} btn-sm" data-apps-filter="approved">${T.appsFilterApproved}</button>
+    <button class="btn ${filter==='rejected'?'ochre':'ghost'} btn-sm" data-apps-filter="rejected">${T.appsFilterRejected}</button>
   </div>
   ${state.applications.length === 0 ? `<div class="empty-state">${T.emptyApps}</div>` : `
     <table>
@@ -2360,8 +2379,12 @@ function renderApplications(){
             <td>${new Date(a.created_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
             <td>
               <div class="row-actions">
-                <button class="btn ochre btn-sm" data-approve="${a.id}">${T.approveBtn}</button>
-                <button class="btn danger btn-sm" data-reject="${a.id}">${T.rejectBtn}</button>
+                ${filter==='pending' ? `
+                  <button class="btn ochre btn-sm" data-approve="${a.id}">${T.approveBtn}</button>
+                  <button class="btn danger btn-sm" data-reject="${a.id}">${T.rejectBtn}</button>
+                ` : filter==='approved' ? `
+                  <button class="btn ghost btn-sm" data-resend-code="${a.id}">${T.resendCodeBtn}</button>
+                ` : ''}
               </div>
             </td>
           </tr>
@@ -2408,7 +2431,7 @@ async function loadDashboard(){
   render();
 }
 async function loadApplications(){
-  state.applications = await api('/admin/staff-applications?status=pending');
+  state.applications = await api(`/admin/staff-applications?status=${state.applicationsFilter || 'pending'}`);
   render();
 }
 async function loadBookings(page){
@@ -2907,6 +2930,20 @@ function attachHandlers(){
     localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
     state.token = null; state.user = null; render();
   };
+
+  document.querySelectorAll('[data-apps-filter]').forEach(el => el.onclick = async () => {
+    state.applicationsFilter = el.dataset.appsFilter;
+    await loadApplications();
+  });
+
+  document.querySelectorAll('[data-resend-code]').forEach(el => el.onclick = async () => {
+    try{
+      const result = await api(`/admin/staff-applications/${el.dataset.resendCode}/resend-code`, { method:'POST' });
+      state.newCredentials = { activationCode: result.activationCode };
+      state.modal = 'credentials';
+      render();
+    }catch(err){ showToast(err.message); }
+  });
 
   document.querySelectorAll('[data-approve]').forEach(el => el.onclick = async () => {
     try{
