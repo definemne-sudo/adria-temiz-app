@@ -3,8 +3,8 @@ const bcrypt = require('bcryptjs');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { generateUsername, generatePassword } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays } = require('../services/catalog');
+const { generateActivationCode } = require('../services/credentials');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -43,21 +43,18 @@ router.post('/staff-applications/:id/approve', (req, res) => {
     return res.status(409).json({ error: 'Bu telefon numarasıyla zaten bir hesap var.' });
   }
 
-  const userId = uuid();
-  const username = generateUsername(application.name);
-  const plainPassword = generatePassword();
-  const passwordHash = bcrypt.hashSync(plainPassword, 10);
-
+  // Hesabı biz oluşturmuyoruz - onay anında sadece tek kullanımlık bir
+  // aktivasyon kodu üretiyoruz. Başvuran, bu kodu MICISTORad'da ilk girişte
+  // kullanıp kendi kullanıcı adını/şifresini kendisi belirleyecek
+  // (POST /auth/staff-activate). Hesap, o adımda gerçekten oluşturuluyor.
+  const activationCode = generateActivationCode();
   db.prepare(
-    `INSERT INTO users (id, phone, name, account_type, username, password_hash, profile_completed)
-     VALUES (?, ?, ?, 'staff', ?, ?, 1)`
-  ).run(userId, application.phone, application.name, username, passwordHash);
-
-  db.prepare(`UPDATE staff_applications SET status = 'approved' WHERE id = ?`).run(application.id);
+    `UPDATE staff_applications SET status = 'approved', activation_code = ? WHERE id = ?`
+  ).run(activationCode, application.id);
 
   res.json({
-    message: 'Başvuru onaylandı, personel hesabı oluşturuldu.',
-    credentials: { username, password: plainPassword },
+    message: 'Başvuru onaylandı, aktivasyon kodu oluşturuldu.',
+    activationCode,
   });
 });
 
@@ -374,11 +371,8 @@ router.post('/chats/:userId/messages', (req, res) => {
 // (SQL injection değil ama en azından anlamsız bir key üretmesin diye).
 const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor', 'ratePerSqm', 'ratePerCapacity'];
 
-function getChecklist(serviceKey) {
-  return db
-    .prepare('SELECT * FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
-    .all(serviceKey);
-}
+// NOT: getChecklist artık services/catalog.js'te - burada import ediliyor
+// (müşteri uygulaması da aynı fonksiyonu kullanıyor, tek doğru kaynak).
 
 router.get('/services', (req, res) => {
   const services = getAllServices().map((s) => ({ ...s, checklist: s.isGroup ? [] : getChecklist(s.key) }));
