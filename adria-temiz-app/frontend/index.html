@@ -1312,6 +1312,18 @@ const MONTENEGRO_CITIES = [
 function montenegroCityCoords(name){
   return MONTENEGRO_CITIES.find(c => c.name === name);
 }
+// Verilen koordinata en yakın Karadağ şehrini bulur - telefon GPS konumu
+// alındığında, o konumun "hangi şehir" olduğunu şehir dropdown'ında otomatik
+// işaretlemek için kullanılıyor (kilometre kesinliği gerekmiyor, sadece
+// dropdown'daki en mantıklı şehri önceden seçili göstermek için).
+function nearestMontenegroCity(lat, lng){
+  let best = null, bestDist = Infinity;
+  for(const c of MONTENEGRO_CITIES){
+    const d = Math.hypot(c.lat - lat, c.lng - lng);
+    if(d < bestDist){ bestDist = d; best = c; }
+  }
+  return best;
+}
 
 const BEDROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6"/><path d="M3 18v2M21 18v2M3 12V8a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v2M13 12V9a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v3"/></svg>';
 const BATHROOM_ICON_SVG = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16v3a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M6 12V6a2 2 0 0 1 3.2-1.6M9 8.5V6"/><path d="M6 19v2M16 19v2"/></svg>';
@@ -2130,16 +2142,18 @@ function renderConfigStep(service, props, selectedProperty){
       <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
     </div>
 
-    <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
-    ${state.addons.filter(a => service.key !== 'office' || a.key !== 'carpet').map(a => `
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-        <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
-          <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
-          <span style="color:var(--navy);">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
-        </label>
-        ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
-      </div>
-    `).join('')}
+    ${service.key === 'deep_clean' ? `
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('extrasLabel')}</div>
+      ${state.addons.map(a => `
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:8px; flex:1; font-size:13px; cursor:pointer;">
+            <input type="checkbox" data-addon-toggle="${a.key}" ${addonChecked(a.key) ? 'checked' : ''} />
+            <span style="color:var(--navy);">${addonIcon(a.key)}</span> ${addonLabel(a.key)} <span style="color:var(--muted); font-size:12px;">(+${a.rate}€)</span>
+          </label>
+          ${addonChecked(a.key) ? `<input type="number" min="1" data-addon-qty="${a.key}" value="${addonQty(a.key)}" style="width:64px; padding:6px 8px; border:1px solid var(--line); border-radius:6px;" />` : ''}
+        </div>
+      `).join('')}
+    ` : ''}
 
     <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
 
@@ -3066,6 +3080,15 @@ function attachHandlers(){
         const loc = await attemptPhoneGeolocation();
         if(loc && state.regStep === 'address' && !state.regLat){
           state.regLat = loc.lat; state.regLng = loc.lng;
+          // Konumun hangi şehre en yakın olduğunu bulup dropdown'da önceden
+          // seçili gösteriyoruz - böylece müşteri kendi şehrini (zaten
+          // tespit edilmiş olanı) seçtiğinde onchange hiç tetiklenmez,
+          // pin GPS'ten gelen hassas konumda kalır. Sadece FARKLI bir şehir
+          // seçerse pin o şehrin merkezine kayar.
+          if(!state.regPropertyCity){
+            const nearest = nearestMontenegroCity(loc.lat, loc.lng);
+            if(nearest) state.regPropertyCity = nearest.name;
+          }
           render();
         }
       }
