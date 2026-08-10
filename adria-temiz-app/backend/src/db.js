@@ -289,6 +289,12 @@ ensureColumn('cleaning_jobs', 'promo_code_id', 'TEXT');
 ensureColumn('cleaning_jobs', 'discount_amount', 'REAL');
 ensureColumn('properties', 'bedroom_count', 'INTEGER');
 ensureColumn('properties', 'bathroom_count', 'INTEGER');
+ensureColumn('staff_applications', 'nationality', 'TEXT');
+ensureColumn('staff_applications', 'gender', 'TEXT');
+ensureColumn('staff_applications', 'birth_date', 'TEXT');
+ensureColumn('staff_applications', 'has_experience', 'INTEGER');
+ensureColumn('staff_applications', 'experience_years', 'INTEGER');
+ensureColumn('staff_applications', 'languages', 'TEXT');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
