@@ -67,6 +67,7 @@
     font-weight:600; font-size:14px; cursor:pointer; font-family:inherit;
   }
   .btn:hover{background:var(--navy-2);}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
   .btn.ochre{background:var(--ochre);}
   .btn.ochre:hover{background:#178a63;}
   .btn.ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
@@ -92,18 +93,25 @@
   .who{font-size:11px; color:#9FB3AE;}
   .logout{font-size:12px; color:#E7B98C; cursor:pointer; text-decoration:underline; white-space:nowrap;}
 
-  .tabs{display:flex; background:#fff; border-bottom:1px solid var(--line); position:sticky; top:57px; z-index:19; overflow-x:auto;}
-  .tab{
-    flex:1; text-align:center; padding:13px 6px; font-size:12.5px; font-weight:700; color:var(--muted);
-    cursor:pointer; border-bottom:3px solid transparent; white-space:nowrap;
+  .bottom-nav{
+    display:flex; position:fixed; bottom:0; left:0; right:0; z-index:45;
+    background:var(--navy); justify-content:space-around; align-items:center;
+    padding:8px 4px calc(6px + env(safe-area-inset-bottom));
+    box-shadow:0 -6px 20px rgba(0,0,0,.18);
   }
-  .tab.active{color:var(--navy); border-bottom-color:var(--ochre);}
-  .tab .count{
-    display:inline-block; background:var(--ochre); color:#fff; font-size:10.5px; font-weight:700;
-    border-radius:20px; padding:1px 7px; margin-left:5px;
+  .nav-item-mobile{
+    position:relative; display:flex; flex-direction:column; align-items:center; gap:2px;
+    font-size:10px; font-weight:700; color:#9FB3AE; padding:5px 8px; border-radius:10px; cursor:pointer;
+  }
+  .nav-item-mobile .icon{ display:flex; }
+  .nav-item-mobile .icon svg{ width:20px; height:20px; }
+  .nav-item-mobile.active{ color:#fff; background:rgba(255,255,255,.12); }
+  .nav-item-mobile .count{
+    position:absolute; top:-2px; right:2px; background:var(--ochre); color:#fff; font-size:9.5px; font-weight:700;
+    border-radius:20px; padding:1px 5px; line-height:1.3;
   }
 
-  .main{flex:1; padding:18px; max-width:640px; width:100%; margin:0 auto;}
+  .main{flex:1; padding:18px; padding-bottom:96px; max-width:640px; width:100%; margin:0 auto;}
   .empty-state{
     border:1.5px dashed var(--line); border-radius:var(--radius); padding:40px 20px; text-align:center; color:var(--muted); font-size:14px;
   }
@@ -215,6 +223,17 @@ const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg
   <path d="M74,104 L93,123 L131,78" stroke="#0F3D2E" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>`;
 
+// Alt navigasyon ikonları - müşteri uygulamasındaki çizim (line icon)
+// stiliyle tutarlı: stroke tabanlı, currentColor, minimal.
+const NAV_ICONS = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+  performance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>',
+  ratings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.8-4.3 4.1 1 5.8L12 16.7l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/></svg>',
+  mine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3M9 11h6M9 15h6M9 7h1"/></svg>',
+  pending: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3M11 8v3l2 2"/></svg>',
+};
+
 // Dağıtım motoru şehir eşleşmesiyle çalışıyor - personelin hangi şehirde
 // çalıştığını seçmesi gerekiyor (otomatik ters coğrafi kodlama için ücretli
 // bir harita API'si gerekir, şimdilik personel kendi seçiyor).
@@ -265,6 +284,11 @@ const TRANSLATIONS = {
     enterPanel: "Panele gir",
     navAvailable: "Bekleyen İşler",
     navMyJobs: "İşlerim",
+    navPending: "Bekleyen İşler",
+    refreshBtn: "Yenile",
+    pendingHint: "Henüz kimse tarafından alınmamış tüm işler burada - çevrimiçiysen doğrudan alabilirsin.",
+    emptyPending: "Şu an bekleyen iş yok.",
+    acceptJobBtn: "İşi Al",
     logout: "Çıkış yap",
     emptyAvailable: "Şu an bekleyen iş yok. Yeni işler geldiğinde burada görünecek.",
     emptyMyJobs: "Henüz aldığın bir iş yok. \"Bekleyen İşler\"den bir iş al.",
@@ -372,6 +396,11 @@ const TRANSLATIONS = {
     enterPanel: "Enter panel",
     navAvailable: "Available Jobs",
     navMyJobs: "My Jobs",
+    navPending: "Available Jobs",
+    refreshBtn: "Refresh",
+    pendingHint: "All jobs not yet taken by anyone are here - if you're online, you can accept directly.",
+    emptyPending: "No pending jobs right now.",
+    acceptJobBtn: "Accept Job",
     logout: "Log out",
     emptyAvailable: "No available jobs right now. New jobs will appear here.",
     emptyMyJobs: "You haven't taken a job yet. Grab one from \"Available Jobs\".",
@@ -479,6 +508,11 @@ const TRANSLATIONS = {
     enterPanel: "Uđi u panel",
     navAvailable: "Poslovi na čekanju",
     navMyJobs: "Moji poslovi",
+    navPending: "Dostupni poslovi",
+    refreshBtn: "Osvježi",
+    pendingHint: "Svi poslovi koje još niko nije preuzeo su ovdje - ako si online, možeš ih direktno prihvatiti.",
+    emptyPending: "Trenutno nema poslova na čekanju.",
+    acceptJobBtn: "Prihvati posao",
     logout: "Odjavi se",
     emptyAvailable: "Trenutno nema poslova na čekanju. Novi poslovi će se pojaviti ovdje.",
     emptyMyJobs: "Još nisi preuzeo/la posao. Uzmi jedan iz \"Poslovi na čekanju\".",
@@ -637,6 +671,7 @@ let state = {
   ratingsOffset: 0,
   ratingsData: null,
   myJobs: [],
+  pendingJobs: [],
   authStep: 'login', // 'login' (kullanıcı adı/şifre) <-> 'activate' (aktivasyon kodu + kendi kullanıcı adı/şifresini oluştur)
   keepSignedIn: true,
   activationCode: '',
@@ -787,16 +822,22 @@ function renderPanel(){
     </div>
   </div>
   ${!isOnline ? `<div class="offline-banner">${t('offlineHint')}</div>` : ''}
-  <div class="tabs">
-    <div class="tab ${state.page==='home'?'active':''}" data-page="home">${t('navHome')}</div>
-    <div class="tab ${state.page==='calendar'?'active':''}" data-page="calendar">${t('navCalendar')}</div>
-    <div class="tab ${state.page==='performance'?'active':''}" data-page="performance">${t('navPerformance')}</div>
-    <div class="tab ${state.page==='ratings'?'active':''}" data-page="ratings">${t('navRatings')}</div>
-    <div class="tab ${state.page==='mine'?'active':''}" data-page="mine">${t('navMyJobs')}${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
-  </div>
   <div class="main">
-    ${state.page==='home' ? renderHome() : state.page==='calendar' ? renderCalendar() : state.page==='performance' ? renderPerformance() : state.page==='ratings' ? renderRatings() : renderMine()}
+    ${state.page==='home' ? renderHome()
+      : state.page==='calendar' ? renderCalendar()
+      : state.page==='performance' ? renderPerformance()
+      : state.page==='ratings' ? renderRatings()
+      : state.page==='pending' ? renderPending()
+      : renderMine()}
   </div>
+  <nav class="bottom-nav">
+    <div class="nav-item-mobile ${state.page==='home'?'active':''}" data-page="home"><span class="icon">${NAV_ICONS.home}</span><span>${t('navHome')}</span></div>
+    <div class="nav-item-mobile ${state.page==='calendar'?'active':''}" data-page="calendar"><span class="icon">${NAV_ICONS.calendar}</span><span>${t('navCalendar')}</span></div>
+    <div class="nav-item-mobile ${state.page==='pending'?'active':''}" data-page="pending"><span class="icon">${NAV_ICONS.pending}</span><span>${t('navPending')}</span>${state.pendingJobs.length ? `<span class="count">${state.pendingJobs.length}</span>` : ''}</div>
+    <div class="nav-item-mobile ${state.page==='performance'?'active':''}" data-page="performance"><span class="icon">${NAV_ICONS.performance}</span><span>${t('navPerformance')}</span></div>
+    <div class="nav-item-mobile ${state.page==='ratings'?'active':''}" data-page="ratings"><span class="icon">${NAV_ICONS.ratings}</span><span>${t('navRatings')}</span></div>
+    <div class="nav-item-mobile ${state.page==='mine'?'active':''}" data-page="mine"><span class="icon">${NAV_ICONS.mine}</span><span>${t('navMyJobs')}</span>${state.myJobs.length ? `<span class="count">${state.myJobs.length}</span>` : ''}</div>
+  </nav>
   ${state.detailJob ? renderJobDetailModal() : ''}
   ${state.offerJob ? renderOfferModal() : ''}
   ${state.showCityPicker ? renderCityPickerModal() : ''}
@@ -1197,6 +1238,43 @@ function renderHomeJobCard(j){
   </div>`;
 }
 
+// "Bekleyen İşler" sekmesi - henüz kimse tarafından alınmamış tüm işleri
+// gösterir. Personel çevrimiçi olduğunda buradan doğrudan "İşi Al"
+// diyebilir - bildirim beklemeye gerek kalmadan.
+function renderPending(){
+  const isOnline = !!state.user.isOnline;
+  return `
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
+    <h2 style="font-size:21px;">${t('navPending')}</h2>
+    <button type="button" class="btn ghost btn-sm" id="refresh-pending-btn" style="width:auto; padding:8px 12px; white-space:nowrap; flex-shrink:0;">${t('refreshBtn')}</button>
+  </div>
+  <div class="hint" style="margin:0 0 16px;">${t('pendingHint')}</div>
+  ${!isOnline ? `<div class="offline-banner" style="position:static; margin-bottom:16px;">${t('offlineHint')}</div>` : ''}
+  ${state.pendingJobs.length === 0 ? `<div class="empty-state">${t('emptyPending')}</div>` : state.pendingJobs.map(j => renderPendingJobCard(j)).join('')}
+  `;
+}
+
+function renderPendingJobCard(j){
+  const icon = serviceIconSrc(j.service_key);
+  const isOnline = !!state.user.isOnline;
+  return `
+  <div class="job-card">
+    <div class="top-row" data-open-detail="${j.id}" style="cursor:pointer;">
+      <div class="job-icon">${icon ? `<img src="${icon}" alt="" />` : `<span>🧹</span>`}</div>
+      <div style="flex:1; min-width:0;">
+        <div class="job-title">${jobServiceLabel(j)}</div>
+        <div class="job-meta">${j.property_name}${j.property_city ? ' · ' + j.property_city : ''}</div>
+      </div>
+      <div class="job-price">${j.price} €</div>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+      ${urgencyBadgeHtml(j)}
+      ${paymentBadgeHtml(j)}
+    </div>
+    <button type="button" class="btn ochre btn-sm" style="width:100%;" data-accept-pending="${j.id}" ${!isOnline?'disabled':''}>${t('acceptJobBtn')}</button>
+  </div>`;
+}
+
 function renderEarningsCard(){
   const e = state.earningsToday;
   const ratePct = Math.round(e.commissionRate * 100);
@@ -1308,10 +1386,11 @@ function renderMine(){
 
 /* ================== VERİ YÜKLEME ================== */
 async function loadAll(){
-  const [mine, home] = await Promise.all([ api('/jobs/mine'), api('/jobs/home-summary') ]);
+  const [mine, home, pending] = await Promise.all([ api('/jobs/mine'), api('/jobs/home-summary'), api('/jobs/pending') ]);
   state.myJobs = mine;
   state.homeJobs = home.todaysJobs;
   state.earningsToday = home.earningsToday;
+  state.pendingJobs = pending;
   if(!state.serviceCatalog.services.length){
     try{
       const catalog = await fetch(API + '/services').then(r => r.json());
@@ -1453,6 +1532,17 @@ function attachHandlers(){
     }catch(err){ showToast(err.message); }
     checkOffersBtn.disabled = false;
   };
+
+  document.querySelectorAll('[data-accept-pending]').forEach(el => el.onclick = async () => {
+    try{
+      await api(`/jobs/${el.dataset.acceptPending}/accept`, { method:'POST' });
+      showToast(t('toastOfferAccepted'));
+      await loadAll();
+    }catch(err){ showToast(err.message); await loadAll(); }
+  });
+
+  const refreshPendingBtn = document.getElementById('refresh-pending-btn');
+  if(refreshPendingBtn) refreshPendingBtn.onclick = async () => { await loadAll(); };
 
   const acceptOffer = document.getElementById('accept-offer');
   if(acceptOffer) acceptOffer.onclick = async () => {
