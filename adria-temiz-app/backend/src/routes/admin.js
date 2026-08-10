@@ -58,6 +58,31 @@ router.post('/staff-applications/:id/approve', (req, res) => {
   });
 });
 
+// Zaten onaylanmış bir başvuru için aktivasyon kodunu YENİDEN üretir.
+// İki durumda gerekli: 1) kişi eski kodu kaybetti/kullanmadı, 2) kişi daha
+// önce aktivasyonu tamamladı AMA hesabı sonradan bir şekilde silindi
+// (örn. veritabanı sıfırlandı) - bu durumda eski kod "kullanıldı" olarak
+// işaretli kaldığı için tekrar kullanılamaz, yeni bir kodla kurtarılır.
+router.post('/staff-applications/:id/resend-code', (req, res) => {
+  const application = db.prepare('SELECT * FROM staff_applications WHERE id = ?').get(req.params.id);
+  if (!application) return res.status(404).json({ error: 'Başvuru bulunamadı.' });
+  if (application.status !== 'approved') {
+    return res.status(409).json({ error: 'Sadece onaylanmış başvurular için kod yenilenebilir.' });
+  }
+  // Hesap gerçekten var mı (aktivasyon tamamlanmış ve hesap hâlâ duruyor
+  // mu) kontrol ediyoruz - eğer varsa, yeni kod üretmek anlamsız, kişi zaten
+  // normal kullanıcı adı/şifresiyle giriş yapabilir durumda.
+  const existingUser = db.prepare('SELECT id FROM users WHERE phone = ?').get(application.phone);
+  if (existingUser) {
+    return res.status(409).json({ error: 'Bu kişinin zaten aktif bir hesabı var, giriş bilgileriyle giriş yapabilir.' });
+  }
+  const activationCode = generateActivationCode();
+  db.prepare(
+    `UPDATE staff_applications SET activation_code = ?, activation_used_at = NULL WHERE id = ?`
+  ).run(activationCode, application.id);
+  res.json({ message: 'Yeni aktivasyon kodu oluşturuldu.', activationCode });
+});
+
 router.post('/staff-applications/:id/reject', (req, res) => {
   const application = db.prepare('SELECT * FROM staff_applications WHERE id = ?').get(req.params.id);
   if (!application) return res.status(404).json({ error: 'Başvuru bulunamadı.' });
