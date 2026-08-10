@@ -71,7 +71,7 @@
   .nav-item.active svg{ opacity:1; }
   .nav-item .badge-count{ background:var(--ochre); color:#fff; font-size:9.5px; font-weight:700; border-radius:20px; padding:1px 6px; margin-left:auto; }
   .sidebar .spacer{flex:1;}
-  .lang-switch{display:flex; gap:4px; margin-bottom:12px;}
+  .lang-switch{display:flex; gap:4px; margin-top:10px; margin-bottom:12px;}
   .lang-switch button{
     background:transparent; border:1px solid rgba(255,255,255,.22); border-radius:6px; padding:4px 9px;
     font-size:11px; font-weight:700; color:#9FB3AE; cursor:pointer; font-family:inherit;
@@ -1270,12 +1270,12 @@ function renderPanel(){
     ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
-    <div class="spacer"></div>
     <div class="lang-switch">
       <button type="button" class="${state.lang==='tr'?'active':''}" data-admin-lang="tr">TR</button>
       <button type="button" class="${state.lang==='en'?'active':''}" data-admin-lang="en">EN</button>
       <button type="button" class="${state.lang==='me'?'active':''}" data-admin-lang="me">ME</button>
     </div>
+    <div class="spacer"></div>
     <div class="who">${state.user.name}</div>
     <div class="logout" id="logout">${T.logout}</div>
     <div class="sidebar-footer">
