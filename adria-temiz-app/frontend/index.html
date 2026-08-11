@@ -677,6 +677,13 @@ const TRANSLATIONS = {
     keepOrderBtn: "Vazgeç",
     toastOrderCancelled: "Sipariş iptal edildi.",
     activeOrderBadge: "Şu An Temizleniyor",
+    headingOutBadge: "Personel Yola Çıktı",
+    tapToTrackHint: "Canlı konumu görmek için dokun →",
+    liveTrackTitle: "Canlı Takip",
+    etaLabel: "Tahmini Varış",
+    etaCalculating: "Hesaplanıyor…",
+    etaMinutes: "~{{count}} dk",
+    contactStaffBtn: "Personel ile İletişime Geç",
     paidBadge: "✓ Ödendi",
     settlingBadge: "Ödeme sonuçlanıyor…",
     cardPaidNote: "💳 Kart · ödeme alındı, tamamlanınca serbest kalır",
@@ -933,6 +940,13 @@ const TRANSLATIONS = {
     keepOrderBtn: "Never mind",
     toastOrderCancelled: "Order cancelled.",
     activeOrderBadge: "Cleaning in Progress",
+    headingOutBadge: "Staff Is On The Way",
+    tapToTrackHint: "Tap to see live location →",
+    liveTrackTitle: "Live Tracking",
+    etaLabel: "Estimated Arrival",
+    etaCalculating: "Calculating…",
+    etaMinutes: "~{{count}} min",
+    contactStaffBtn: "Contact Staff",
     paidBadge: "✓ Paid",
     settlingBadge: "Settling payment…",
     cardPaidNote: "💳 Card · charged, released once completed",
@@ -1189,6 +1203,13 @@ const TRANSLATIONS = {
     keepOrderBtn: "Odustani",
     toastOrderCancelled: "Narudžba otkazana.",
     activeOrderBadge: "Čišćenje u toku",
+    headingOutBadge: "Osoblje je na putu",
+    tapToTrackHint: "Dodirni za praćenje uživo →",
+    liveTrackTitle: "Praćenje uživo",
+    etaLabel: "Procijenjeno vrijeme dolaska",
+    etaCalculating: "Računa se…",
+    etaMinutes: "~{{count}} min",
+    contactStaffBtn: "Kontaktiraj osoblje",
     paidBadge: "✓ Plaćeno",
     settlingBadge: "Plaćanje se obrađuje…",
     cardPaidNote: "💳 Kartica · naplaćeno, oslobađa se po završetku",
@@ -1519,6 +1540,10 @@ let state = {
   joinTeamMessage: '',
   joinTeamLanguages: [],
   editPropertyId: null,
+  liveTrackJobId: null,
+  liveTrackData: null,
+  liveTrackContact: null,
+  liveTrackPollHandle: null,
   deletePropertyTargetId: null,
   regPropertyAddress: '',
   regPropertyIcalUrl: '',
@@ -1892,6 +1917,7 @@ function renderPanel(){
     ${state.page==='services' ? renderServices() : state.page==='properties' ? renderProperties() : state.page==='profile' ? renderProfile() : renderJobs()}
   </div>
   ${state.modal ? renderModal() : ''}
+  ${state.liveTrackJobId ? renderLiveTrackModal() : ''}
   ${renderChatWidget()}
   `;
 }
@@ -1947,15 +1973,16 @@ function visibleServices(){
 // hizmetleri görmeden önce bunu fark etmesi için üstte bir kart gösteriyoruz.
 // Aktif iş yoksa kart hiç render edilmiyor.
 function renderActiveOrderCard(){
-  const activeJob = (state.jobs || []).find(j => j.status === 'in_progress');
+  const activeJob = (state.jobs || []).find(j => j.status === 'in_progress' || (j.status === 'assigned' && j.headed_out_at));
   if(!activeJob) return '';
 
+  const isHeadingOut = activeJob.status === 'assigned' && activeJob.headed_out_at;
   const initial = activeJob.staff_name ? activeJob.staff_name.charAt(0).toUpperCase() : '?';
   return `
-  <div style="border:1.5px solid var(--sage); border-radius:12px; padding:16px 18px; margin-bottom:20px; background:var(--bg); cursor:pointer;" data-goto-active-job="${activeJob.id}">
+  <div style="border:1.5px solid var(--sage); border-radius:12px; padding:16px 18px; margin-bottom:20px; background:var(--bg); cursor:pointer;" data-open-live-track="${activeJob.id}">
     <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
       <span style="width:9px; height:9px; border-radius:50%; background:var(--sage); flex-shrink:0;"></span>
-      <span style="font-size:11px; font-weight:700; color:var(--sage-dark); text-transform:uppercase; letter-spacing:.03em;">${t('activeOrderBadge')}</span>
+      <span style="font-size:11px; font-weight:700; color:var(--sage-dark); text-transform:uppercase; letter-spacing:.03em;">${isHeadingOut ? t('headingOutBadge') : t('activeOrderBadge')}</span>
     </div>
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
       <div>
@@ -1967,6 +1994,7 @@ function renderActiveOrderCard(){
         <span style="font-size:13px; color:var(--navy);">${activeJob.staff_name || ''}</span>
       </div>
     </div>
+    ${isHeadingOut ? `<div style="font-size:11.5px; color:var(--sage-dark); margin-top:8px; font-weight:600;">${t('tapToTrackHint')}</div>` : ''}
   </div>
   `;
 }
@@ -2561,6 +2589,97 @@ function renderAddonsSummary(addonsJson){
   }catch(e){ return ''; }
 }
 
+// İki koordinat arası kuş uçuşu mesafeyi km cinsinden, sonra kabaca tahmini
+// varış süresini (şehir içi ortalama ~28 km/s varsayımıyla) hesaplar.
+// Canlı takip modalı açıkken personelin konumunu periyodik olarak
+// yeniliyoruz. Modal kapanınca interval mutlaka temizleniyor.
+async function refreshLiveTrackData(){
+  if(!state.liveTrackJobId) return;
+  try{
+    const data = await api(`/jobs/${state.liveTrackJobId}/staff-location`);
+    state.liveTrackData = data;
+    render();
+  }catch(err){
+    // Geçici bir ağ hatası olabilir - modalı kapatmıyoruz, sadece bu
+    // döngüyü atlıyoruz, bir sonraki periyotta tekrar denenecek.
+  }
+}
+function startLiveTrackPolling(){
+  if(state.liveTrackPollHandle) clearInterval(state.liveTrackPollHandle);
+  state.liveTrackPollHandle = setInterval(refreshLiveTrackData, 15000);
+}
+function stopLiveTrackAndClose(){
+  if(state.liveTrackPollHandle){ clearInterval(state.liveTrackPollHandle); state.liveTrackPollHandle = null; }
+  state.liveTrackJobId = null;
+  state.liveTrackData = null;
+  state.liveTrackContact = null;
+  render();
+}
+
+function haversineKmCustomer(lat1, lng1, lat2, lng2){
+  const R = 6371;
+  const dLat = (lat2-lat1) * Math.PI/180, dLng = (lng2-lng1) * Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function estimateEtaMinutes(km){
+  return Math.max(1, Math.round((km / 28) * 60));
+}
+
+let liveTrackMapInstance = null;
+function initLiveTrackMap(staffLat, staffLng, propLat, propLng){
+  const el = document.getElementById('live-track-map');
+  if(!el || typeof L === 'undefined') return;
+  if(liveTrackMapInstance){ try{ liveTrackMapInstance.remove(); }catch(e){} liveTrackMapInstance = null; }
+  const map = L.map('live-track-map', { zoomControl:false, dragging:false, scrollWheelZoom:false, doubleClickZoom:false, touchZoom:false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+  const staffIcon = L.divIcon({ html:'<div style="width:16px;height:16px;border-radius:50%;background:#1D9E73;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>', className:'', iconSize:[16,16] });
+  const homeIcon = L.divIcon({ html:'<div style="width:14px;height:14px;border-radius:50%;background:#0F3D2E;border:2px solid #fff;"></div>', className:'', iconSize:[14,14] });
+  const bounds = [];
+  if(staffLat && staffLng){ L.marker([staffLat, staffLng], { icon: staffIcon }).addTo(map); bounds.push([staffLat, staffLng]); }
+  if(propLat && propLng){ L.marker([propLat, propLng], { icon: homeIcon }).addTo(map); bounds.push([propLat, propLng]); }
+  if(bounds.length === 2) map.fitBounds(bounds, { padding:[30,30] });
+  else if(bounds.length === 1) map.setView(bounds[0], 14);
+  liveTrackMapInstance = map;
+  setTimeout(() => map.invalidateSize(), 80);
+}
+
+function renderLiveTrackModal(){
+  const job = (state.jobs || []).find(j => j.id === state.liveTrackJobId);
+  const d = state.liveTrackData;
+  if(!job) return '';
+
+  let etaHtml = t('etaCalculating');
+  if(d && d.staffLat && d.staffLng && d.propertyLat && d.propertyLng){
+    const km = haversineKmCustomer(d.staffLat, d.staffLng, d.propertyLat, d.propertyLng);
+    etaHtml = t('etaMinutes', { count: estimateEtaMinutes(km) });
+  }
+
+  return `
+  <div class="modal-backdrop" id="live-track-backdrop">
+    <div class="modal">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+        <h3 style="margin-bottom:0;">${t('liveTrackTitle')}</h3>
+        <span id="close-live-track" style="cursor:pointer; color:var(--muted); font-size:20px; line-height:1;">✕</span>
+      </div>
+      <div class="hint" style="margin:0 0 14px;">${job.staff_name || ''} · ${job.building_name || job.property_name}</div>
+      <div id="live-track-map" class="mini-map" style="height:220px;"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:10px; padding:12px 16px; margin-bottom:14px;">
+        <span style="font-size:12.5px; color:var(--muted);">${t('etaLabel')}</span>
+        <span style="font-family:'Fraunces',serif; font-size:18px; color:var(--navy);">${etaHtml}</span>
+      </div>
+      ${state.liveTrackContact ? `
+        <div style="text-align:center; margin-bottom:10px;">
+          <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">${state.liveTrackContact.name}</div>
+          <a href="tel:${state.liveTrackContact.phone}" style="font-family:'Fraunces',serif; font-size:20px; color:var(--sage-dark); text-decoration:none;">${state.liveTrackContact.phone}</a>
+        </div>
+      ` : `
+        <button type="button" class="btn ochre" id="contact-staff-btn" data-job="${job.id}">${t('contactStaffBtn')}</button>
+      `}
+    </div>
+  </div>`;
+}
+
 function renderModal(){
   if(state.modal === 'cancel-order'){
     return `
@@ -3125,6 +3244,10 @@ function attachHandlers(){
   const regPropIcal = document.getElementById('reg-property-ical');
   if(regPropIcal) regPropIcal.oninput = () => { state.regPropertyIcalUrl = regPropIcal.value; };
 
+  if(state.liveTrackJobId && state.liveTrackData){
+    initLiveTrackMap(state.liveTrackData.staffLat, state.liveTrackData.staffLng, state.liveTrackData.propertyLat, state.liveTrackData.propertyLng);
+  }
+
   initLeafletPickerMap('reg-map', (lat, lng) => {
     state.regLat = lat; state.regLng = lng;
     const hint = document.querySelector('#reg-map ~ .map-hint');
@@ -3370,8 +3493,32 @@ function attachHandlers(){
     state.page = el.dataset.page; await loadAll();
   });
 
-  const activeOrderCard = document.querySelector('[data-goto-active-job]');
-  if(activeOrderCard) activeOrderCard.onclick = () => { state.page = 'jobs'; render(); };
+  const activeOrderCard = document.querySelector('[data-open-live-track]');
+  if(activeOrderCard) activeOrderCard.onclick = async () => {
+    const jobId = activeOrderCard.dataset.openLiveTrack;
+    const job = (state.jobs || []).find(j => j.id === jobId);
+    if(!job || !job.headed_out_at){ state.page = 'jobs'; render(); return; }
+    state.liveTrackJobId = jobId;
+    state.liveTrackData = null;
+    state.liveTrackContact = null;
+    render();
+    await refreshLiveTrackData();
+    startLiveTrackPolling();
+  };
+
+  const closeLiveTrack = document.getElementById('close-live-track');
+  if(closeLiveTrack) closeLiveTrack.onclick = () => { stopLiveTrackAndClose(); };
+  const liveTrackBackdrop = document.getElementById('live-track-backdrop');
+  if(liveTrackBackdrop) liveTrackBackdrop.onclick = (e) => { if(e.target === liveTrackBackdrop) stopLiveTrackAndClose(); };
+
+  const contactStaffBtn = document.getElementById('contact-staff-btn');
+  if(contactStaffBtn) contactStaffBtn.onclick = async () => {
+    try{
+      const contact = await api(`/jobs/${contactStaffBtn.dataset.job}/staff-contact`);
+      state.liveTrackContact = contact;
+      render();
+    }catch(err){ showToast(err.message); }
+  };
 
   const copyReferralBtn = document.getElementById('copy-referral-code');
   if(copyReferralBtn) copyReferralBtn.onclick = async () => {
