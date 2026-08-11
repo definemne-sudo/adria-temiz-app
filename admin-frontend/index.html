@@ -387,6 +387,11 @@ tr: {
   fieldRatePerFloor: "Kat başına (€)",
   fieldRatePerSqm: "m² başına (€)",
   fieldRatePerCapacity: "Kişi başına (€)",
+  fieldThresholdSqm: "Kaç m²'ye kadar",
+  fieldFlatPrice: "Sabit fiyat (€)",
+  fieldExtraRate: "+m² başına (€)",
+  commonAreaCardTitle: "Ortak Alan Temizliği",
+  commonAreaCardSubtitle: "Merdiven, kat koridoru ve asansör temizliğinin fiyatlandırması.",
   saveBtn: "Kaydet",
   savedToast: "Fiyatlandırma güncellendi.",
   checklistTitle: "Görev Listesi (Checklist)",
@@ -704,6 +709,11 @@ en: {
   fieldRatePerFloor: "Per floor (€)",
   fieldRatePerSqm: "Per m² (€)",
   fieldRatePerCapacity: "Per person (€)",
+  fieldThresholdSqm: "Up to how many m²",
+  fieldFlatPrice: "Flat price (€)",
+  fieldExtraRate: "+per m² (€)",
+  commonAreaCardTitle: "Common Area Cleaning",
+  commonAreaCardSubtitle: "Pricing for staircase, floor corridor, and elevator cleaning.",
   saveBtn: "Save",
   savedToast: "Pricing updated.",
   checklistTitle: "Checklist",
@@ -1020,6 +1030,11 @@ me: {
   fieldRatePerFloor: "Po spratu (€)",
   fieldRatePerSqm: "Po m² (€)",
   fieldRatePerCapacity: "Po osobi (€)",
+  fieldThresholdSqm: "Do koliko m²",
+  fieldFlatPrice: "Fiksna cijena (€)",
+  fieldExtraRate: "+po m² (€)",
+  commonAreaCardTitle: "Čišćenje zajedničkih prostorija",
+  commonAreaCardSubtitle: "Cijene za čišćenje stepeništa, hodnika i lifta.",
   saveBtn: "Sačuvaj",
   savedToast: "Cijene ažurirane.",
   checklistTitle: "Lista zadataka (checklist)",
@@ -1659,17 +1674,15 @@ function renderCustomers(){
 }
 
 function commonAreaFieldsFor(s){
-  if(s.paramType==='floors') return [['base',T.fieldBase],['ratePerFloor',T.fieldRatePerFloor],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
-  if(s.paramType==='corridor') return [['base',T.fieldBase],['ratePerFloor',T.fieldRatePerFloor],['ratePerSqm',T.fieldRatePerSqm],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
-  if(s.paramType==='elevator') return [['base',T.fieldBase],['ratePerCapacity',T.fieldRatePerCapacity],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  if(s.paramType==='floors') return [['ratePerFloor',T.fieldRatePerFloor],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  if(s.paramType==='corridor') return [['ratePerSqm',T.fieldRatePerSqm],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
+  if(s.paramType==='elevator') return [['ratePerCapacity',T.fieldRatePerCapacity],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]];
   return [];
 }
 
-function renderServiceCard(s, fields){
+function renderServicePricingBlock(s, fields){
   const checklist = s.checklist || [];
   return `
-  <div class="panel-card service-price-card">
-    <div class="panel-head"><h3>${s.name}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${s.description}</div></div>
     <form data-pricing-form="${s.key}" style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px;">
       ${fields.map(([field,label]) => `
         <div class="field" style="margin-bottom:0;">
@@ -1696,6 +1709,34 @@ function renderServiceCard(s, fields){
       <input name="itemText" placeholder="${T.addChecklistItemPlaceholder}" style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
       <button class="btn ghost btn-sm" type="submit">${T.addBtn}</button>
     </form>
+  `;
+}
+
+function renderServiceCard(s, fields){
+  return `
+  <div class="panel-card service-price-card">
+    <div class="panel-head"><h3>${s.name}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${s.description}</div></div>
+    ${renderServicePricingBlock(s, fields)}
+  </div>`;
+}
+
+// Merdiven, Kat Koridoru ve Asansör temizliğini "Ortak Alan Temizliği"
+// başlığı altında TEK bir kartta, ayrı bölümler halinde gösterir - her
+// birinin kendi parametresi/fiyatı ve checklist'i var, ama artık ayrı
+// ayrı 3 kart olarak dağılmıyorlar.
+function renderCommonAreaCard(subOptions){
+  return `
+  <div class="panel-card service-price-card" style="grid-column:1 / -1;">
+    <div class="panel-head"><h3>${T.commonAreaCardTitle}</h3><div style="font-size:12px; color:var(--muted); margin-top:2px;">${T.commonAreaCardSubtitle}</div></div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:20px;">
+      ${subOptions.map((s, i) => `
+        <div style="${i > 0 ? 'border-left:1px solid var(--line); padding-left:20px;' : ''}">
+          <div style="font-size:13px; font-weight:700; color:var(--navy); margin-bottom:2px;">${s.name}</div>
+          <div style="font-size:11.5px; color:var(--muted); margin-bottom:12px;">${s.description}</div>
+          ${renderServicePricingBlock(s, commonAreaFieldsFor(s))}
+        </div>
+      `).join('')}
+    </div>
   </div>`;
 }
 
@@ -2284,8 +2325,8 @@ function renderServicesPricing(){
   return `
   <div class="page-head"><div><h2>${T.servicesTitle}</h2><p>${T.servicesSubtitle}</p></div></div>
   <div class="services-grid">
-    ${priceableServices.map(s => renderServiceCard(s, [['base',T.fieldBase],['rate',T.fieldRate],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]])).join('')}
-    ${d.commonAreaSubOptions.map(s => renderServiceCard(s, commonAreaFieldsFor(s))).join('')}
+    ${priceableServices.map(s => renderServiceCard(s, [['thresholdSqm',T.fieldThresholdSqm],['flatPrice',T.fieldFlatPrice],['extraRate',T.fieldExtraRate],['min',T.fieldMin],['estimatedMinutes',T.fieldEstimatedMinutes]])).join('')}
+    ${renderCommonAreaCard(d.commonAreaSubOptions)}
     ${d.addons.map(a => renderServiceCard(a, [['rate',T.fieldRate]])).join('')}
   </div>
 
