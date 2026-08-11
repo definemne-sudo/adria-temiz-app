@@ -3,6 +3,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { calcNetEarning, getCommissionRate, getPayoutCycleDays } = require('../services/catalog');
+const { toDateKey, round2, getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -12,12 +13,6 @@ router.use((req, res, next) => {
   }
   next();
 });
-
-function toDateKey(d) {
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-function round2(n) { return Math.round(n * 100) / 100; }
 
 function getPeriodRange(period, offset) {
   const now = new Date();
@@ -39,62 +34,15 @@ function getPeriodRange(period, offset) {
 
 // --- Personel bazında 15 günlük ödeme dönemleri -----------------------------
 
-function calcStaffRange(staffId, startKey, endKey) {
-  const jobs = db
-    .prepare(`SELECT price, payment_method FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done' AND date(completed_at) BETWEEN ? AND ?`)
-    .all(staffId, startKey, endKey);
-  let owedToStaff = 0, owedToBusiness = 0;
-  jobs.forEach((j) => {
-    const net = calcNetEarning(j.price);
-    if (j.payment_method === 'cash') owedToBusiness += (j.price - net);
-    else owedToStaff += net;
-  });
-  return {
-    jobCount: jobs.length,
-    owedToStaff: round2(owedToStaff),
-    owedToBusiness: round2(owedToBusiness),
-    netSettlement: round2(owedToStaff - owedToBusiness),
-  };
-}
-
-// Personelin ilk tamamladığı işten bugüne kadar, 15 günlük pencereler
-// halinde ödeme dönemlerini üretir (canlı hesaplanır, saklanmaz - sadece
-// "ödendi" işareti staff_payment_marks'ta tutulur). En yeni dönem en başta.
-function getStaffPeriods(staffId) {
-  const firstJob = db
-    .prepare(`SELECT MIN(date(completed_at)) AS d FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done'`)
-    .get(staffId);
-  if (!firstJob.d) return [];
-
-  const periods = [];
-  const cycleDays = getPayoutCycleDays();
-  let periodStart = new Date(firstJob.d + 'T00:00:00');
-  const today = new Date();
-  while (periodStart <= today) {
-    const periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + cycleDays - 1);
-    const startKey = toDateKey(periodStart);
-    const endKey = toDateKey(periodEnd);
-    const stats = calcStaffRange(staffId, startKey, endKey);
-    const mark = db.prepare('SELECT * FROM staff_payment_marks WHERE staff_id = ? AND period_start = ?').get(staffId, startKey);
-    periods.push({
-      periodStart: startKey, periodEnd: endKey, ...stats,
-      isPaid: !!mark, paidAt: mark ? mark.paid_at : null,
-    });
-    periodStart.setDate(periodStart.getDate() + cycleDays);
-  }
-  return periods.reverse();
-}
-
 router.get('/staff', (req, res) => {
   const staffRows = db.prepare(`SELECT id, name, phone, current_city, is_online FROM users WHERE account_type = 'staff' ORDER BY name ASC`).all();
   const result = staffRows.map((s) => {
-    const allJobs = db.prepare(`SELECT price FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done'`).all(s.id);
-    const totalEarned = round2(allJobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0));
+    const totalEarned = getStaffLifetimeTotal(s.id);
+    const allJobs = db.prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done'`).get(s.id);
     const periods = getStaffPeriods(s.id);
     const unpaidPeriods = periods.filter((p) => !p.isPaid && (p.owedToStaff > 0 || p.owedToBusiness > 0));
     const pendingNet = round2(unpaidPeriods.reduce((sum, p) => sum + p.netSettlement, 0));
-    return { ...s, totalEarned, jobCount: allJobs.length, unpaidPeriodCount: unpaidPeriods.length, pendingNet };
+    return { ...s, totalEarned, jobCount: allJobs.c, unpaidPeriodCount: unpaidPeriods.length, pendingNet };
   });
   res.json({ staff: result });
 });
