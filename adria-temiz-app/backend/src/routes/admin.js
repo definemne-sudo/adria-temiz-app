@@ -394,7 +394,7 @@ router.post('/chats/:userId/messages', (req, res) => {
 // Fiyatlandırma alanı isimlerinin pricing_settings'teki anahtara nasıl
 // eşlendiğini kontrol eder - admin rastgele bir sütuna yazamasın diye
 // (SQL injection değil ama en azından anlamsız bir key üretmesin diye).
-const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor', 'ratePerSqm', 'ratePerCapacity'];
+const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor', 'ratePerSqm', 'ratePerCapacity', 'thresholdSqm', 'flatPrice', 'extraRate'];
 
 // NOT: getChecklist artık services/catalog.js'te - burada import ediliyor
 // (müşteri uygulaması da aynı fonksiyonu kullanıyor, tek doğru kaynak).
