@@ -324,7 +324,7 @@ const TRANSLATIONS = {
     jobHistoryTitle: "Tamamlanan İşler",
     emptyHistory: "Bu dönemde tamamlanan iş yok.",
     navRatings: "Değerlendirme",
-    ratingsSummary: "{{total}} değerlendirmeden {{like}} tanesi olumlu",
+    ratingsSummary: "{{total}} değerlendirmenin ortalaması",
     ratingsListTitle: "İş Bazında Değerlendirmeler",
     emptyRatings: "Bu dönemde değerlendirme yok.",
     emptyCalendarDay: "Bu gün için onaylanmış bir işin yok.",
@@ -453,7 +453,7 @@ const TRANSLATIONS = {
     jobHistoryTitle: "Completed Jobs",
     emptyHistory: "No jobs completed in this period.",
     navRatings: "Ratings",
-    ratingsSummary: "{{like}} out of {{total}} ratings were positive",
+    ratingsSummary: "average of {{total}} ratings",
     ratingsListTitle: "Ratings by Job",
     emptyRatings: "No ratings in this period.",
     emptyCalendarDay: "You have no confirmed jobs for this day.",
@@ -582,7 +582,7 @@ const TRANSLATIONS = {
     jobHistoryTitle: "Završeni poslovi",
     emptyHistory: "Nema završenih poslova u ovom periodu.",
     navRatings: "Ocjene",
-    ratingsSummary: "{{like}} od {{total}} ocjena je pozitivno",
+    ratingsSummary: "prosjek {{total}} ocjena",
     ratingsListTitle: "Ocjene po poslu",
     emptyRatings: "Nema ocjena u ovom periodu.",
     emptyCalendarDay: "Nemaš potvrđenih poslova za ovaj dan.",
@@ -991,15 +991,15 @@ function ratingsPeriodLabel(d){
 function renderRatingRow(r){
   const icon = serviceIconSrc(r.service_key);
   const dateLabel = new Date((r.completed_at||'').replace(' ','T')).toLocaleDateString(LOCALES[state.lang], { day:'numeric', month:'short' });
-  const isLike = r.staff_rating === 'like';
   return `
   <div class="job-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
     <div class="job-icon" style="width:38px; height:38px; flex-shrink:0;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:18px;">🧹</span>`}</div>
     <div style="flex:1; min-width:0;">
       <div style="font-size:13px; font-weight:700; color:var(--navy);">${jobServiceLabel(r)}</div>
       <div style="font-size:11.5px; color:var(--muted);">${r.property_name} · ${dateLabel}</div>
+      ${r.staff_feedback ? `<div style="font-size:11.5px; color:var(--muted); margin-top:3px; font-style:italic;">"${r.staff_feedback}"</div>` : ''}
     </div>
-    <div style="font-size:22px; flex-shrink:0;">${isLike ? '👍' : '👎'}</div>
+    <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ochre); flex-shrink:0;">${r.staff_score}<span style="font-size:12px; color:var(--muted); font-family:Inter;">/10</span></div>
   </div>`;
 }
 
@@ -1023,8 +1023,8 @@ function renderRatings(){
     ${d.totalRated === 0 ? `
       <div style="font-size:13px; color:var(--muted); padding:8px 0;">${t('emptyRatings')}</div>
     ` : `
-      <div style="font-family:'Fraunces',serif; font-size:40px; color:var(--ochre);">%${d.likePercentage}</div>
-      <div style="font-size:12px; color:var(--muted); margin-top:4px;">${t('ratingsSummary', { like: d.likeCount, total: d.totalRated })}</div>
+      <div style="font-family:'Fraunces',serif; font-size:40px; color:var(--ochre);">${d.avgScore}<span style="font-size:18px; color:var(--muted);">/10</span></div>
+      <div style="font-size:12px; color:var(--muted); margin-top:4px;">${t('ratingsSummary', { total: d.totalRated })}</div>
     `}
   </div>
 
