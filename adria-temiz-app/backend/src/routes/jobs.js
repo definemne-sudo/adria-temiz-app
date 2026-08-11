@@ -495,23 +495,22 @@ router.get('/ratings', (req, res) => {
 
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.service_params, j.completed_at, j.staff_rating,
+      `SELECT j.id, j.service_key, j.service_params, j.completed_at, j.staff_score, j.staff_feedback,
               p.name AS property_name, p.city AS property_city
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status = 'done' AND j.staff_rating IS NOT NULL
+       WHERE j.assigned_staff_id = ? AND j.status = 'done' AND j.staff_score IS NOT NULL
          AND date(j.completed_at) BETWEEN ? AND ?
        ORDER BY j.completed_at DESC`
     )
     .all(req.user.id, startKey, endKey);
 
   const totalRated = rows.length;
-  const likeCount = rows.filter((r) => r.staff_rating === 'like').length;
-  const likePercentage = totalRated ? Math.round((likeCount / totalRated) * 100) : null;
+  const avgScore = totalRated ? Math.round((rows.reduce((sum, r) => sum + r.staff_score, 0) / totalRated) * 10) / 10 : null;
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
-    ratings: rows, totalRated, likeCount, dislikeCount: totalRated - likeCount, likePercentage,
+    ratings: rows, totalRated, avgScore,
   });
 });
 
@@ -596,7 +595,7 @@ router.patch('/:id/status', (req, res) => {
 // bu da gerçek bir push bildirimi olmasa da "tamamlandı" haberini iletir.
 router.post('/:id/rate', (req, res) => {
   const { id } = req.params;
-  const { serviceRating, serviceFeedback, staffRating, staffFeedback } = req.body;
+  const { serviceScore, serviceFeedback, staffScore, staffFeedback } = req.body;
 
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
@@ -606,17 +605,19 @@ router.post('/:id/rate', (req, res) => {
   if (job.status !== 'done') {
     return res.status(400).json({ error: 'Yalnızca tamamlanmış siparişler değerlendirilebilir.' });
   }
-  if (!['like', 'dislike'].includes(serviceRating) || !['like', 'dislike'].includes(staffRating)) {
-    return res.status(400).json({ error: 'Geçerli bir değerlendirme seç.' });
+  const sScore = Number(serviceScore);
+  const stScore = Number(staffScore);
+  if (!Number.isInteger(sScore) || sScore < 1 || sScore > 10 || !Number.isInteger(stScore) || stScore < 1 || stScore > 10) {
+    return res.status(400).json({ error: 'Puan 1 ile 10 arasında olmalı.' });
   }
 
   db.prepare(
     `UPDATE cleaning_jobs SET
-       service_rating = ?, service_feedback = ?,
-       staff_rating = ?, staff_feedback = ?,
+       service_score = ?, service_feedback = ?,
+       staff_score = ?, staff_feedback = ?,
        rated_at = datetime('now')
      WHERE id = ?`
-  ).run(serviceRating, serviceFeedback || null, staffRating, staffFeedback || null, id);
+  ).run(sScore, sScore < 10 ? (serviceFeedback || null) : null, stScore, stScore < 10 ? (staffFeedback || null) : null, id);
 
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
 });
