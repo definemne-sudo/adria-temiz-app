@@ -2471,6 +2471,41 @@ function startLiveMapPolling(){
 function stopLiveMapPolling(){
   if(liveMapPollInterval){ clearInterval(liveMapPollInterval); liveMapPollInterval = null; }
 }
+
+let chatPollInterval = null;
+// Destek sayfası açıkken ve bir sohbet seçiliyken, müşteriden gelen yeni
+// mesajları görmek için sekmeyi kapatıp açmaya gerek kalmasın diye birkaç
+// saniyede bir arka planda kontrol ediyoruz. Hem seçili sohbetin içeriğini
+// hem soldaki listeyi (okunmamış sayaç/son mesaj) güncel tutuyor.
+function startChatPolling(){
+  stopChatPolling();
+  chatPollInterval = setInterval(async () => {
+    if(state.page !== 'support' || !state.token) return;
+    try{
+      if(state.activeChatUserId){
+        const fresh = await api(`/admin/chats/${state.activeChatUserId}/messages`);
+        if(!state.chatMessages || fresh.length !== state.chatMessages.length){
+          state.chatMessages = fresh;
+          const thread = document.getElementById('chat-thread');
+          if(thread){
+            thread.innerHTML = state.chatMessages.map(m => `
+              <div style="align-self:${m.sender==='admin'?'flex-end':'flex-start'}; max-width:75%;">
+                <div style="background:${m.sender==='admin'?'var(--navy)':'#F0F4F2'}; color:${m.sender==='admin'?'#fff':'var(--text)'}; padding:9px 13px; border-radius:12px; font-size:13.5px;">${m.message}</div>
+                <div style="font-size:10px; color:var(--muted); margin-top:3px; text-align:${m.sender==='admin'?'right':'left'};">${new Date(m.created_at.replace(' ','T')).toLocaleString('sr-Latn-ME',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+              </div>
+            `).join('');
+            thread.scrollTop = thread.scrollHeight;
+          }
+        }
+      }
+      state.chats = await api('/admin/chats');
+    }catch(e){ /* sessizce geç, bir sonraki denemede tekrar dener */ }
+  }, 3500);
+}
+function stopChatPolling(){
+  if(chatPollInterval){ clearInterval(chatPollInterval); chatPollInterval = null; }
+}
+
 async function loadChats(){
   state.chats = await api('/admin/chats');
   render();
@@ -2595,7 +2630,8 @@ function attachHandlers(){
     if(state.page === 'bookings') await loadBookings(1);
     if(state.page === 'workers') await loadWorkers();
     if(state.page === 'customers') await loadCustomers();
-    if(state.page === 'support') await loadChats();
+    if(state.page === 'support'){ await loadChats(); startChatPolling(); }
+    else stopChatPolling();
     if(state.page === 'services') await loadServicesData();
     if(state.page === 'finance') await loadFinanceSubPage();
     if(state.page === 'settings'){ await loadSettings(); await loadAdmins(); }
@@ -2927,6 +2963,7 @@ function attachHandlers(){
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
     stopLiveMapPolling();
+    stopChatPolling();
     localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
     state.token = null; state.user = null; render();
   };
