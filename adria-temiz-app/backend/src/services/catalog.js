@@ -98,8 +98,12 @@ function getService(key) {
   if (def.isGroup) return def;
   return {
     ...def,
-    base: getPricingValue(`${key}.base`),
-    rate: getPricingValue(`${key}.rate`),
+    // Yeni fiyatlandırma modeli: "X m²'ye kadar" sabit fiyat, üstü için
+    // m² başına ek ücret. Eski base/rate modelinden farklı - müşteri
+    // mülkünün büyüklüğüne göre net, anlaşılır bir fiyat mantığı.
+    thresholdSqm: getPricingValue(`${key}.thresholdSqm`),
+    flatPrice: getPricingValue(`${key}.flatPrice`),
+    extraRate: getPricingValue(`${key}.extraRate`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
     checklist: getChecklist(key),
@@ -145,20 +149,24 @@ function getSuppliesFees() {
 
 function calcPrice(serviceKey, { sizeSqm } = {}) {
   const service = getService(serviceKey);
-  const price = service.base + (Number(sizeSqm) || 0) * service.rate;
+  const sqm = Number(sizeSqm) || 0;
+  const price = sqm <= service.thresholdSqm
+    ? service.flatPrice
+    : service.flatPrice + (sqm - service.thresholdSqm) * service.extraRate;
   return Math.max(service.min, Math.round(price / 5) * 5);
 }
 
-// Tek bir ortak alan alt seçeneğinin fiyatı.
+// Tek bir ortak alan alt seçeneğinin fiyatı. Sabit bir "başlangıç ücreti"
+// yok, bilerek - admin panelinde tek bir parametreye karşılık tek bir
+// birim fiyat girilsin diye (kat sayısı × kat başına ücret gibi).
 function calcCommonAreaSubPrice(key, params = {}) {
   const sub = getCommonAreaSubOption(key);
-  let price = sub.base;
+  let price = 0;
   if (sub.paramType === 'floors') {
     price += (Number(params.floorCount) || 0) * sub.ratePerFloor;
   } else if (sub.paramType === 'corridor') {
     const floors = Number(params.floorCount) || 0;
     const sqmPerFloor = Number(params.sqmPerFloor) || 0;
-    price += floors * sub.ratePerFloor;
     price += (floors * sqmPerFloor) * sub.ratePerSqm;
   } else if (sub.paramType === 'elevator') {
     price += (Number(params.elevatorCapacity) || 0) * sub.ratePerCapacity;
