@@ -1923,7 +1923,10 @@ function renderPanel(){
 }
 
 function calcPriceClient(service, { sizeSqm } = {}){
-  const price = service.base + (Number(sizeSqm)||0) * service.rate;
+  const sqm = Number(sizeSqm) || 0;
+  const price = sqm <= service.thresholdSqm
+    ? service.flatPrice
+    : service.flatPrice + (sqm - service.thresholdSqm) * service.extraRate;
   return Math.max(service.min, Math.round(price/5)*5);
 }
 
