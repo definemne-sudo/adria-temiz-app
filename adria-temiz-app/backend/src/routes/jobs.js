@@ -6,6 +6,7 @@ const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, get
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
 const { sendPushToUser } = require('../services/push');
+const { getStaffPeriods, getStaffLifetimeTotal, round2 } = require('../services/financeCalc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -620,6 +621,40 @@ router.post('/:id/rate', (req, res) => {
   ).run(sScore, sScore < 10 ? (serviceFeedback || null) : null, stScore, stScore < 10 ? (staffFeedback || null) : null, id);
 
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+});
+
+// Personelin kendi finans/mutabakat görünümü: toplam ömür boyu kazancı,
+// tüm 15 günlük dönemleri (admin'in gördüğüyle birebir aynı hesap), ve
+// henüz ödenmemiş dönemlerin toplamı ("son ödemeden bugüne kazanç").
+router.get('/finance-summary', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const totalEarned = getStaffLifetimeTotal(req.user.id);
+  const periods = getStaffPeriods(req.user.id);
+  const unpaidPeriods = periods.filter((p) => !p.isPaid && (p.owedToStaff > 0 || p.owedToBusiness > 0));
+  const owedToStaffPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToStaff, 0));
+  const owedToBusinessPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToBusiness, 0));
+  const pendingNet = round2(owedToStaffPending - owedToBusinessPending);
+  res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet });
+});
+
+// Personel "Ödememi Aldım" dediğinde, admin'in "Ödendi İşaretle" dediğinde
+// yazdığı AYNI kayda (staff_payment_marks) yazılıyor - iki taraf da aynı
+// mutabakat gerçeğini görüyor. Personel yalnızca KENDİ dönemini
+// işaretleyebilir (req.user.id üzerinden, URL'den staffId alınmıyor).
+router.post('/finance/mark-received', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
+  }
+  const { periodStart, periodEnd, amount } = req.body;
+  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'periodStart ve periodEnd zorunlu.' });
+  db.prepare(
+    `INSERT INTO staff_payment_marks (id, staff_id, period_start, period_end, amount)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(staff_id, period_start) DO UPDATE SET amount = excluded.amount, paid_at = datetime('now')`
+  ).run(uuid(), req.user.id, periodStart, periodEnd, Number(amount) || 0);
+  res.json({ message: 'Ödeme alındı olarak işaretlendi.' });
 });
 
 module.exports = router;
