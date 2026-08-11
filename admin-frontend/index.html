@@ -1272,8 +1272,7 @@ function navItem(page, icon, label, badgeCount){
 function renderPanel(){
   return `
   <div class="sidebar">
-    <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="30" height="30" ')}<h1>MICISTO</h1></div>
-    <div class="brand-tagline">Man · Cleaning on Demand</div>
+    <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="30" height="30" ')}<h1>MICISTOMan</h1></div>
     ${navItem('dashboard', 'dashboard', T.navDashboard)}
     ${navItem('bookings', 'bookings', T.navBookings)}
     ${navItem('workers', 'workers', T.navWorkers)}
@@ -1294,10 +1293,6 @@ function renderPanel(){
     <div class="spacer"></div>
     <div class="who">${state.user.name}</div>
     <div class="logout" id="logout">${T.logout}</div>
-    <div class="sidebar-footer">
-      ${BRAND_MARK.replace('<svg ', '<svg width="16" height="16" ')}
-      <span class="footer-text">MICISTOMan v1.0</span>
-    </div>
   </div>
   <div class="main">
     ${renderTopbar()}
