@@ -311,9 +311,11 @@ ensureColumn('cleaning_jobs', 'headed_out_at', 'TEXT');
 // panelinde "boş" değil, mevcut gerçek değerlerle karşılaşır. Zaten bir
 // değer varsa (admin daha önce değiştirmişse) dokunulmaz.
 const DEFAULT_PRICING = {
-  'checkin_checkout.base': 20, 'checkin_checkout.rate': 0.28, 'checkin_checkout.min': 30, 'checkin_checkout.estimatedMinutes': 60,
-  'deep_clean.base': 30, 'deep_clean.rate': 0.48, 'deep_clean.min': 45, 'deep_clean.estimatedMinutes': 150,
-  'office.base': 25, 'office.rate': 0.22, 'office.min': 40, 'office.estimatedMinutes': 90,
+  // Yeni model: "X m²'ye kadar" sabit fiyat (flatPrice), üstü için m²
+  // başına ek ücret (extraRate).
+  'checkin_checkout.thresholdSqm': 50, 'checkin_checkout.flatPrice': 35, 'checkin_checkout.extraRate': 0.30, 'checkin_checkout.min': 30, 'checkin_checkout.estimatedMinutes': 60,
+  'deep_clean.thresholdSqm': 60, 'deep_clean.flatPrice': 55, 'deep_clean.extraRate': 0.50, 'deep_clean.min': 45, 'deep_clean.estimatedMinutes': 150,
+  'office.thresholdSqm': 50, 'office.flatPrice': 35, 'office.extraRate': 0.25, 'office.min': 40, 'office.estimatedMinutes': 90,
   'staircase.base': 15, 'staircase.ratePerFloor': 4, 'staircase.min': 25, 'staircase.estimatedMinutes': 40,
   'corridor.base': 12, 'corridor.ratePerSqm': 0.3, 'corridor.ratePerFloor': 3, 'corridor.min': 30, 'corridor.estimatedMinutes': 35,
   'elevator.base': 12, 'elevator.ratePerCapacity': 1.4, 'elevator.min': 20, 'elevator.estimatedMinutes': 20,
