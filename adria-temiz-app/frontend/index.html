@@ -2971,6 +2971,34 @@ function attemptPhoneGeolocation(){
   });
 }
 
+let chatPollInterval = null;
+// Sohbet paneli açıkken, karşı taraftan (admin) gelen yeni mesajları anlık
+// görebilmek için birkaç saniyede bir arka planda kontrol ediyoruz. Tüm
+// sayfayı yeniden çizmek yerine sadece sohbet kutusunun içeriğini
+// güncelliyoruz - böylece yazarken/kaydırırken bir kesinti olmuyor.
+function startChatPolling(){
+  stopChatPolling();
+  chatPollInterval = setInterval(async () => {
+    if(!state.chatOpen) return;
+    try{
+      const fresh = await api('/chat/messages');
+      if(fresh.length !== state.chatMessages.length){
+        state.chatMessages = fresh;
+        const body = document.getElementById('chat-panel-body');
+        if(body){
+          body.innerHTML = state.chatMessages.length === 0
+            ? `<div style="text-align:center; color:var(--muted); font-size:12px; margin-top:24px;">${t('chatEmptyState')}</div>`
+            : state.chatMessages.map(m => `<div class="chat-bubble ${m.sender}">${m.message}</div>`).join('');
+          body.scrollTop = body.scrollHeight;
+        }
+      }
+    }catch(e){ /* sessizce geç, bir sonraki denemede tekrar dener */ }
+  }, 3500);
+}
+function stopChatPolling(){
+  if(chatPollInterval){ clearInterval(chatPollInterval); chatPollInterval = null; }
+}
+
 function urlBase64ToUint8Array(base64String){
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -3345,6 +3373,7 @@ function attachHandlers(){
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
+    stopChatPolling();
     localStorage.removeItem('token'); localStorage.removeItem('user');
     state.token = null; state.user = null; state.authStep = 'phone'; render();
   };
@@ -3866,6 +3895,9 @@ function attachHandlers(){
     state.chatOpen = !state.chatOpen;
     if(state.chatOpen){
       try{ state.chatMessages = await api('/chat/messages'); }catch(err){ /* sessizce geç */ }
+      startChatPolling();
+    } else {
+      stopChatPolling();
     }
     render();
     if(state.chatOpen){
