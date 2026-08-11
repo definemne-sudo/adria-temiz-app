@@ -154,11 +154,11 @@ router.get('/dashboard', (req, res) => {
 
   const satisfactionRow = db
     .prepare(
-      `SELECT COUNT(*) AS total, SUM(CASE WHEN service_rating = 'like' THEN 1 ELSE 0 END) AS likes
-       FROM cleaning_jobs WHERE service_rating IS NOT NULL`
+      `SELECT COUNT(*) AS total, SUM(service_score) AS sumScore
+       FROM cleaning_jobs WHERE service_score IS NOT NULL`
     )
     .get();
-  const satisfactionPercent = satisfactionRow.total ? Math.round((satisfactionRow.likes / satisfactionRow.total) * 100) : null;
+  const avgScore = satisfactionRow.total ? Math.round((satisfactionRow.sumScore / satisfactionRow.total) * 10) / 10 : null;
 
   const todaysBookings = db
     .prepare(
@@ -176,7 +176,7 @@ router.get('/dashboard', (req, res) => {
 
   const recentReviews = db
     .prepare(
-      `SELECT j.id, j.service_rating, j.service_feedback, j.rated_at,
+      `SELECT j.id, j.service_score, j.service_feedback, j.rated_at,
               p.name AS property_name, p.city AS property_city, u.name AS customer_name
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
@@ -203,7 +203,7 @@ router.get('/dashboard', (req, res) => {
       onlineStaff,
       pendingApplications,
       todayRevenue,
-      satisfactionPercent,
+      avgScore,
       unreadChats,
     },
     workerSummary: { total: totalStaff, online: availableStaff, busy: busyStaff, offline: offlineStaff },
@@ -255,8 +255,8 @@ router.get('/workers', (req, res) => {
       `SELECT u.id, u.name, u.phone, u.username, u.is_online, u.current_city, u.current_lat, u.current_lng,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'done') AS completed_jobs,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating IS NOT NULL) AS total_ratings,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating = 'like') AS like_ratings
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS total_ratings,
+              (SELECT SUM(staff_score) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS sum_score
        FROM users u
        WHERE u.account_type = 'staff'
        ORDER BY u.name ASC`
@@ -266,7 +266,7 @@ router.get('/workers', (req, res) => {
   const workers = rows.map((r) => ({
     ...r,
     isBusy: r.active_jobs > 0,
-    satisfactionPercent: r.total_ratings ? Math.round((r.like_ratings / r.total_ratings) * 100) : null,
+    avgScore: r.total_ratings ? Math.round((r.sum_score / r.total_ratings) * 10) / 10 : null,
   }));
 
   res.json({ workers });
