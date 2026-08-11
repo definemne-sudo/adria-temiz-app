@@ -107,20 +107,20 @@ router.get('/staff-trend', (req, res) => {
       startKey = toDateKey(target); endKey = toDateKey(monthEnd); label = startKey.slice(0, 7);
     }
     const row = db.prepare(`SELECT COUNT(*) AS jobs FROM cleaning_jobs WHERE status='done' AND date(completed_at) BETWEEN ? AND ?`).get(startKey, endKey);
-    const ratingRow = db.prepare(`SELECT COUNT(*) AS total, SUM(CASE WHEN staff_rating='like' THEN 1 ELSE 0 END) AS likes FROM cleaning_jobs WHERE staff_rating IS NOT NULL AND date(completed_at) BETWEEN ? AND ?`).get(startKey, endKey);
-    series.push({ label, jobs: row.jobs, satisfactionPercent: ratingRow.total ? Math.round((ratingRow.likes / ratingRow.total) * 100) : null });
+    const ratingRow = db.prepare(`SELECT COUNT(*) AS total, SUM(staff_score) AS sumScore FROM cleaning_jobs WHERE staff_score IS NOT NULL AND date(completed_at) BETWEEN ? AND ?`).get(startKey, endKey);
+    series.push({ label, jobs: row.jobs, avgScore: ratingRow.total ? Math.round((ratingRow.sumScore / ratingRow.total) * 10) / 10 : null });
   }
 
   const leaderboard = db
     .prepare(
       `SELECT u.id, u.name,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status='done') AS totalJobs,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating IS NOT NULL) AS totalRatings,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_rating = 'like') AS likeRatings
+              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS totalRatings,
+              (SELECT SUM(staff_score) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS sumScore
        FROM users u WHERE u.account_type = 'staff' ORDER BY totalJobs DESC`
     )
     .all()
-    .map((s) => ({ ...s, satisfactionPercent: s.totalRatings ? Math.round((s.likeRatings / s.totalRatings) * 100) : null }));
+    .map((s) => ({ ...s, avgScore: s.totalRatings ? Math.round((s.sumScore / s.totalRatings) * 10) / 10 : null }));
 
   res.json({ granularity, series, leaderboard });
 });
