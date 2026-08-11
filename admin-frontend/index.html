@@ -1445,7 +1445,7 @@ function renderDashboard(){
     ['completed', s.completedJobs, T.statCompletedJobsCard, null],
     ['workers', s.totalStaff, T.statActiveWorkers, tt('onlineSuffix', { count: s.onlineStaff })],
     ['revenue', s.todayRevenue + ' €', T.statTodayRevenue, null],
-    ['satisfaction', s.satisfactionPercent !== null ? '%' + s.satisfactionPercent : T.noSatisfactionData, T.statSatisfaction, null],
+    ['satisfaction', s.avgScore !== null ? s.avgScore + '/10' : T.noSatisfactionData, T.statSatisfaction, null],
     ['pending', s.pendingJobs, T.statPendingJobsCard, null],
   ];
 
@@ -1527,7 +1527,7 @@ function renderDashboard(){
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
               <div class="booking-avatar" style="width:30px; height:30px; font-size:12px;">${(r.customer_name||'?').charAt(0).toUpperCase()}</div>
               <div style="font-weight:700; font-size:13px; color:var(--navy);">${r.customer_name}</div>
-              <div style="margin-left:auto; font-size:16px;">${r.service_rating==='like' ? '👍' : '👎'}</div>
+              <div style="margin-left:auto; font-family:'Fraunces',serif; font-weight:600; font-size:15px; color:var(--ochre);">${r.service_score}<span style="font-size:11px; color:var(--muted); font-family:Inter;">/10</span></div>
             </div>
             <div style="font-size:13px; color:var(--text); line-height:1.5;">${r.service_feedback}</div>
             <div style="font-size:11px; color:var(--muted); margin-top:8px;">${r.property_city || ''} · ${new Date(r.rated_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</div>
@@ -1627,7 +1627,7 @@ function renderWorkers(){
                              : `<span class="status-pill" style="background:#EDF0EE; color:#5B7A6C;">${T.statusOffline}</span>`}
             </td>
             <td>${x.completed_jobs}</td>
-            <td>${x.satisfactionPercent !== null ? '%' + x.satisfactionPercent : T.noRatingsYet}</td>
+            <td>${x.avgScore !== null ? x.avgScore + '/10' : T.noRatingsYet}</td>
           </tr>
         `).join('')}
       </tbody>
@@ -2127,7 +2127,7 @@ function renderAnalytics(){
       <table>
         <thead><tr><th>${T.colName}</th><th>${T.colTotalJobs}</th><th>${T.colSatisfaction}</th></tr></thead>
         <tbody>
-          ${st.leaderboard.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.totalJobs}</td><td>${s.satisfactionPercent!==null ? '%'+s.satisfactionPercent : '—'}</td></tr>`).join('')}
+          ${st.leaderboard.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.totalJobs}</td><td>${s.avgScore!==null ? s.avgScore+'/10' : '—'}</td></tr>`).join('')}
         </tbody>
       </table>
     `}
