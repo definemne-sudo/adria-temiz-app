@@ -297,6 +297,11 @@ ensureColumn('staff_applications', 'experience_years', 'INTEGER');
 ensureColumn('staff_applications', 'languages', 'TEXT');
 ensureColumn('staff_applications', 'activation_code', 'TEXT');
 ensureColumn('staff_applications', 'activation_used_at', 'TEXT');
+// Eski beğen/beğenme (like/dislike) yerine 1-10 puanlama sistemine geçildi.
+// Eski service_rating/staff_rating (TEXT) sütunları geçmiş veri için
+// duruyor ama artık yazılmıyor - yeni skorlar bu sütunlarda tutuluyor.
+ensureColumn('cleaning_jobs', 'service_score', 'INTEGER');
+ensureColumn('cleaning_jobs', 'staff_score', 'INTEGER');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
