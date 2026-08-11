@@ -302,6 +302,9 @@ ensureColumn('staff_applications', 'activation_used_at', 'TEXT');
 // duruyor ama artık yazılmıyor - yeni skorlar bu sütunlarda tutuluyor.
 ensureColumn('cleaning_jobs', 'service_score', 'INTEGER');
 ensureColumn('cleaning_jobs', 'staff_score', 'INTEGER');
+// Personel "Yola Çık" dediğinde işaretleniyor - müşteri uygulamasında canlı
+// harita/ETA/iletişim butonunun görünmesi bu alana bağlı.
+ensureColumn('cleaning_jobs', 'headed_out_at', 'TEXT');
 
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
