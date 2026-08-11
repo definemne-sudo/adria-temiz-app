@@ -1780,8 +1780,13 @@ function attachHandlers(){
     try{
       await api(`/jobs/${el.dataset.startJob}/status`, { method:'PATCH', body: JSON.stringify({ status:'in_progress' }) });
       showToast(t('toastJobStarted'));
-      state.detailJob = null;
       await loadAll();
+      // Modalı kapatmak yerine, güncel (artık 'in_progress') haliyle açık
+      // tutuyoruz - böylece personel "İşi Tamamla" ve destek butonunu
+      // görmek için kartı tekrar açmak zorunda kalmıyor.
+      const updated = findJobById(el.dataset.startJob);
+      state.detailJob = updated || null;
+      render();
     }catch(err){ showToast(err.message); }
   });
 
