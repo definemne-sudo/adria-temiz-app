@@ -657,4 +657,69 @@ router.post('/finance/mark-received', (req, res) => {
   res.json({ message: 'Ödeme alındı olarak işaretlendi.' });
 });
 
+// Personel "Yola Çık" dediğinde: 1) işi işaretle 2) müşteriye "personelin
+// yola çıktı, canlı konumunu takip edebilirsin" bildirimi gönder.
+router.post('/:id/head-out', (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (job.assigned_staff_id !== req.user.id) {
+    return res.status(403).json({ error: 'Bu iş sana atanmamış.' });
+  }
+  db.prepare(`UPDATE cleaning_jobs SET headed_out_at = datetime('now') WHERE id = ?`).run(id);
+  res.json({ message: 'Yola çıktığın işaretlendi.' });
+
+  const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(job.property_id);
+  const staff = db.prepare('SELECT name FROM users WHERE id = ?').get(req.user.id);
+  if (property) {
+    sendPushToUser(property.owner_id, {
+      title: 'Personelin yola çıktı! 🚗',
+      body: `${staff ? staff.name : 'Personelimiz'}, ${property.name} için yola çıktı - canlı konumunu uygulamadan takip edebilirsin.`,
+      jobId: id,
+      type: 'staff_headed_out',
+    }).catch((err) => console.error('Yola çıktı bildirimi hata:', err));
+  }
+});
+
+// Müşteri, kendi aktif siparişinde personelin ANLIK konumunu görebilir -
+// ama yalnızca personel "Yola Çık" dedikten sonra (mahremiyet: personel
+// işe atanmadan/yola çıkmadan önce konumu paylaşılmaz).
+router.get('/:id/staff-location', (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (!accessiblePropertyIds(req.user.id).includes(job.property_id)) {
+    return res.status(403).json({ error: 'Bu siparişe erişim yetkiniz yok.' });
+  }
+  if (!job.headed_out_at || !job.assigned_staff_id) {
+    return res.status(409).json({ error: 'Personel henüz yola çıkmadı.' });
+  }
+  const staff = db.prepare('SELECT current_lat, current_lng FROM users WHERE id = ?').get(job.assigned_staff_id);
+  const property = db.prepare('SELECT latitude, longitude FROM properties WHERE id = ?').get(job.property_id);
+  res.json({
+    staffLat: staff ? staff.current_lat : null,
+    staffLng: staff ? staff.current_lng : null,
+    propertyLat: property ? property.latitude : null,
+    propertyLng: property ? property.longitude : null,
+    headedOutAt: job.headed_out_at,
+  });
+});
+
+// Müşterinin, atanmış personelin telefon numarasını görebilmesi - adreste
+// bir sorun olursa (bulamama, yol tarifi vb.) doğrudan ulaşabilsin diye.
+router.get('/:id/staff-contact', (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (!accessiblePropertyIds(req.user.id).includes(job.property_id)) {
+    return res.status(403).json({ error: 'Bu siparişe erişim yetkiniz yok.' });
+  }
+  if (!job.assigned_staff_id) {
+    return res.status(409).json({ error: 'Bu işe henüz bir personel atanmadı.' });
+  }
+  const staff = db.prepare('SELECT name, phone FROM users WHERE id = ?').get(job.assigned_staff_id);
+  if (!staff) return res.status(404).json({ error: 'Personel bulunamadı.' });
+  res.json({ name: staff.name, phone: staff.phone });
+});
+
 module.exports = router;
