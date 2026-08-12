@@ -577,6 +577,8 @@ const TRANSLATIONS = {
     acceptTermsAnd: "ve",
     acceptTermsSuffix: "'nı okudum, kabul ediyorum.",
     pleaseAcceptTerms: "Devam etmek için Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmelisin.",
+    confirmAgeLabel: "18 yaşından büyük olduğumu onaylıyorum.",
+    pleaseConfirmAge: "Devam etmek için 18 yaşından büyük olduğunu onaylamalısın.",
     joinTeamExperienceLabel: "Temizlik tecrüben var mı?",
     yesOpt: "Evet",
     noOpt: "Hayır",
@@ -846,6 +848,8 @@ const TRANSLATIONS = {
     acceptTermsAnd: "and",
     acceptTermsSuffix: ".",
     pleaseAcceptTerms: "You must accept the Terms of Service and Privacy Policy to continue.",
+    confirmAgeLabel: "I confirm that I am over 18 years old.",
+    pleaseConfirmAge: "You must confirm you are over 18 to continue.",
     joinTeamExperienceLabel: "Do you have cleaning experience?",
     yesOpt: "Yes",
     noOpt: "No",
@@ -1115,6 +1119,8 @@ const TRANSLATIONS = {
     acceptTermsAnd: "i",
     acceptTermsSuffix: ".",
     pleaseAcceptTerms: "Moraš prihvatiti Uslove korišćenja i Politiku privatnosti da bi nastavio/la.",
+    confirmAgeLabel: "Potvrđujem da imam više od 18 godina.",
+    pleaseConfirmAge: "Moraš potvrditi da imaš više od 18 godina da bi nastavio/la.",
     joinTeamExperienceLabel: "Imaš li iskustvo u čišćenju?",
     yesOpt: "Da",
     noOpt: "Ne",
@@ -1650,6 +1656,7 @@ let state = {
   legalPage: null,
   legalPageReturnTo: null,
   acceptedTerms: false,
+  confirmedAge: false,
   joinTeamAcceptedTerms: false,
   deletePropertyTargetId: null,
   regPropertyAddress: '',
@@ -1885,10 +1892,14 @@ function renderAuth(){
           `}
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
           <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:14px 0 6px; cursor:pointer;">
+            <input type="checkbox" id="accept-age-checkbox" ${state.confirmedAge?'checked':''} style="margin-top:2px;" />
+            <span>${t('confirmAgeLabel')}</span>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:0 0 6px; cursor:pointer;">
             <input type="checkbox" id="accept-terms-checkbox" ${state.acceptedTerms?'checked':''} style="margin-top:2px;" />
             <span>${t('acceptTermsPrefix')} <span data-open-legal="terms" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('termsOfServiceTitle')}</span> ${t('acceptTermsAnd')} <span data-open-legal="privacy" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('privacyPolicyTitle')}</span>${t('acceptTermsSuffix')}</span>
           </label>
-          <button class="btn ochre" type="submit" ${!state.acceptedTerms?'disabled style="opacity:.5;"':''}>${state.accountTypeChoice==='individual' ? t('continueBtn') : t('enterPanel')}</button>
+          <button class="btn ochre" type="submit" ${(!state.acceptedTerms || !state.confirmedAge)?'disabled style="opacity:.5;"':''}>${state.accountTypeChoice==='individual' ? t('continueBtn') : t('enterPanel')}</button>
         </form>
       `;
     } else {
@@ -1913,10 +1924,14 @@ function renderAuth(){
           <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
           <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:14px 0 6px; cursor:pointer;">
+            <input type="checkbox" id="accept-age-checkbox" ${state.confirmedAge?'checked':''} style="margin-top:2px;" />
+            <span>${t('confirmAgeLabel')}</span>
+          </label>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:0 0 6px; cursor:pointer;">
             <input type="checkbox" id="accept-terms-checkbox" ${state.acceptedTerms?'checked':''} style="margin-top:2px;" />
             <span>${t('acceptTermsPrefix')} <span data-open-legal="terms" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('termsOfServiceTitle')}</span> ${t('acceptTermsAnd')} <span data-open-legal="privacy" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('privacyPolicyTitle')}</span>${t('acceptTermsSuffix')}</span>
           </label>
-          <button class="btn ochre" type="submit" ${!state.acceptedTerms?'disabled style="opacity:.5;"':''}>${t('enterPanel')}</button>
+          <button class="btn ochre" type="submit" ${(!state.acceptedTerms || !state.confirmedAge)?'disabled style="opacity:.5;"':''}>${t('enterPanel')}</button>
         </form>
       `;
     }
@@ -3475,6 +3490,8 @@ function attachHandlers(){
 
   const acceptTermsCheckbox = document.getElementById('accept-terms-checkbox');
   if(acceptTermsCheckbox) acceptTermsCheckbox.onchange = () => { state.acceptedTerms = acceptTermsCheckbox.checked; render(); };
+  const acceptAgeCheckbox = document.getElementById('accept-age-checkbox');
+  if(acceptAgeCheckbox) acceptAgeCheckbox.onchange = () => { state.confirmedAge = acceptAgeCheckbox.checked; render(); };
   const joinTeamAcceptTerms = document.getElementById('join-team-accept-terms');
   if(joinTeamAcceptTerms) joinTeamAcceptTerms.onchange = () => { state.joinTeamAcceptedTerms = joinTeamAcceptTerms.checked; render(); };
 
@@ -3598,6 +3615,9 @@ function attachHandlers(){
       return;
     }
     // Şirket: mülk adımı hiç yok, tek ekranda tamamlanıp doğrudan gönderiliyor.
+    if(!state.confirmedAge){
+      state.authError = t('pleaseConfirmAge'); render(); return;
+    }
     if(!state.acceptedTerms){
       state.authError = t('pleaseAcceptTerms'); render(); return;
     }
@@ -3631,6 +3651,9 @@ function attachHandlers(){
   const profileAddressForm = document.getElementById('profile-address-form');
   if(profileAddressForm) profileAddressForm.onsubmit = async (e) => {
     e.preventDefault();
+    if(!state.confirmedAge){
+      state.authError = t('pleaseConfirmAge'); render(); return;
+    }
     if(!state.acceptedTerms){
       state.authError = t('pleaseAcceptTerms'); render(); return;
     }
