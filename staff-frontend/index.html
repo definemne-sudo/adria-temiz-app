@@ -213,6 +213,10 @@ const API = (location.hostname === 'localhost' || location.hostname === '127.0.0
   ? 'http://localhost:4000/api'
   : 'https://adria-temiz-app-production.up.railway.app/api';
 
+// Gizlilik Politikası ve Kullanım Koşulları metni tek kaynakta (müşteri
+// uygulaması) tutuluyor - burada tekrar etmek yerine oraya link veriyoruz.
+const LEGAL_BASE_URL = 'https://adria-temiz-app.vercel.app';
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
@@ -275,6 +279,14 @@ const TRANSLATIONS = {
     confirmPasswordLabel: "Şifreyi Tekrar Gir",
     activateBtn: "Hesabımı Oluştur",
     passwordMismatchError: "Şifreler eşleşmiyor.",
+    termsOfServiceTitle: "Kullanım Koşulları",
+    privacyPolicyTitle: "Gizlilik Politikası",
+    acceptTermsPrefix: "",
+    acceptTermsAnd: "ve",
+    acceptTermsSuffix: "'nı okudum, kabul ediyorum.",
+    pleaseAcceptTerms: "Devam etmek için Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmelisin.",
+    confirmAgeLabel: "18 yaşından büyük olduğumu onaylıyorum.",
+    pleaseConfirmAge: "Devam etmek için 18 yaşından büyük olduğunu onaylamalısın.",
     credentialsTagline: "Giriş bilgilerin hazır! Bunları not al — bundan sonra hep bunlarla giriş yapacaksın.",
     credentialsHint: "Bu bilgiler bir daha gösterilmeyecek. Unutursan, telefonunla tekrar doğrulayıp yenilerini oluşturabilirsin.",
     credentialsContinueBtn: "Devam Et",
@@ -419,6 +431,14 @@ const TRANSLATIONS = {
     confirmPasswordLabel: "Confirm Password",
     activateBtn: "Create My Account",
     passwordMismatchError: "Passwords don't match.",
+    termsOfServiceTitle: "Terms of Service",
+    privacyPolicyTitle: "Privacy Policy",
+    acceptTermsPrefix: "I have read and agree to the",
+    acceptTermsAnd: "and",
+    acceptTermsSuffix: ".",
+    pleaseAcceptTerms: "You must accept the Terms of Service and Privacy Policy to continue.",
+    confirmAgeLabel: "I confirm that I am over 18 years old.",
+    pleaseConfirmAge: "You must confirm you are over 18 to continue.",
     credentialsTagline: "Your login details are ready! Write them down — you'll use these to log in from now on.",
     credentialsHint: "These won't be shown again. If you forget them, verify with your phone again to generate new ones.",
     credentialsContinueBtn: "Continue",
@@ -563,6 +583,14 @@ const TRANSLATIONS = {
     confirmPasswordLabel: "Potvrdi šifru",
     activateBtn: "Kreiraj moj nalog",
     passwordMismatchError: "Šifre se ne poklapaju.",
+    termsOfServiceTitle: "Uslovi korišćenja",
+    privacyPolicyTitle: "Politika privatnosti",
+    acceptTermsPrefix: "Pročitao/la sam i slažem se sa",
+    acceptTermsAnd: "i",
+    acceptTermsSuffix: ".",
+    pleaseAcceptTerms: "Moraš prihvatiti Uslove korišćenja i Politiku privatnosti da bi nastavio/la.",
+    confirmAgeLabel: "Potvrđujem da imam više od 18 godina.",
+    pleaseConfirmAge: "Moraš potvrditi da imaš više od 18 godina da bi nastavio/la.",
     credentialsTagline: "Tvoji podaci za prijavu su spremni! Zapiši ih — od sada ćeš se prijavljivati sa njima.",
     credentialsHint: "Ovi podaci se neće ponovo prikazati. Ako ih zaboraviš, ponovo se potvrdi telefonom da napraviš nove.",
     credentialsContinueBtn: "Nastavi",
@@ -784,6 +812,8 @@ let state = {
   activationUsername: '',
   activationPassword: '',
   activationPasswordConfirm: '',
+  activationAcceptedTerms: false,
+  activationConfirmedAge: false,
   authError: '',
 };
 
@@ -897,8 +927,17 @@ function renderAuth(){
         <div class="field"><label>${t('choosePasswordLabel')}</label><input id="activation-password-input" name="password" type="password" required minlength="6" value="${state.activationPassword}" /></div>
         <div class="field"><label>${t('confirmPasswordLabel')}</label><input id="activation-password-confirm-input" name="passwordConfirm" type="password" required minlength="6" value="${state.activationPasswordConfirm}" /></div>
 
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:14px 0 6px; cursor:pointer;">
+          <input type="checkbox" id="activation-age-checkbox" ${state.activationConfirmedAge?'checked':''} style="margin-top:2px;" />
+          <span>${t('confirmAgeLabel')}</span>
+        </label>
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:0 0 10px; cursor:pointer;">
+          <input type="checkbox" id="activation-terms-checkbox" ${state.activationAcceptedTerms?'checked':''} style="margin-top:2px;" />
+          <span>${t('acceptTermsPrefix')} <a href="${LEGAL_BASE_URL}/?legal=terms" target="_blank" rel="noopener" style="color:var(--sage-dark);">${t('termsOfServiceTitle')}</a> ${t('acceptTermsAnd')} <a href="${LEGAL_BASE_URL}/?legal=privacy" target="_blank" rel="noopener" style="color:var(--sage-dark);">${t('privacyPolicyTitle')}</a>${t('acceptTermsSuffix')}</span>
+        </label>
+
         ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-        <button class="btn ochre" type="submit">${t('activateBtn')}</button>
+        <button class="btn ochre" type="submit" ${(!state.activationAcceptedTerms || !state.activationConfirmedAge)?'disabled style="opacity:.5;"':''}>${t('activateBtn')}</button>
       </form>
       <div style="text-align:center; margin-top:16px;">
         <span id="back-to-login" style="font-size:12.5px; color:var(--muted); cursor:pointer; text-decoration:underline;">${t('backToLoginLink')}</span>
@@ -1700,11 +1739,21 @@ function attachHandlers(){
   if(activationPasswordInput) activationPasswordInput.oninput = () => { state.activationPassword = activationPasswordInput.value; };
   const activationPasswordConfirmInput = document.getElementById('activation-password-confirm-input');
   if(activationPasswordConfirmInput) activationPasswordConfirmInput.oninput = () => { state.activationPasswordConfirm = activationPasswordConfirmInput.value; };
+  const activationAgeCheckbox = document.getElementById('activation-age-checkbox');
+  if(activationAgeCheckbox) activationAgeCheckbox.onchange = () => { state.activationConfirmedAge = activationAgeCheckbox.checked; render(); };
+  const activationTermsCheckbox = document.getElementById('activation-terms-checkbox');
+  if(activationTermsCheckbox) activationTermsCheckbox.onchange = () => { state.activationAcceptedTerms = activationTermsCheckbox.checked; render(); };
 
   const activateForm = document.getElementById('activate-form');
   if(activateForm) activateForm.onsubmit = async (e) => {
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(activateForm));
+    if(!state.activationConfirmedAge){
+      state.authError = t('pleaseConfirmAge'); render(); return;
+    }
+    if(!state.activationAcceptedTerms){
+      state.authError = t('pleaseAcceptTerms'); render(); return;
+    }
     if(fd.password !== fd.passwordConfirm){
       state.authError = t('passwordMismatchError'); render(); return;
     }
@@ -1716,6 +1765,7 @@ function attachHandlers(){
       storeSession(data.token, data.user, state.keepSignedIn);
       state.authStep = 'login';
       state.activationCode = ''; state.activationUsername = ''; state.activationPassword = ''; state.activationPasswordConfirm = '';
+      state.activationAcceptedTerms = false; state.activationConfirmedAge = false;
       state.authError = '';
       await loadAll();
     }catch(err){ state.authError = err.message; render(); }
