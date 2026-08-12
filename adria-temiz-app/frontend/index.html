@@ -134,6 +134,13 @@
   .btn.ghost{background:transparent; color:var(--navy); border:1.5px solid var(--line);}
   .error-msg{color:var(--danger); font-size:13px; margin:-6px 0 14px;}
   .hint{font-size:12px; color:var(--muted); margin-top:16px; line-height:1.5;}
+  .legal-content{ font-size:13.5px; line-height:1.65; color:var(--text); max-height:60vh; overflow-y:auto; padding-right:4px; }
+  .legal-content h3{ font-size:14px; color:var(--navy); margin:18px 0 6px; }
+  .legal-content h3:first-child{ margin-top:0; }
+  .legal-content p{ margin:0 0 4px; }
+  .legal-content .legal-updated{ color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .legal-links{ display:flex; gap:6px; justify-content:center; margin-top:18px; font-size:11.5px; color:var(--muted); flex-wrap:wrap; }
+  .legal-links span{ cursor:pointer; text-decoration:underline; }
 
   .lang-switch{display:flex; gap:4px; justify-content:flex-end; margin-bottom:14px;}
   .lang-switch button{
@@ -382,6 +389,84 @@ if ('serviceWorker' in navigator) {
 /* ================== CEVIRILER ================== */
 const LOCALES = { tr:'tr-TR', en:'en-GB', me:'sr-Latn-ME' };
 
+// Gizlilik Politikası ve Kullanım Koşulları - tam metin, hem kayıt öncesi
+// (auth ekranı alt linkleri) hem kayıt sırasında (zorunlu onay kutusu) hem
+// giriş yaptıktan sonra (Profil ekranı) erişilebiliyor.
+const PRIVACY_POLICY_HTML = `
+  <p class="legal-updated">Son güncelleme: 12 Ağustos 2026</p>
+  <p>Bu Gizlilik Politikası, MICISTO müşteri uygulaması ve MICISTORad personel uygulaması üzerinden topladığımız kişisel verileri nasıl işlediğimizi açıklar. Karadağ Kişisel Verilerin Korunması Kanunu'na (PDPL) uygun hareket etmeye özen gösteriyoruz.</p>
+
+  <h3>1. Hangi Verileri Topluyoruz</h3>
+  <p><strong>Müşteri hesabı:</strong> Ad soyad, telefon numarası, hesap tipi, mülk bilgileri (adres, şehir, GPS konumu, m², oda/banyo sayısı), sipariş geçmişi, ödeme yöntemi tercihi (kart bilgileri maskeli saklanır), değerlendirmeleriniz, destek sohbeti mesajları.</p>
+  <p><strong>Personel hesabı:</strong> Ad soyad, telefon, uyruk, cinsiyet, doğum tarihi, yaşadığı şehir, konuştuğu diller, tecrübesi, ve yalnızca çevrimiçiyken/iş üzerindeyken canlı konum.</p>
+  <p><strong>Otomatik toplanan:</strong> Cihaz/tarayıcı bilgisi, IP adresi, push bildirim aboneliği.</p>
+
+  <h3>2. Verileri Neden Topluyoruz</h3>
+  <p>Hesap oluşturma ve doğrulama (SMS), sipariş/personel eşleştirme, ödeme işlemleri, müşteri desteği, push bildirimi, yasal yükümlülükler (fatura/vergi), hizmet kalitesi analizi.</p>
+
+  <h3>3. Verilerinizi Kimlerle Paylaşıyoruz</h3>
+  <p>Eşleştiğiniz personel/müşteri ile (ad, telefon, adres); ödeme hizmet sağlayıcımızla (kart bilgileriniz bizim sunucularımızda saklanmaz); SMS doğrulama sağlayıcımızla; barındırma/altyapı sağlayıcılarımızla. Verilerinizi satmıyoruz veya pazarlama amacıyla üçüncü taraflarla paylaşmıyoruz.</p>
+
+  <h3>4. Saklama Süresi</h3>
+  <p>Hesabınız aktif olduğu sürece verileriniz saklanır. Hesap kapatma talebinizde, yasal saklama yükümlülükleri dışındaki veriler makul sürede silinir/anonimleştirilir.</p>
+
+  <h3>5. Haklarınız</h3>
+  <p>Karadağ PDPL kapsamında: verilerinizin işlendiği hakkında bilgi talep etme, düzeltme, silme talep etme, işlemeye itiraz etme, rızanızı geri çekme haklarına sahipsiniz. Şikayetlerinizi Karadağ Kişisel Verileri Koruma Ajansı'na (AZLP) da iletebilirsiniz.</p>
+
+  <h3>6. Konum Verisi</h3>
+  <p>Personelin konumu, yalnızca kendisine atanmış bir işi olduğunda ve "yola çıktım" bildirimi sonrasında ilgili müşteriyle paylaşılır - sürekli takip edilmez.</p>
+
+  <h3>7. Çerezler</h3>
+  <p>Oturumunuzu açık tutmak için tarayıcınızın yerel depolamasını kullanırız. Üçüncü taraf reklam/takip çerezi kullanmıyoruz.</p>
+
+  <h3>8. Veri Güvenliği</h3>
+  <p>Verilerinizi korumak için şifreli bağlantı (HTTPS) ve şifrelenmiş parolalar gibi makul önlemler alıyoruz.</p>
+
+  <h3>9. Çocukların Gizliliği</h3>
+  <p>MICISTO hizmetleri 18 yaş altı kişilere yönelik değildir.</p>
+
+  <h3>10. Değişiklikler</h3>
+  <p>Bu politikayı güncelleyebiliriz. Önemli değişikliklerde uygulama içinden bilgilendirilirsiniz.</p>
+
+  <h3>11. Bize Ulaşın</h3>
+  <p>Sorularınız için destek sohbeti üzerinden bize ulaşabilirsiniz.</p>
+`;
+
+const TERMS_OF_SERVICE_HTML = `
+  <p class="legal-updated">Son güncelleme: 12 Ağustos 2026</p>
+  <p>Bu Kullanım Koşulları, MICISTO müşteri uygulaması ve MICISTORad personel uygulamasını kullanımınızı düzenler. Uygulamayı kullanarak bu Koşulları kabul etmiş sayılırsınız.</p>
+
+  <h3>1. Hizmetin Tanımı</h3>
+  <p>MICISTO, Karadağ'da ev sahiplerini, yönetim şirketlerini ve işyeri sahiplerini bağımsız temizlik personeli ile buluşturan bir aracı platformdur. Temizlik hizmetini bizzat sunmaz; sipariş oluşturma, eşleştirme, ödeme takibi ve değerlendirme süreçlerini kolaylaştırır.</p>
+
+  <h3>2. Hesap Oluşturma</h3>
+  <p>Hesap oluşturmak için 18 yaşından büyük olmanız ve doğru bilgi vermeniz gerekir. Telefon numaranız SMS ile doğrulanır. Hesap bilgilerinizin gizliliğinden siz sorumlusunuz.</p>
+
+  <h3>3. Sipariş, İptal ve Ücretlendirme</h3>
+  <p>Fiyatlar sipariş onayından önce uygulama içinde netleşir. Sipariş, personel işe başlamadan önce iptal edilebilir; başladıktan sonra destek ile iletişime geçilmesi gerekir. Ödeme nakit, kart veya (şirket hesaplarında) fatura ile yapılabilir. Promosyon kodları belirtilen şartlarla sınırlıdır, nakde çevrilemez.</p>
+
+  <h3>4. Personel — Bağımsız Yüklenici Statüsü</h3>
+  <p>MICISTORad üzerinden hizmet veren personel, MICISTO'nun çalışanı değil, bağımsız yüklenicisidir; kendi çalışma saatlerini ve hangi işleri kabul edeceğini kendisi belirler.</p>
+
+  <h3>5. Kullanıcı Davranış Kuralları</h3>
+  <p>Platform dışında ödeme anlaşması yapmak, taciz/tehdit, sahte hesap açmak ve platformun işleyişini bozmaya yönelik girişimler kesinlikle yasaktır. İhlal halinde hesabınız uyarılabilir, askıya alınabilir veya kapatılabilir.</p>
+
+  <h3>6. Değerlendirme Sistemi</h3>
+  <p>Her tamamlanan sipariş sonrası hizmet ve personel 1-10 arası puanlanır. Değerlendirmelerin gerçek deneyime dayalı, adil ve saygılı olması beklenir.</p>
+
+  <h3>7. Sorumluluğun Sınırlandırılması</h3>
+  <p>MICISTO, personel tarafından verilen hizmetin sonucunu garanti etmez; şikayetler için destek kanalımız açıktır. Mülkünüzde meydana gelebilecek hasar/kayıp iddiaları için derhal destek ekibimize bildirimde bulununuz.</p>
+
+  <h3>8. Fikri Mülkiyet</h3>
+  <p>Uygulama içeriği, tasarımı ve yazılımı MICISTO'ya aittir; izinsiz kopyalanamaz veya ticari amaçla kullanılamaz.</p>
+
+  <h3>9. Hesap Kapatma</h3>
+  <p>Hesabınızı istediğiniz zaman kapatmamızı talep edebilirsiniz. Bu Koşulların ihlali halinde MICISTO hesabınızı askıya alma/kapatma hakkını saklı tutar.</p>
+
+  <h3>10. Uygulanacak Hukuk</h3>
+  <p>Bu Koşullar Karadağ hukukuna tabidir; olası uyuşmazlıklarda Karadağ mahkemeleri yetkilidir.</p>
+`;
+
 const BRAND_MARK = `<svg width="30" height="30" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;">
   <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
   <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
@@ -486,6 +571,12 @@ const TRANSLATIONS = {
     monthLabel: "Ay",
     yearLabel: "Yıl",
     pleaseSelectBirthDate: "Lütfen doğum tarihini eksiksiz seç.",
+    privacyPolicyTitle: "Gizlilik Politikası",
+    termsOfServiceTitle: "Kullanım Koşulları",
+    acceptTermsPrefix: "",
+    acceptTermsAnd: "ve",
+    acceptTermsSuffix: "'nı okudum, kabul ediyorum.",
+    pleaseAcceptTerms: "Devam etmek için Kullanım Koşulları ve Gizlilik Politikası'nı kabul etmelisin.",
     joinTeamExperienceLabel: "Temizlik tecrüben var mı?",
     yesOpt: "Evet",
     noOpt: "Hayır",
@@ -749,6 +840,12 @@ const TRANSLATIONS = {
     monthLabel: "Month",
     yearLabel: "Year",
     pleaseSelectBirthDate: "Please select your full date of birth.",
+    privacyPolicyTitle: "Privacy Policy",
+    termsOfServiceTitle: "Terms of Service",
+    acceptTermsPrefix: "I have read and agree to the",
+    acceptTermsAnd: "and",
+    acceptTermsSuffix: ".",
+    pleaseAcceptTerms: "You must accept the Terms of Service and Privacy Policy to continue.",
     joinTeamExperienceLabel: "Do you have cleaning experience?",
     yesOpt: "Yes",
     noOpt: "No",
@@ -1012,6 +1109,12 @@ const TRANSLATIONS = {
     monthLabel: "Mjesec",
     yearLabel: "Godina",
     pleaseSelectBirthDate: "Molimo izaberi kompletan datum rođenja.",
+    privacyPolicyTitle: "Politika privatnosti",
+    termsOfServiceTitle: "Uslovi korišćenja",
+    acceptTermsPrefix: "Pročitao/la sam i slažem se sa",
+    acceptTermsAnd: "i",
+    acceptTermsSuffix: ".",
+    pleaseAcceptTerms: "Moraš prihvatiti Uslove korišćenja i Politiku privatnosti da bi nastavio/la.",
     joinTeamExperienceLabel: "Imaš li iskustvo u čišćenju?",
     yesOpt: "Da",
     noOpt: "Ne",
@@ -1544,6 +1647,10 @@ let state = {
   liveTrackData: null,
   liveTrackContact: null,
   liveTrackPollHandle: null,
+  legalPage: null,
+  legalPageReturnTo: null,
+  acceptedTerms: false,
+  joinTeamAcceptedTerms: false,
   deletePropertyTargetId: null,
   regPropertyAddress: '',
   regPropertyIcalUrl: '',
@@ -1561,7 +1668,9 @@ let state = {
 function render(){
   document.getElementById('html-root').lang = state.lang;
   let html;
-  if(!(state.token && state.user)){
+  if(state.legalPage){
+    html = renderLegalPage();
+  } else if(!(state.token && state.user)){
     html = renderAuth();
   } else if(state.ratingJob){
     html = renderRatingScreen();
@@ -1675,6 +1784,22 @@ async function api(path, opts={}){
   return data;
 }
 
+// Gizlilik Politikası / Kullanım Koşulları - tam ekran, giriş yapılmış
+// olsun ya da olmasın erişilebilir bir sayfa. "Geri" butonu, hangi
+// ekrandan açıldıysa oraya (auth ya da profil) dönüyor.
+function renderLegalPage(){
+  const isPrivacy = state.legalPage === 'privacy';
+  return `
+  <div class="auth-wrap" style="align-items:flex-start; padding-top:0;">
+    <div class="auth-card" style="max-width:640px; margin-top:24px; text-align:left;">
+      <button type="button" id="close-legal-page" style="background:none; border:none; padding:0; margin-bottom:18px; cursor:pointer; color:var(--sage-dark); font-weight:600; font-size:13px;">‹ ${t('backBtn')}</button>
+      <h2 style="font-size:20px; margin-bottom:4px;">${isPrivacy ? t('privacyPolicyTitle') : t('termsOfServiceTitle')}</h2>
+      <div class="legal-content">${isPrivacy ? PRIVACY_POLICY_HTML : TERMS_OF_SERVICE_HTML}</div>
+    </div>
+  </div>
+  `;
+}
+
 function renderAuth(){
   let inner = '';
 
@@ -1695,6 +1820,11 @@ function renderAuth(){
       </form>
       <div class="hint">${t('authPhoneHint')}</div>
       <button type="button" id="join-team-link" class="btn ghost btn-sm" style="width:100%; margin-top:16px; color:var(--sage-dark); border-color:var(--sage);">${t('joinTeamLink')}</button>
+      <div class="legal-links">
+        <span data-open-legal="privacy">${t('privacyPolicyTitle')}</span>
+        <span>·</span>
+        <span data-open-legal="terms">${t('termsOfServiceTitle')}</span>
+      </div>
     `;
   }
 
@@ -1754,7 +1884,11 @@ function renderAuth(){
             <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
           `}
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-          <button class="btn ochre" type="submit">${state.accountTypeChoice==='individual' ? t('continueBtn') : t('enterPanel')}</button>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:14px 0 6px; cursor:pointer;">
+            <input type="checkbox" id="accept-terms-checkbox" ${state.acceptedTerms?'checked':''} style="margin-top:2px;" />
+            <span>${t('acceptTermsPrefix')} <span data-open-legal="terms" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('termsOfServiceTitle')}</span> ${t('acceptTermsAnd')} <span data-open-legal="privacy" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('privacyPolicyTitle')}</span>${t('acceptTermsSuffix')}</span>
+          </label>
+          <button class="btn ochre" type="submit" ${!state.acceptedTerms?'disabled style="opacity:.5;"':''}>${state.accountTypeChoice==='individual' ? t('continueBtn') : t('enterPanel')}</button>
         </form>
       `;
     } else {
@@ -1778,7 +1912,11 @@ function renderAuth(){
           </div>
           <div class="field"><label>${t('referredByCodeLabel')}</label><input name="referredByCode" placeholder="${t('referredByCodePlaceholder')}" style="text-transform:uppercase;" /></div>
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
-          <button class="btn ochre" type="submit">${t('enterPanel')}</button>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:14px 0 6px; cursor:pointer;">
+            <input type="checkbox" id="accept-terms-checkbox" ${state.acceptedTerms?'checked':''} style="margin-top:2px;" />
+            <span>${t('acceptTermsPrefix')} <span data-open-legal="terms" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('termsOfServiceTitle')}</span> ${t('acceptTermsAnd')} <span data-open-legal="privacy" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('privacyPolicyTitle')}</span>${t('acceptTermsSuffix')}</span>
+          </label>
+          <button class="btn ochre" type="submit" ${!state.acceptedTerms?'disabled style="opacity:.5;"':''}>${t('enterPanel')}</button>
         </form>
       `;
     }
@@ -2499,6 +2637,12 @@ function renderProfile(){
     ${langSwitch()}
   </div>
 
+  <div class="legal-links" style="margin:16px 0;">
+    <span data-open-legal="privacy">${t('privacyPolicyTitle')}</span>
+    <span>·</span>
+    <span data-open-legal="terms">${t('termsOfServiceTitle')}</span>
+  </div>
+
   <button class="btn ghost btn-sm" id="logout" style="width:100%; color:var(--danger);">${t('logout')}</button>
   `;
 }
@@ -2775,10 +2919,14 @@ function renderModal(){
           </div>
 
           <div class="field"><label>${t('joinTeamMessageLabel')}</label><textarea id="join-team-message" name="message" rows="3" placeholder="${t('joinTeamMessagePlaceholder')}" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:inherit; font-size:14px; resize:vertical;">${state.joinTeamMessage}</textarea></div>
+          <label style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; color:var(--muted); margin:6px 0 6px; cursor:pointer;">
+            <input type="checkbox" id="join-team-accept-terms" ${state.joinTeamAcceptedTerms?'checked':''} style="margin-top:2px;" />
+            <span>${t('acceptTermsPrefix')} <span data-open-legal="terms" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('termsOfServiceTitle')}</span> ${t('acceptTermsAnd')} <span data-open-legal="privacy" style="color:var(--sage-dark); text-decoration:underline; cursor:pointer;">${t('privacyPolicyTitle')}</span>${t('acceptTermsSuffix')}</span>
+          </label>
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
           <div class="actions">
             <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
-            <button type="submit" class="btn ochre">${t('joinTeamSubmitBtn')}</button>
+            <button type="submit" class="btn ochre" ${!state.joinTeamAcceptedTerms?'disabled style="opacity:.5;"':''}>${t('joinTeamSubmitBtn')}</button>
           </div>
         </form>
       </div>
@@ -3316,6 +3464,20 @@ function attachHandlers(){
     }catch(err){ state.authError = err.message; render(); }
   };
 
+  document.querySelectorAll('[data-open-legal]').forEach(el => el.onclick = () => {
+    state.legalPageReturnTo = state.token && state.user ? 'panel' : 'auth';
+    state.legalPage = el.dataset.openLegal;
+    render();
+    window.scrollTo(0, 0);
+  });
+  const closeLegalPage = document.getElementById('close-legal-page');
+  if(closeLegalPage) closeLegalPage.onclick = () => { state.legalPage = null; render(); };
+
+  const acceptTermsCheckbox = document.getElementById('accept-terms-checkbox');
+  if(acceptTermsCheckbox) acceptTermsCheckbox.onchange = () => { state.acceptedTerms = acceptTermsCheckbox.checked; render(); };
+  const joinTeamAcceptTerms = document.getElementById('join-team-accept-terms');
+  if(joinTeamAcceptTerms) joinTeamAcceptTerms.onchange = () => { state.joinTeamAcceptedTerms = joinTeamAcceptTerms.checked; render(); };
+
   const joinTeamLink = document.getElementById('join-team-link');
   if(joinTeamLink) joinTeamLink.onclick = () => {
     state.modal = 'join-team'; state.authError = '';
@@ -3323,6 +3485,7 @@ function attachHandlers(){
     state.joinTeamName = ''; state.joinTeamNationality = '';
     state.joinTeamBirthDay = ''; state.joinTeamBirthMonth = ''; state.joinTeamBirthYear = '';
     state.joinTeamExperienceYears = ''; state.joinTeamMessage = ''; state.joinTeamLanguages = [];
+    state.joinTeamAcceptedTerms = false;
     render();
   };
 
@@ -3368,6 +3531,9 @@ function attachHandlers(){
     const phone = `${state.countryCode} ${fd.phoneLocal}`.trim();
     if(!state.joinTeamBirthDay || !state.joinTeamBirthMonth || !state.joinTeamBirthYear){
       state.authError = t('pleaseSelectBirthDate'); render(); return;
+    }
+    if(!state.joinTeamAcceptedTerms){
+      state.authError = t('pleaseAcceptTerms'); render(); return;
     }
     const birthDate = `${state.joinTeamBirthYear}-${String(state.joinTeamBirthMonth).padStart(2,'0')}-${String(state.joinTeamBirthDay).padStart(2,'0')}`;
     try{
@@ -3432,6 +3598,9 @@ function attachHandlers(){
       return;
     }
     // Şirket: mülk adımı hiç yok, tek ekranda tamamlanıp doğrudan gönderiliyor.
+    if(!state.acceptedTerms){
+      state.authError = t('pleaseAcceptTerms'); render(); return;
+    }
     const body = {
       name: fd.name, accountType: 'company', companyName: fd.companyName,
       taxNumber: fd.taxNumber, billingAddress: fd.billingAddress,
@@ -3462,6 +3631,9 @@ function attachHandlers(){
   const profileAddressForm = document.getElementById('profile-address-form');
   if(profileAddressForm) profileAddressForm.onsubmit = async (e) => {
     e.preventDefault();
+    if(!state.acceptedTerms){
+      state.authError = t('pleaseAcceptTerms'); render(); return;
+    }
     const fd = Object.fromEntries(new FormData(profileAddressForm));
     const body = {
       name: state.regName, accountType: 'individual',
