@@ -1,67 +1,96 @@
-const CACHE = 'cisto-v4';
-const ASSETS = [
-  '/index.html', '/manifest.json',
-  '/icon-service-checkin.png', '/icon-service-deep.png', '/icon-service-office.png', '/icon-service-common-area.png',
-  '/icon-property-apartment.png', '/icon-property-house.png', '/icon-property-office.png',
-];
+// MICISTO Service Worker
+//
+// ÖNEMLİ: CACHE_VERSION'ı her önemli güncellemede DEĞİŞTİR (örn. 'v2', 'v3'...).
+// Bu numara değişmediği sürece tarayıcı eski dosyaları önbellekten sunmaya
+// devam edebilir - "en son güncellediğim tasarım gelmiyor" sorununun kök
+// nedeni tam olarak buydu: eski service worker sonsuza kadar aynı önbelleği
+// kullanıyor, hiç kontrol etmiyordu.
+const CACHE_VERSION = 'micisto-v2';
 
+// index.html TEK dosyalık bir uygulama (tüm kod içinde) - bu yüzden onu
+// ASLA "cache-first" sunmuyoruz. Her ziyarette önce ağdan taze sürüm
+// istiyoruz; ağ başarısız olursa (offline) önbellekteki son bilinen
+// sürümü gösteriyoruz. Böylece kullanıcı HER uygulamayı açtığında en
+// güncel hâli görür, ama internet yoksa da tamamen boş ekranla kalmaz.
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
-  );
-  self.skipWaiting();
+  self.skipWaiting(); // yeni service worker'ı beklemeden hemen devreye al
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      // Eski sürüm önbelleklerini temizle
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)));
+      await self.clients.claim(); // açık sekmeleri de hemen bu sürüme bağla
+    })()
   );
-  self.clients.claim();
 });
 
-// API çağrılarını (localhost:4000 veya prod backend) önbelleğe almıyoruz,
-// sadece statik arayüz dosyalarını offline kullanılabilir yapıyoruz.
 self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api')) return;
+  const req = event.request;
 
+  // Sayfa navigasyonları (uygulamayı açma/yenileme) - HER ZAMAN ağdan taze
+  // çek. Bu, "güncel özellikler gelmiyor" sorununu doğrudan çözen kısım.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req).then((cached) => cached || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Diğer statik dosyalar (ikonlar vb.) - önce ağ, olmazsa önbellek.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
 
-// "Siparişin onaylandı" gibi bildirimler - tarayıcı/uygulama kapalı olsa
-// bile (desteklenen platformlarda) bu event tetiklenir ve bildirim gösterilir.
+// --- Push Bildirimleri -------------------------------------------------
+
 self.addEventListener('push', (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (e) { /* yoksay */ }
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+
   const title = data.title || 'MICISTO';
   const options = {
-    body: data.body || 'Yeni bir bildirimin var.',
+    body: data.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: { jobId: data.jobId || null, type: data.type || null },
-    vibrate: [200, 100, 200],
+    data: { jobId: data.jobId || null, type: data.type || null, url: data.url || '/' },
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Bildirime tıklayınca uygulamayı Siparişlerim sekmesiyle açar/öne getirir.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = '/index.html?openJobs=1';
+  const jobId = event.notification.data && event.notification.data.jobId;
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
+    (async () => {
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Uygulama zaten açıksa, sekmeye odaklan ve içeride yönlendir.
+      for (const client of allClients) {
         if ('focus' in client) {
-          client.postMessage({ type: 'OPEN_JOBS' });
+          client.postMessage({ type: 'OPEN_OFFER', jobId });
           return client.focus();
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-    })
+      // Uygulama kapalıysa, Siparişlerim sekmesi açık şekilde başlat.
+      if (clients.openWindow) {
+        return clients.openWindow('/index.html?openJobs=1');
+      }
+    })()
   );
 });
