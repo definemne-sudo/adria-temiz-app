@@ -8,6 +8,18 @@
 <meta name="theme-color" content="#0F3D2E" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MICISTO" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<!-- iOS "Ana Ekrana Ekle" açılış ekranı - Safari bu görselleri otomatik
+     oluşturmuyor, ikon+isim+sloganı içeren hazır PNG'ler vermemiz gerekiyor.
+     Cihaz eşleştirmesi tam piksel/oran uyumuna göre yapılıyor. -->
+<link rel="apple-touch-startup-image" href="splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" />
+<link rel="apple-touch-startup-image" href="splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" />
+<link rel="apple-touch-startup-image" href="splash-1620x2160.png" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2)" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -374,6 +386,32 @@
 </style>
 </head>
 <body>
+<!-- Uygulama içi açılış ekranı - native (Android/iOS işletim sistemi seviyesi)
+     splash ekranları JS çalışmadan ÖNCE, tamamen statik gösterildiği için
+     kullanıcının kayıtlı dil tercihini okuyamıyorlar (Android ayrıca hiç
+     slogan gösteremiyor, sadece uygulama adını gösterebiliyor - platform
+     sınırı). Bu yüzden gerçek app script'i yüklenmeden hemen önce, kendi
+     çizdiğimiz bu ekran devreye giriyor - localStorage'daki dili okuyup
+     doğru dilde sloganı gösteriyor, ana uygulama hazır olunca kayboluyor.
+     Sayfa HTML'i indirilir indirilmez göründüğü için harici hiçbir CSS/JS
+     dosyasını beklemiyor, tamamen satır içi stillerle çiziliyor. -->
+<div id="app-splash" style="position:fixed; inset:0; z-index:9999; background:#F6FBF8; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:-apple-system,'Poppins',sans-serif;">
+  <div style="width:110px; height:110px; border-radius:24px; overflow:hidden; box-shadow:0 6px 24px rgba(15,61,46,.15); margin-bottom:28px;">
+    <img src="icon-512.png" alt="" style="width:100%; height:100%; object-fit:cover; display:block;" />
+  </div>
+  <div style="font-size:30px; font-weight:700; color:#0F3D2E; letter-spacing:.02em; margin-bottom:8px;">MICISTO</div>
+  <div id="app-splash-tagline" style="font-family:Georgia,'Fraunces',serif; font-style:italic; font-size:15px; color:#C98A3E;"></div>
+</div>
+<script>
+  // Ana script'ten bağımsız, en erken anda çalışan minik dil tespiti -
+  // büyük TRANSLATIONS nesnesini beklemeden sloganı hemen doğru dilde yazar.
+  (function(){
+    var SPLASH_TAGLINES = { tr: "Tek tıkla, temiz ev.", en: "One click, a clean home.", me: "Jedan klik, čist dom." };
+    var lang = localStorage.getItem('lang') || 'me';
+    document.getElementById('app-splash-tagline').textContent = SPLASH_TAGLINES[lang] || SPLASH_TAGLINES.me;
+  })();
+</script>
+
 <div id="app" class="app"></div>
 
 <script>
@@ -1675,6 +1713,11 @@ let state = {
 
 function render(){
   document.getElementById('html-root').lang = state.lang;
+  // Gerçek uygulama ilk kez içerik çizecek, statik açılış ekranını (varsa)
+  // kaldırıyoruz - element zaten yoksa (ikinci ve sonraki render'lar) bu
+  // satır sessizce hiçbir şey yapmıyor.
+  const splashEl = document.getElementById('app-splash');
+  if(splashEl) splashEl.remove();
   let html;
   if(state.legalPage){
     html = renderLegalPage();
