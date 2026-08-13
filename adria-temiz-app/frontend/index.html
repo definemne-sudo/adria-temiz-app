@@ -185,10 +185,11 @@
   .card .meta{font-size:12px; color:var(--muted); margin-bottom:12px;}
   .card .price{font-family:'Fraunces',serif; font-size:20px; color:var(--ochre); margin-bottom:12px;}
   .service-icon{
-    width:92px; height:92px; border-radius:22px; overflow:hidden; margin-bottom:14px;
+    width:100%; height:150px; border-radius:16px; overflow:hidden; margin-bottom:14px;
     box-shadow:0 4px 14px rgba(15,61,46,.18);
     display:flex; align-items:center; justify-content:center; background:var(--bg);
   }
+  .service-icon svg{ width:60%; height:60%; }
   .service-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
   .property-avatar{
     width:92px; height:92px; border-radius:22px; overflow:hidden; margin-bottom:14px;
@@ -1554,7 +1555,7 @@ function serviceIconHtml(key){
   const icon = serviceIcon(key);
   return icon.type === 'img'
     ? `<img src="${icon.value}" alt="" />`
-    : `<span style="display:inline-flex; width:40px; height:40px; color:var(--sage-dark);">${icon.value}</span>`;
+    : `<span style="display:inline-flex; width:76px; height:76px; color:var(--sage-dark);">${icon.value}</span>`;
 }
 function addonLabel(key){
   const a = ADDON_I18N[key];
@@ -4293,6 +4294,13 @@ if('serviceWorker' in navigator){
 (async function init(){
   if(state.token && !state.user){
     localStorage.removeItem('token'); state.token = null;
+  }
+  // Başka bir MICISTO uygulamasından (örn. MICISTORad) ?legal=terms ya da
+  // ?legal=privacy ile doğrudan bu sayfaya link verilebiliyor - metni her
+  // uygulamada ayrı ayrı tutmak yerine tek kaynağa (burası) yönlendiriyoruz.
+  const legalParam = new URLSearchParams(location.search).get('legal');
+  if(legalParam === 'terms' || legalParam === 'privacy'){
+    state.legalPage = legalParam;
   }
   render();
   if(state.token){
