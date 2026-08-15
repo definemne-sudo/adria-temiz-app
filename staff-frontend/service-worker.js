@@ -1,64 +1,91 @@
-const CACHE = 'micistorad-v2';
-const ASSETS = [
-  '/index.html', '/manifest.json',
-  '/icon-service-checkin.png', '/icon-service-deep.png', '/icon-service-office.png', '/icon-service-common-area.png',
-];
+// MICISTORad Service Worker
+//
+// ONEMLI: CACHE_VERSION'i her onemli guncellemede DEGISTIR (orn. 'v2', 'v3'...).
+// Eski dosyada bu kontrol hic yoktu ve "cache-first" strateji kullaniliyordu -
+// yani service worker index.html'i bir kere onbellege aldiktan sonra BIR DAHA
+// HIC agdan kontrol etmiyordu. Bu, "guncel logo/tasarim gelmiyor" sorununun
+// tam kok nedeniydi. Musteri uygulamasinda (frontend/) uyguladigimiz ayni
+// duzeltmeyi burada da uyguluyoruz.
+const CACHE_VERSION = 'micistorad-v2';
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).catch(() => {})
-  );
-  self.skipWaiting();
+  self.skipWaiting(); // yeni service worker'i beklemeden hemen devreye al
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  const req = event.request;
+
+  // Sayfa navigasyonlari (uygulamayi acma/yenileme) - HER ZAMAN agdan taze
+  // cek. Boylece kullanici HER acilista en guncel logo/tasarimi gorur.
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          const copy = res.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+          return res;
+        })
+        .catch(() => caches.match(req).then((cached) => cached || caches.match('/index.html')))
+    );
+    return;
+  }
+
+  // Diger statik dosyalar (ikonlar vb.) - once ag, olmazsa onbellek.
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => cached))
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
 
-// Sipariş teklifi bildirimi - tarayıcı/uygulama kapalı olsa bile (desteklenen
-// platformlarda) bu event tetiklenir ve bildirim gösterilir.
+// --- Push Bildirimleri -------------------------------------------------
+
 self.addEventListener('push', (event) => {
   let data = {};
-  try { data = event.data ? event.data.json() : {}; } catch (e) { /* yoksay */ }
-  const title = data.title || 'MICISTO';
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = {}; }
+
+  const title = data.title || 'MICISTORad';
   const options = {
-    body: data.body || 'Yeni bir bildirimin var.',
+    body: data.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     data: { jobId: data.jobId || null, type: data.type || null },
-    requireInteraction: true, // kabul/red karari verilene kadar ekranda kalsin
-    vibrate: [200, 100, 200],
   };
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Bildirime tıklayınca uygulamayı ilgili işin teklif ekranıyla açar/öne getirir.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const jobId = event.notification.data && event.notification.data.jobId;
-  const targetUrl = jobId ? `/index.html?offerJobId=${jobId}` : '/index.html';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
+    (async () => {
+      const allClients = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // Uygulama zaten aciksa, sekmeye odaklan ve iceride teklif modalini ac.
+      for (const client of allClients) {
         if ('focus' in client) {
           client.postMessage({ type: 'OPEN_OFFER', jobId });
           return client.focus();
         }
       }
-      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-    })
+      // Uygulama kapaliysa, teklif ekrani acik sekilde baslat.
+      if (clients.openWindow) {
+        return clients.openWindow(`/index.html?offerJobId=${jobId}`);
+      }
+    })()
   );
 });
