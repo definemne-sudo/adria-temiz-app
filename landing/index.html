@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="me">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MICISTO — Karadağ'ın Temizlik Hizmeti Pazaryeri</title>
+<meta name="description" content="MICISTO — Airbnb ev sahipleri ve Karadağ'da yaşayanlar için doğrulanmış temizlikçiler, canlı takip ve şeffaf fiyatlandırma.">
+<link rel="icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F3D2E; --navy-2:#14503D; --sage:#1D9E73; --ochre:#C98A3E;
+    --cream:#F6FBF8; --ink:#16241C; --muted:#5B7A6C; --line:#D7E7DE;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Inter',sans-serif; color:var(--ink); background:var(--cream);
+    -webkit-font-smoothing:antialiased;
+  }
+  img{max-width:100%; display:block;}
+  a{color:inherit; text-decoration:none;}
+  .wrap{max-width:1180px; margin:0 auto; padding:0 32px;}
+  .eyebrow{font-family:'Poppins',sans-serif; font-weight:700; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--ochre);}
+
+  /* ---- Header ---- */
+  header{
+    position:sticky; top:0; z-index:50; background:rgba(246,251,248,.92); backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .nav{ display:flex; align-items:center; justify-content:space-between; padding:16px 32px; max-width:1180px; margin:0 auto; }
+  .nav-brand{ display:flex; align-items:center; gap:10px; }
+  .nav-brand img{ width:34px; height:34px; border-radius:9px; }
+  .nav-brand span{ font-family:'Poppins',sans-serif; font-weight:800; font-size:19px; color:var(--navy); }
+  .nav-links{ display:flex; align-items:center; gap:30px; }
+  .nav-links a{ font-family:'Poppins',sans-serif; font-weight:600; font-size:14.5px; color:var(--navy); }
+  .lang-switch{ display:flex; gap:4px; background:#fff; border:1px solid var(--line); border-radius:20px; padding:3px; }
+  .lang-switch button{
+    font-family:'Poppins',sans-serif; font-weight:700; font-size:12px; padding:6px 12px; border-radius:16px;
+    border:none; background:transparent; color:var(--muted); cursor:pointer;
+  }
+  .lang-switch button.active{ background:var(--navy); color:#fff; }
+  .nav-cta{ background:var(--ochre); color:var(--navy); font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; padding:11px 22px; border-radius:30px; }
+  .nav-toggle{ display:none; }
+
+  /* ---- Hero ---- */
+  .hero{ position:relative; overflow:hidden; padding:64px 0 40px; }
+  .hero-blob{ position:absolute; top:-180px; right:-220px; width:640px; height:640px; border-radius:50%; background:#DCEAE2; z-index:0; }
+  .hero-grid{ position:relative; z-index:1; display:grid; grid-template-columns:1.1fr .9fr; gap:40px; align-items:center; }
+  .hero-tag{ margin-bottom:20px; }
+  .hero h1{ font-family:'Poppins',sans-serif; font-weight:800; font-size:56px; line-height:1.1; color:var(--navy); margin-bottom:24px; max-width:560px; }
+  .hero h1 em{ font-style:normal; color:var(--sage); }
+  .hero-sub{ font-family:'Fraunces',serif; font-style:italic; font-size:22px; color:var(--muted); max-width:480px; line-height:1.5; margin-bottom:36px; }
+  .hero-ctas{ display:flex; gap:14px; flex-wrap:wrap; }
+  .btn-primary{ background:var(--navy); color:#fff; font-family:'Poppins',sans-serif; font-weight:700; font-size:16px; padding:17px 32px; border-radius:40px; display:inline-flex; align-items:center; gap:10px; }
+  .btn-secondary{ background:#fff; color:var(--navy); border:1.5px solid var(--line); font-family:'Poppins',sans-serif; font-weight:700; font-size:16px; padding:16px 30px; border-radius:40px; }
+  .hero-proof{ display:flex; gap:28px; margin-top:40px; flex-wrap:wrap; }
+  .hero-proof-item{ display:flex; align-items:center; gap:10px; font-family:'Inter',sans-serif; font-size:14px; color:var(--muted); }
+  .hero-proof-item svg{ width:20px; height:20px; color:var(--sage); flex-shrink:0; }
+
+  /* Phone mockup (hero) */
+  .hero-phone-stage{ position:relative; z-index:1; display:flex; justify-content:center; }
+  .phone{ width:290px; background:#0a0a0a; border-radius:44px; padding:12px; box-shadow:0 40px 80px rgba(15,61,46,.28); transform:rotate(2deg); }
+  .phone-screen{ width:100%; border-radius:32px; overflow:hidden; position:relative; background:var(--navy); }
+  .phone-notch{ position:absolute; top:12px; left:50%; transform:translateX(-50%); width:96px; height:24px; background:#0a0a0a; border-radius:16px; z-index:5; }
+  .phone-statusbar{ height:28px; background:var(--navy); }
+  .phone img.screen-shot{ width:100%; display:block; }
+
+  /* ---- Trust section ---- */
+  .section{ padding:88px 0; }
+  .section-head{ max-width:640px; margin-bottom:52px; }
+  .section-head h2{ font-family:'Poppins',sans-serif; font-weight:800; font-size:38px; color:var(--navy); line-height:1.18; margin-top:14px; }
+  .section-head h2 em{ font-style:normal; color:var(--sage); }
+
+  #neden-micisto .section-head h2{ font-size:48px; }
+  #nasil-calisir .section-head h2{ font-size:46px; color:var(--ochre); }
+
+  .pillars{ display:grid; grid-template-columns:repeat(3,1fr); gap:22px; }
+  .pillar{ background:#fff; border-radius:22px; padding:32px 26px; box-shadow:0 10px 30px rgba(15,61,46,.06); }
+  .pillar-head{ display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+  .pillar-icon{ width:56px; height:56px; border-radius:15px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .pillar-icon svg{ width:28px; height:28px; }
+  .pillar h3{ font-family:'Poppins',sans-serif; font-weight:700; font-size:24px; color:var(--navy); }
+  .pillar p{ font-size:17px; color:var(--muted); line-height:1.55; }
+
+  /* ---- Services ---- */
+  .services-band{ background:var(--navy); position:relative; overflow:hidden; }
+  .services-band .hero-blob{ background:rgba(255,255,255,.04); top:-260px; left:-220px; right:auto; }
+  .services-band .section-head h2{ color:#fff; }
+  .services-band .eyebrow{ color:var(--ochre); }
+  .services-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:18px; position:relative; z-index:1; }
+  .svc-card{ background:rgba(255,255,255,.06); border-radius:20px; padding:22px; }
+  .svc-icon{ width:100%; height:130px; border-radius:14px; overflow:hidden; margin-bottom:18px; background:rgba(255,255,255,.05); }
+  .svc-icon img{ width:100%; height:100%; object-fit:cover; }
+  .svc-card h4{ font-family:'Poppins',sans-serif; font-weight:700; font-size:16.5px; color:#fff; margin-bottom:6px; }
+  .svc-card p{ font-size:13.5px; color:#B9CDC2; line-height:1.5; margin-bottom:14px; }
+  .svc-price{ font-family:'Fraunces',serif; font-style:italic; font-size:18px; color:var(--ochre); }
+
+  /* ---- How it works ---- */
+  .steps{ display:grid; grid-template-columns:repeat(3,1fr); gap:30px; }
+  .step{ position:relative; padding-left:0; }
+  .step-num{ font-family:'Poppins',sans-serif; font-weight:800; font-size:44px; color:var(--line); margin-bottom:10px; }
+  .step h3{ font-family:'Poppins',sans-serif; font-weight:700; font-size:20px; color:var(--navy); margin-bottom:10px; }
+  .step p{ font-size:15px; color:var(--muted); line-height:1.55; }
+
+  /* ---- Staff CTA band ---- */
+  .staff-band{ background:linear-gradient(150deg, var(--ochre) 0%, #B57935 100%); border-radius:32px; padding:60px 52px; display:flex; align-items:center; justify-content:space-between; gap:40px; flex-wrap:wrap; }
+  .staff-band-text h2{ font-family:'Poppins',sans-serif; font-weight:800; font-size:42px; color:#FFFFFF; margin-bottom:18px; max-width:520px; line-height:1.16; }
+  .staff-band-line{ font-family:'Inter',sans-serif; font-weight:600; font-size:18px; color:#FFFFFF; max-width:480px; line-height:1.5; margin-bottom:8px; }
+  .staff-band .btn-primary{ background:var(--navy); flex-shrink:0; }
+
+  /* ---- Footer ---- */
+  footer{ background:var(--navy); color:#DCEAE2; padding:56px 0 32px; }
+  .footer-grid{ display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:40px; margin-bottom:44px; }
+  .footer-brand{ display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+  .footer-brand img{ width:32px; height:32px; border-radius:8px; }
+  .footer-brand span{ font-family:'Poppins',sans-serif; font-weight:800; font-size:18px; color:#fff; }
+  .footer-tagline{ font-family:'Fraunces',serif; font-style:italic; font-size:14.5px; color:#9FB3AE; max-width:280px; }
+  .footer-col h5{ font-family:'Poppins',sans-serif; font-weight:700; font-size:13px; letter-spacing:.06em; text-transform:uppercase; color:var(--ochre); margin-bottom:16px; }
+  .footer-col a{ display:block; font-size:14.5px; color:#DCEAE2; margin-bottom:11px; }
+  .footer-bottom{ border-top:1px solid rgba(255,255,255,.12); padding-top:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; color:#9FB3AE; }
+
+  @media (max-width: 860px){
+    .nav-links{ display:none; }
+    .hero-grid{ grid-template-columns:1fr; }
+    .hero h1{ font-size:38px; }
+    .hero-sub{ font-size:19px; }
+    .hero-phone-stage{ margin-top:20px; }
+    .pillars, .steps{ grid-template-columns:1fr; }
+    .services-grid{ grid-template-columns:repeat(2,1fr); }
+    .section-head h2{ font-size:28px; }
+    #neden-micisto .section-head h2{ font-size:32px; }
+    #nasil-calisir .section-head h2{ font-size:30px; }
+    .staff-band{ flex-direction:column; text-align:center; padding:40px 28px; }
+    .staff-band-text h2{ max-width:none; }
+    .staff-band-line{ margin-left:auto; margin-right:auto; }
+    .footer-grid{ grid-template-columns:1fr; gap:28px; }
+  }
+  @media (max-width: 520px){
+    .nav{ padding:14px 16px; gap:6px; }
+    .nav-brand{ flex-shrink:0; }
+    .nav-brand span{ font-size:15px; }
+    .nav-brand img{ width:26px; height:26px; }
+    .lang-switch{ padding:2px; }
+    .lang-switch button{ padding:5px 7px; font-size:10.5px; }
+    .nav-cta{ padding:8px 12px; font-size:11.5px; white-space:nowrap; }
+    .wrap{ padding:0 20px; }
+    .hero{ padding:40px 0 28px; }
+    .hero h1{ font-size:32px; }
+    .services-grid{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <div class="nav-brand"><img src="icon-512.png" alt="MICISTO"><span>MICISTO</span></div>
+    <div class="nav-links">
+      <a href="#hizmetler" data-i18n="navServices">Hizmetler</a>
+      <a href="#nasil-calisir" data-i18n="navHow">Nasıl Çalışır</a>
+      <a href="#micistorad" data-i18n="navStaff">MICISTORad Ol</a>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <div class="lang-switch">
+        <button data-lang="tr">TR</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="me" class="active">CG</button>
+      </div>
+      <a href="#" class="nav-cta" data-i18n="navCta">Uygulamayı Aç</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-blob"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow hero-tag" data-i18n="heroEyebrow">KARADAĞ'IN TEMİZLİK PAZARYERİ</div>
+      <h1 data-i18n-html="heroHeadline">Bir tık,<br><em>tertemiz ev.</em></h1>
+      <p class="hero-sub" data-i18n="heroSub">Doğrulanmış temizlikçiler, canlı takip — Airbnb ev sahipleri ve yerleşikler için.</p>
+      <div class="hero-ctas">
+        <a href="#" class="btn-primary" data-i18n="heroCtaPrimary">Şimdi Talep Oluştur →</a>
+        <a href="#nasil-calisir" class="btn-secondary" data-i18n="heroCtaSecondary">Nasıl Çalışır?</a>
+      </div>
+      <div class="hero-proof">
+        <div class="hero-proof-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <span data-i18n="proof1">Doğrulanmış temizlikçiler</span>
+        </div>
+        <div class="hero-proof-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <span data-i18n="proof2">Şeffaf fiyatlandırma</span>
+        </div>
+        <div class="hero-proof-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <span data-i18n="proof3">Canlı takip</span>
+        </div>
+      </div>
+    </div>
+    <div class="hero-phone-stage">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-notch"></div>
+          <div class="phone-statusbar"></div>
+          <img class="screen-shot" id="hero-screenshot" src="real-services-screen-me.png" alt="MICISTO uygulama ekranı">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section services-band" id="hizmetler">
+  <div class="hero-blob"></div>
+  <div class="wrap" style="position:relative; z-index:1;">
+    <div class="section-head">
+      <div class="eyebrow" data-i18n="svcEyebrow">HİZMETLER</div>
+      <h2 data-i18n="svcHeadline">İhtiyacına göre bir hizmet seç</h2>
+    </div>
+    <div class="services-grid">
+      <div class="svc-card">
+        <div class="svc-icon"><img src="icon-service-checkin.png" alt=""></div>
+        <h4 data-i18n="svc1Title">Airbnb/Booking Temizliği</h4>
+        <p data-i18n="svc1Desc">Misafir çıkışı ve girişi arasında hızlı temizlik.</p>
+      </div>
+      <div class="svc-card">
+        <div class="svc-icon"><img src="icon-service-deep.png" alt=""></div>
+        <h4 data-i18n="svc2Title">Detaylı Temizlik</h4>
+        <p data-i18n="svc2Desc">Dolap içi, fırın, cam gibi detayları kapsayan temizlik.</p>
+      </div>
+      <div class="svc-card">
+        <div class="svc-icon"><img src="icon-service-office.png" alt=""></div>
+        <h4 data-i18n="svc3Title">Ofis Temizliği</h4>
+        <p data-i18n="svc3Desc">Çalışma alanları için profesyonel temizlik.</p>
+      </div>
+      <div class="svc-card">
+        <div class="svc-icon"><img src="icon-service-common-area.png" alt=""></div>
+        <h4 data-i18n="svc4Title">Ortak Alan Temizliği</h4>
+        <p data-i18n="svc4Desc">Merdiven, koridor, asansör temizliği.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="neden-micisto">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow" data-i18n="trustEyebrow">NEDEN MICISTO</div>
+      <h2 data-i18n-html="trustHeadline">Sisteme güven,<br><em>tesadüfe değil.</em></h2>
+    </div>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-head">
+          <div class="pillar-icon" style="background:var(--sage);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#F6FBF8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l7.5 3.2v5.8c0 5-3.2 8.9-7.5 10.5-4.3-1.6-7.5-5.5-7.5-10.5V5.7L12 2.5z"/><path d="M8.7 12.2l2.3 2.3 4.3-4.6"/></svg>
+          </div>
+          <h3 data-i18n="pillar1Title">Aynı Kalite</h3>
+        </div>
+        <p data-i18n="pillar1Desc">Kim gelirse gelsin, standart kalite ve iş akışı.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-head">
+          <div class="pillar-icon" style="background:var(--ochre);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#F6FBF8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.5H5a2 2 0 0 0-2 2v7.6c0 .5.2 1 .6 1.4l8.6 8.6c.8.8 2 .8 2.8 0l6-6c.8-.8.8-2 0-2.8l-8.6-8.6c-.4-.4-.9-.6-1.4-.6z"/><circle cx="8" cy="8" r="1.6" fill="#F6FBF8" stroke="none"/></svg>
+          </div>
+          <h3 data-i18n="pillar2Title">Şeffaf Fiyat</h3>
+        </div>
+        <p data-i18n="pillar2Desc">Sipariş vermeden önce ne ödeyeceğini bilirsin.</p>
+      </div>
+      <div class="pillar">
+        <div class="pillar-head">
+          <div class="pillar-icon" style="background:var(--navy);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#F6FBF8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h3.2l1.6 4-2 1.6a9.5 9.5 0 0 0 4.3 4.3l1.6-2 4 1.6V16a2.3 2.3 0 0 1-2.3 2.3A14.7 14.7 0 0 1 3.7 5.8 2.3 2.3 0 0 1 6 3.5z"/><path d="M2.5 2.5l19 19"/></svg>
+          </div>
+          <h3 data-i18n="pillar3Title">Sıfır Arama Telaşı</h3>
+        </div>
+        <p data-i18n="pillar3Desc">Temizlikçi aramaktan, sağa sola sormaktan kurtul.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="nasil-calisir">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow" data-i18n="howEyebrow">NASIL ÇALIŞIR</div>
+      <h2 data-i18n="howHeadline">3 adımda temiz bir ev</h2>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01</div>
+        <h3 data-i18n="how1Title">Hizmeti Seç</h3>
+        <p data-i18n="how1Desc">İhtiyacına uygun hizmeti ve mülkünü seç, zamanlamayı belirle.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02</div>
+        <h3 data-i18n="how2Title">Onayla</h3>
+        <p data-i18n="how2Desc">Fiyatı gör, siparişini onayla — sürpriz ücret yok.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03</div>
+        <h3 data-i18n="how3Title">Takip Et, Rahatla</h3>
+        <p data-i18n="how3Desc">Personel yola çıktığında canlı konumunu izle, iş bitince bildirim al.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="micistorad">
+  <div class="wrap">
+    <div class="staff-band">
+      <div class="staff-band-text">
+        <h2 data-i18n="staffHeadline">MICISTORad ekibimize katıl, kendi patronun ol!</h2>
+        <p class="staff-band-line" data-i18n="staffLine1">MICISTORad ekibine katıl, dilediğin gün dilediğin saat kadar çalış!</p>
+        <p class="staff-band-line" data-i18n="staffLine2">Başvur, onaylan, hemen kazanmaya başla!</p>
+      </div>
+      <a href="#" class="btn-primary" data-i18n="staffCta">MICISTORad Ol →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand"><img src="icon-512.png" alt=""><span>MICISTO</span></div>
+        <p class="footer-tagline" data-i18n="footerTagline">Karadağ'ın temizlik hizmeti pazaryeri.</p>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footerColProduct">Ürün</h5>
+        <a href="#hizmetler" data-i18n="navServices">Hizmetler</a>
+        <a href="#nasil-calisir" data-i18n="navHow">Nasıl Çalışır</a>
+        <a href="#micistorad" data-i18n="navStaff">MICISTORad Ol</a>
+      </div>
+      <div class="footer-col">
+        <h5 data-i18n="footerColLegal">Yasal</h5>
+        <a href="#" data-i18n="footerPrivacy">Gizlilik Politikası</a>
+        <a href="#" data-i18n="footerTerms">Kullanım Koşulları</a>
+        <a href="https://instagram.com/micistoapp" target="_blank">Instagram</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 MICISTO. <span data-i18n="footerRights">Tüm hakları saklıdır.</span></span>
+      <span data-i18n="footerLocation">Karadağ'da tasarlandı 🇲🇪</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+const TRANSLATIONS = {
+  tr: {
+    navServices: "Hizmetler", navHow: "Nasıl Çalışır", navStaff: "MICISTORad Ol", navCta: "Uygulamayı Aç",
+    heroEyebrow: "KARADAĞ'IN TEMİZLİK UYGULAMASI",
+    heroHeadline: "Bir tıkla,<br><em>tertemiz ev.</em>",
+    heroSub: "Onaylanmış ve eğitimli profesyonel temizlikçiler, canlı takip — temizlik hizmeti isteyen herkes için.",
+    heroCtaPrimary: "Şimdi Talep Oluştur →", heroCtaSecondary: "Nasıl Çalışır?",
+    proof1: "Onaylı, eğitimli ekip", proof2: "Şeffaf fiyatlandırma", proof3: "Canlı takip",
+    trustEyebrow: "NEDEN MICISTO",
+    trustHeadline: "Sisteme güven,<br><em>şansa değil.</em>",
+    pillar1Title: "Aynı Kalite", pillar1Desc: "Kim gelirse gelsin, standart kalite ve iş akışı.",
+    pillar2Title: "Şeffaf Fiyat", pillar2Desc: "Sipariş vermeden önce ne ödeyeceğini bilirsin.",
+    pillar3Title: "Sıfır Arama Telaşı", pillar3Desc: "Temizlikçi aramaktan, sağa sola sormaktan kurtul.",
+    svcEyebrow: "HİZMETLER", svcHeadline: "İhtiyacına göre bir hizmet seç",
+    svc1Title: "Airbnb/Booking Temizliği", svc1Desc: "Misafir çıkışı ve girişi arasında hızlı temizlik.", svc1Price: "40 €'dan başlayan",
+    svc2Title: "Detaylı Temizlik", svc2Desc: "Dolap içi, fırın, cam gibi detayları kapsayan temizlik.", svc2Price: "55 €'dan başlayan",
+    svc3Title: "Ofis Temizliği", svc3Desc: "Çalışma alanları için profesyonel temizlik.", svc3Price: "35 €'dan başlayan",
+    svc4Title: "Ortak Alan Temizliği", svc4Desc: "Merdiven, koridor, asansör temizliği.", svc4Price: "Metrekareye göre",
+    howEyebrow: "NASIL ÇALIŞIR", howHeadline: "3 adımda hizmet kapında",
+    how1Title: "Hizmeti Seç", how1Desc: "İhtiyacına uygun hizmeti ve mülkünü seç, zamanlamayı belirle.",
+    how2Title: "Onayla", how2Desc: "Fiyatı gör, siparişini onayla — sürpriz ücret yok.",
+    how3Title: "Takip Et, Rahatla", how3Desc: "Personel yola çıktığında canlı konumunu izle, iş bitince bildirim al.",
+    staffHeadline: "MICISTORad ekibimize katıl, kendi patronun ol!", staffLine1: "MICISTORad ekibine katıl, dilediğin gün dilediğin saat kadar çalış!", staffLine2: "Başvur, onaylan, hemen kazanmaya başla!", staffCta: "MICISTORad Ol →",
+    footerTagline: "Karadağ'ın temizlik hizmeti pazaryeri.", footerColProduct: "Ürün", footerColLegal: "Yasal",
+    footerPrivacy: "Gizlilik Politikası", footerTerms: "Kullanım Koşulları", footerRights: "Tüm hakları saklıdır.", footerLocation: "Karadağ'da tasarlandı 🇲🇪",
+    screenshotSrc: "real-services-screen-tr.png",
+  },
+  en: {
+    navServices: "Services", navHow: "How It Works", navStaff: "Become MICISTORad", navCta: "Open the App",
+    heroEyebrow: "MONTENEGRO'S CLEANING APP",
+    heroHeadline: "Spotless<br><em>in minutes.</em>",
+    heroSub: "Verified, trained professional cleaners, live tracking — for anyone who needs a cleaning service.",
+    heroCtaPrimary: "Book Now →", heroCtaSecondary: "How It Works",
+    proof1: "Verified, trained team", proof2: "Transparent pricing", proof3: "Live tracking",
+    trustEyebrow: "WHY MICISTO",
+    trustHeadline: "Trust the system,<br><em>not luck.</em>",
+    pillar1Title: "Same Quality", pillar1Desc: "Whoever comes, the same standard every time.",
+    pillar2Title: "Transparent Pricing", pillar2Desc: "Know what you'll pay before you book.",
+    pillar3Title: "No More Searching", pillar3Desc: "Stop asking around for a reliable cleaner.",
+    svcEyebrow: "SERVICES", svcHeadline: "Pick a service that fits your needs",
+    svc1Title: "Airbnb/Booking Cleaning", svc1Desc: "Fast cleaning between guest check-out and check-in.", svc1Price: "From €40",
+    svc2Title: "Deep Cleaning", svc2Desc: "Covers cabinets, oven, windows and every detail.", svc2Price: "From €55",
+    svc3Title: "Office Cleaning", svc3Desc: "Professional cleaning for workspaces.", svc3Price: "From €35",
+    svc4Title: "Common Area Cleaning", svc4Desc: "Staircases, hallways, elevators.", svc4Price: "By square meter",
+    howEyebrow: "HOW IT WORKS", howHeadline: "A clean home in 3 steps",
+    how1Title: "Pick a Service", how1Desc: "Choose the service and property, set the timing.",
+    how2Title: "Confirm", how2Desc: "See the price and confirm your order — no surprise fees.",
+    how3Title: "Track & Relax", how3Desc: "Follow live location once staff heads out, get notified when done.",
+    staffHeadline: "Join our MICISTORad team, be your own boss!", staffLine1: "Join the MICISTORad team, work whenever you want!", staffLine2: "Apply, get approved, start earning right away!", staffCta: "Become MICISTORad →",
+    footerTagline: "Montenegro's cleaning service marketplace.", footerColProduct: "Product", footerColLegal: "Legal",
+    footerPrivacy: "Privacy Policy", footerTerms: "Terms of Service", footerRights: "All rights reserved.", footerLocation: "Designed in Montenegro 🇲🇪",
+    screenshotSrc: "real-services-screen-en.png",
+  },
+  me: {
+    navServices: "Usluge", navHow: "Kako Funkcioniše", navStaff: "Postani MICISTORad", navCta: "Otvori Aplikaciju",
+    heroEyebrow: "APLIKACIJA ZA ČIŠĆENJE U CRNOJ GORI",
+    heroHeadline: "Čisto<br><em>za par klikova.</em>",
+    heroSub: "Provjereni, obučeni profesionalni čistači, live praćenje — za sve kojima je potrebna usluga čišćenja.",
+    heroCtaPrimary: "Naruči Sada →", heroCtaSecondary: "Kako Funkcioniše",
+    proof1: "Provjeren, obučen tim", proof2: "Transparentne cijene", proof3: "Live praćenje",
+    trustEyebrow: "ZAŠTO MICISTO",
+    trustHeadline: "Vjeruj sistemu,<br><em>ne sreći.</em>",
+    pillar1Title: "Ista Kvaliteta", pillar1Desc: "Ko god dođe, isti standard svaki put.",
+    pillar2Title: "Transparentna Cena", pillar2Desc: "Znaš unaprijed koliko ćeš platiti.",
+    pillar3Title: "Bez Traženja", pillar3Desc: "Prestani da pitaš unaokolo za čistača.",
+    svcEyebrow: "USLUGE", svcHeadline: "Izaberi uslugu koja ti odgovara",
+    svc1Title: "Airbnb/Booking Čišćenje", svc1Desc: "Brzo čišćenje između odjave i prijave gosta.", svc1Price: "Od 40 €",
+    svc2Title: "Detaljno Čišćenje", svc2Desc: "Obuhvata ormare, rernu, prozore i svaki detalj.", svc2Price: "Od 55 €",
+    svc3Title: "Čišćenje Kancelarija", svc3Desc: "Profesionalno čišćenje radnih prostora.", svc3Price: "Od 35 €",
+    svc4Title: "Čišćenje Zajedničkih Prostora", svc4Desc: "Stepenište, hodnici, liftovi.", svc4Price: "Po kvadratu",
+    howEyebrow: "KAKO FUNKCIONIŠE", howHeadline: "Čist dom u 3 koraka",
+    how1Title: "Izaberi Uslugu", how1Desc: "Izaberi uslugu i nekretninu, odredi termin.",
+    how2Title: "Potvrdi", how2Desc: "Vidi cijenu i potvrdi narudžbu — bez skrivenih troškova.",
+    how3Title: "Prati i Opusti Se", how3Desc: "Prati live lokaciju kad osoblje krene, dobij obavještenje kad završi.",
+    staffHeadline: "Pridruži se MICISTORad timu, budi svoj šef!", staffLine1: "Pridruži se MICISTORad timu, radi kad god želiš!", staffLine2: "Prijavi se, budi odobren, odmah počni da zarađuješ!", staffCta: "Postani MICISTORad →",
+    footerTagline: "Pijaca usluga čišćenja u Crnoj Gori.", footerColProduct: "Proizvod", footerColLegal: "Pravno",
+    footerPrivacy: "Politika Privatnosti", footerTerms: "Uslovi Korišćenja", footerRights: "Sva prava zadržana.", footerLocation: "Dizajnirano u Crnoj Gori 🇲🇪",
+    screenshotSrc: "real-services-screen-me.png",
+  },
+};
+
+function applyLang(lang){
+  const t = TRANSLATIONS[lang];
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if(t[key] !== undefined) el.textContent = t[key];
+  });
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    if(t[key] !== undefined) el.innerHTML = t[key];
+  });
+  const shot = document.getElementById('hero-screenshot');
+  if(shot && t.screenshotSrc) shot.src = t.screenshotSrc;
+  document.querySelectorAll('.lang-switch button').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+  localStorage.setItem('micisto_landing_lang', lang);
+}
+
+document.querySelectorAll('.lang-switch button').forEach(btn => {
+  btn.addEventListener('click', () => applyLang(btn.dataset.lang));
+});
+
+const savedLang = localStorage.getItem('micisto_landing_lang') || 'me';
+applyLang(savedLang);
+</script>
+
+</body>
+</html>
