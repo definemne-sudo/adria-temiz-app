@@ -164,9 +164,9 @@
     </div>
     <div style="display:flex; align-items:center; gap:16px;">
       <div class="lang-switch">
-        <button data-lang="tr">TR</button>
-        <button data-lang="en">EN</button>
         <button data-lang="me" class="active">CG</button>
+        <button data-lang="en">EN</button>
+        <button data-lang="tr">TR</button>
       </div>
       <a href="#" class="nav-cta" data-i18n="navCta">Uygulamayı Aç</a>
     </div>
@@ -445,15 +445,16 @@ function applyLang(lang){
   document.querySelectorAll('.lang-switch button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.lang === lang);
   });
-  localStorage.setItem('micisto_landing_lang', lang);
 }
 
 document.querySelectorAll('.lang-switch button').forEach(btn => {
   btn.addEventListener('click', () => applyLang(btn.dataset.lang));
 });
 
-const savedLang = localStorage.getItem('micisto_landing_lang') || 'me';
-applyLang(savedLang);
+// Sayfa her acildiginda varsayilan olarak Karadagca (CG) gelsin - onceki
+// ziyarette baska bir dil secilmis olsa bile hatirlanmasin, kullanici
+// isterse kendisi degistirir.
+applyLang('me');
 </script>
 
 </body>
