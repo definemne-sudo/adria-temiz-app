@@ -4469,6 +4469,13 @@ if(isIos() && !isRunningStandalone() && !wasRecentlyDismissed()){
   if(legalParam === 'terms' || legalParam === 'privacy'){
     state.legalPage = legalParam;
   }
+  // Landing page'deki "MICISTORad Ol" / "Hemen Başvur" butonlarından
+  // ?modal=join-team ile doğrudan başvuru formunu açık şekilde geliyoruz -
+  // kullanıcı giriş ekranını görmeden direkt forma ulaşsın diye.
+  const modalParam = new URLSearchParams(location.search).get('modal');
+  if(modalParam === 'join-team'){
+    state.modal = 'join-team';
+  }
   render();
   if(state.token){
     try{
