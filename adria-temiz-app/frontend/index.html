@@ -1486,10 +1486,9 @@ const ADDON_I18N = {
   carpet: { icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M7 5v14M17 5v14M3 10h18M3 14h18"/></svg>', tr: "Halı yıkama", en: "Carpet washing", me: "Pranje tepiha" },
   upholstery: { icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3"/><path d="M4 12h16a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-1v1.5a.5.5 0 0 1-1 0V18H6v1.5a.5.5 0 0 1-1 0V18H4a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z"/></svg>', tr: "Koltuk yıkama", en: "Upholstery washing", me: "Pranje tapaciranog namještaja" },
 };
-// Backend'deki catalog.js'teki SUPPLIES_FEES ile birebir aynı olmalı -
-// burada sadece anlık fiyat önizlemesi için kullanılıyor, gerçek fiyat
-// backend'de hesaplanır.
-const SUPPLIES_FEES = { noEquipment: 15, noChemicals: 10 };
+// NOT: malzeme/kimyasal ek ucretleri artik burada sabit tutulmuyor -
+// state.suppliesFees uzerinden, /services endpoint'inden backend'in
+// (admin panelindeki gercek deger) dondurdugu haliyle kullaniliyor.
 
 const ERROR_TRANSLATIONS = {
   "Geçerli bir telefon numarası gir.": { en: "Enter a valid phone number.", me: "Unesi ispravan broj telefona." },
@@ -1715,6 +1714,11 @@ let state = {
   regBedroomCount: 1,
   regBathroomCount: 1,
   regPropertyName: '',
+  // Backend'den /services yanitiyla gelir (loadAll icinde guncellenir).
+  // Sayfa ilk acildiginda henuz veri gelmeden bir yerde kullanilirsa diye
+  // makul bir varsayilanla basliyoruz - admin panelindeki gercek deger
+  // yuklenir yuklenmez bunun uzerine yazilir.
+  suppliesFees: { noEquipment: 15, noChemicals: 10 },
   regPropertyCity: '',
   // "Mulklerim" sekmesinden mulk eklerken kullanilan, kayit akisiyla ayni
   // 2 adimli (detaylar + adres) yapiyi kullanan alanlar. regSizeSqm,
@@ -2179,7 +2183,11 @@ function calcPriceClient(service, { sizeSqm } = {}){
   const price = sqm <= service.thresholdSqm
     ? service.flatPrice
     : service.flatPrice + (sqm - service.thresholdSqm) * service.extraRate;
-  return Math.max(service.min, Math.round(price/5)*5);
+  // ONEMLI: fiyat en yakin 5'e degil, kurusa (2 ondalik basamaga)
+  // yuvarlanir - admin panelindeki parametrelere gore tam/net rakam
+  // gostermek icin. Eskiden Math.round(price/5)*5 kullaniliyordu, bu da
+  // gercek hesaplanan degeri bloklar halinde (5,10,15...) yanlis yuvarliyordu.
+  return Math.max(service.min, Math.round(price * 100) / 100);
 }
 
 function bookingAddonsTotal(){
@@ -2202,7 +2210,7 @@ function calcCommonAreaSubPriceClient(sub, params = {}){
     price += floors * sub.ratePerFloor;
     price += (floors * sqmPerFloor) * sub.ratePerSqm;
   } else if(sub.paramType === 'elevator') price += (Number(params.elevatorCapacity)||0) * sub.ratePerCapacity;
-  return Math.max(sub.min, Math.round(price/5)*5);
+  return Math.max(sub.min, Math.round(price * 100) / 100);
 }
 
 function commonAreaSelectionsTotal(property){
@@ -2284,7 +2292,10 @@ function renderServices(){
       const previewProperty = s.key === 'office'
         ? (props.find(p => p.category === 'office' && p.id === state.bookingPropertyId) || props.find(p => p.category === 'office'))
         : selectedProperty;
-      const preview = !isGroup ? calcPriceClient(s, { sizeSqm: previewProperty?.size_sqm }) : null;
+      // Ofis hizmeti icin kullanicinin hic ofis mulku yoksa previewProperty
+      // undefined kalir - bu durumda fiyat HESAPLANMAMALI (eskiden 0 m²
+      // ile hesaplanip yanlislikla taban fiyati gosteriyordu).
+      const preview = (!isGroup && previewProperty) ? calcPriceClient(s, { sizeSqm: previewProperty?.size_sqm }) : null;
       return `
       <div class="card ${isOpen ? 'card-selected' : ''}">
         <div class="service-icon">${serviceIconHtml(s.key)}</div>
@@ -2330,8 +2341,8 @@ function buildReceiptLines(draft){
         floorCount: property?.floor_count, sqmPerFloor: property?.sqm_per_floor, elevatorCapacity: property?.elevator_capacity,
       }) });
     });
-    if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
-    if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
+    if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: state.suppliesFees.noEquipment });
+    if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: state.suppliesFees.noChemicals });
     const total = lines.reduce((s,l) => s+l.amount, 0);
     return { lines, total, property };
   }
@@ -2341,8 +2352,8 @@ function buildReceiptLines(draft){
   const property = props.find(p => p.id === draft.propertyId);
   const basePrice = calcPriceClient(service, { sizeSqm: property?.size_sqm });
   lines.push({ label: label.name, amount: basePrice });
-  if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: SUPPLIES_FEES.noEquipment });
-  if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: SUPPLIES_FEES.noChemicals });
+  if(draft.hasEquipment === false) lines.push({ label: t('noEquipmentFeeLabel'), amount: state.suppliesFees.noEquipment });
+  if(draft.hasChemicals === false) lines.push({ label: t('noChemicalsFeeLabel'), amount: state.suppliesFees.noChemicals });
   (draft.addons||[]).forEach(a => {
     const addon = state.addons.find(x => x.key === a.key);
     if(addon) lines.push({ label: `${addonIcon(a.key)} ${addonLabel(a.key)} × ${a.quantity}`, amount: addon.rate * a.quantity });
@@ -2368,7 +2379,7 @@ function renderBookingPanel(service, props, selectedProperty){
 // getirisi kalmamıştı, birleştirildi.
 function renderConfigStep(service, props, selectedProperty){
   const isGroup = !!service.isGroup;
-  const suppliesFee = (state.bookingHasEquipment?0:SUPPLIES_FEES.noEquipment) + (state.bookingHasChemicals?0:SUPPLIES_FEES.noChemicals);
+  const suppliesFee = (state.bookingHasEquipment?0:state.suppliesFees.noEquipment) + (state.bookingHasChemicals?0:state.suppliesFees.noChemicals);
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
 
@@ -2434,12 +2445,12 @@ function renderConfigStep(service, props, selectedProperty){
       <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
       <div class="option-row">
         <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noEquipment}€)</div>
+        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${state.suppliesFees.noEquipment}€)</div>
       </div>
       <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
       <div class="option-row">
         <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
+        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${state.suppliesFees.noChemicals}€)</div>
       </div>
 
       <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
@@ -2498,12 +2509,12 @@ function renderConfigStep(service, props, selectedProperty){
     <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
     <div class="option-row">
       <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
-      <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noEquipment}€)</div>
+      <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${state.suppliesFees.noEquipment}€)</div>
     </div>
     <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
     <div class="option-row">
       <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
-      <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${SUPPLIES_FEES.noChemicals}€)</div>
+      <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${state.suppliesFees.noChemicals}€)</div>
     </div>
 
     ${service.key === 'deep_clean' ? `
@@ -3355,6 +3366,7 @@ async function loadAll(){
     state.services = results[3].services;
     state.commonAreaSubOptions = results[3].commonAreaSubOptions || [];
     state.addons = results[3].addons;
+    if(results[3].suppliesFees) state.suppliesFees = results[3].suppliesFees;
   }
   state.ratingJob = findNextRatingJob();
   render();
