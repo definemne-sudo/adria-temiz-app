@@ -156,9 +156,9 @@
 
 <header>
   <div class="nav">
-    <div class="nav-brand"><img src="icon-512.png" alt="MICISTO"><span>MICISTO</span></div>
+    <div class="nav-brand" data-page="home"><img src="icon-512.png" alt="MICISTO"><span>MICISTO</span></div>
     <div class="nav-links">
-      <a href="hizmetler.html" data-i18n="navServices">Hizmetler</a>
+      <a href="hizmetler.html" data-page="services" data-i18n="navServices">Hizmetler</a>
       <a href="#nasil-calisir" data-i18n="navHow">Nasıl Çalışır</a>
       <a href="#micistorad" data-i18n="navStaff">MICISTORad Ol</a>
     </div>
@@ -329,7 +329,7 @@
       </div>
       <div class="footer-col">
         <h5 data-i18n="footerColProduct">Ürün</h5>
-        <a href="hizmetler.html" data-i18n="navServices">Hizmetler</a>
+        <a href="hizmetler.html" data-page="services" data-i18n="navServices">Hizmetler</a>
         <a href="#nasil-calisir" data-i18n="navHow">Nasıl Çalışır</a>
         <a href="#micistorad" data-i18n="navStaff">MICISTORad Ol</a>
       </div>
@@ -348,8 +348,22 @@
 </footer>
 
 <script>
+// Her sayfanin dile gore farkli dosya adi (slug) alabilmesi icin ortak
+// rota haritasi. Yeni bir alt sayfa eklendiginde buraya da eklenmeli -
+// index.html, hizmetler.html/services.html/usluge.html ve gelecekteki
+// tum sayfalarda BIREBIR AYNI bu obje bulunmali.
+const PAGE_ROUTES = {
+  home: { tr: 'index.html', en: 'index.html', me: 'index.html' },
+  services: { tr: 'hizmetler.html', en: 'services.html', me: 'usluge.html' },
+  howItWorks: { tr: 'nasil-calisir.html', en: 'how-it-works.html', me: 'kako-funkcionise.html' },
+  becomeStaff: { tr: 'micistorad-ol.html', en: 'become-micistorad.html', me: 'postani-micistorad.html' },
+};
+// Bu dosyanin PAGE_ROUTES icindeki kendi kimligi - her sayfada degisir.
+const CURRENT_PAGE = 'home';
+
 const TRANSLATIONS = {
   tr: {
+    pageTitle: "MICISTO — Karadağ'ın Temizlik Uygulaması",
     navServices: "Hizmetler", navHow: "Nasıl Çalışır", navStaff: "MICISTORad Ol", navCta: "Uygulamayı Aç",
     heroEyebrow: "KARADAĞ'IN TEMİZLİK UYGULAMASI",
     heroHeadline: "Bir tıkla,<br><em>tertemiz ev.</em>",
@@ -376,6 +390,7 @@ const TRANSLATIONS = {
     screenshotSrc: "real-services-screen-tr.png",
   },
   en: {
+    pageTitle: "MICISTO — Montenegro's Cleaning App",
     navServices: "Services", navHow: "How It Works", navStaff: "Become MICISTORad", navCta: "Open the App",
     heroEyebrow: "MONTENEGRO'S CLEANING APP",
     heroHeadline: "Spotless<br><em>in minutes.</em>",
@@ -402,6 +417,7 @@ const TRANSLATIONS = {
     screenshotSrc: "real-services-screen-en.png",
   },
   me: {
+    pageTitle: "MICISTO — Aplikacija za čišćenje u Crnoj Gori",
     navServices: "Usluge", navHow: "Kako Funkcioniše", navStaff: "Postani MICISTORad", navCta: "Otvori Aplikaciju",
     heroEyebrow: "APLIKACIJA ZA ČIŠĆENJE U CRNOJ GORI",
     heroHeadline: "Čisto<br><em>za par klikova.</em>",
@@ -432,6 +448,7 @@ const TRANSLATIONS = {
 function applyLang(lang){
   const t = TRANSLATIONS[lang];
   document.documentElement.lang = lang;
+  if(t.pageTitle) document.title = t.pageTitle;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if(t[key] !== undefined) el.textContent = t[key];
@@ -444,6 +461,12 @@ function applyLang(lang){
   if(shot && t.screenshotSrc) shot.src = t.screenshotSrc;
   document.querySelectorAll('.lang-switch button').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+  // Hazir olan alt sayfa linklerini (su an sadece Hizmetler) secili dile
+  // gore doğru slug dosyasina isaret edecek sekilde guncelle.
+  document.querySelectorAll('[data-page]').forEach(el => {
+    const pageKey = el.getAttribute('data-page');
+    if(PAGE_ROUTES[pageKey] && el.tagName === 'A') el.href = PAGE_ROUTES[pageKey][lang];
   });
 }
 
