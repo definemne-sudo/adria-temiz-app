@@ -7,6 +7,40 @@ const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist } = require('../services/catalog');
 
 const router = express.Router();
+
+// ===========================================================================
+// GEÇİCİ KURTARMA ENDPOINT'İ — admin şifresi/kullanıcı adı unutulduğunda yeni
+// bir admin hesabı oluşturmak için. requireAuth'tan ÖNCE tanımlandığı için
+// giriş yapmadan erişilebiliyor, bu yüzden bir secret ile korunuyor.
+// KULLANDIKTAN HEMEN SONRA BU BLOĞU SİL VE DEPLOY ET - kalıcı kalırsa
+// güvenlik açığı oluşturur.
+router.get('/bootstrap-recovery', (req, res) => {
+  const SECRET = 'micisto-recovery-2026-x7k9';
+  const { secret, name, username, password } = req.query;
+  if (secret !== SECRET) {
+    return res.status(403).json({ error: 'Geçersiz secret.' });
+  }
+  if (!name || !username || !password) {
+    return res.status(400).json({ error: 'name, username, password query parametreleri gerekli.' });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Şifre en az 6 karakter olmalı.' });
+  }
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username.trim());
+  if (existing) {
+    return res.status(409).json({ error: 'Bu kullanıcı adı zaten alınmış, farklı bir kullanıcı adı dene.' });
+  }
+  const id = uuid();
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const placeholderPhone = `admin-${id.slice(0, 8)}`;
+  db.prepare(
+    `INSERT INTO users (id, phone, name, account_type, username, password_hash, profile_completed)
+     VALUES (?, ?, ?, 'admin', ?, ?, 1)`
+  ).run(id, placeholderPhone, name.trim(), username.trim(), passwordHash);
+  res.json({ message: 'Admin hesabı oluşturuldu. Şimdi bu endpoint bloğunu koddan sil ve tekrar deploy et.', username: username.trim() });
+});
+// ===========================================================================
+
 router.use(requireAuth);
 
 // Tüm admin route'ları için ortak yetki kontrolü.
