@@ -29,12 +29,14 @@
     position:sticky; top:0; z-index:50; background:rgba(246,251,248,.92); backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);
   }
-  .nav{ display:flex; align-items:center; justify-content:space-between; padding:16px 32px; max-width:1180px; margin:0 auto; }
+  .nav{ display:flex; align-items:center; justify-content:space-between; padding:16px 32px; max-width:1180px; margin:0 auto; position:relative; }
   .nav-brand{ display:flex; align-items:center; gap:10px; }
   .nav-brand img{ width:34px; height:34px; border-radius:9px; }
   .nav-brand span{ font-family:'Poppins',sans-serif; font-weight:800; font-size:19px; color:var(--navy); }
   .nav-links{ display:flex; align-items:center; gap:30px; }
   .nav-links a{ font-family:'Poppins',sans-serif; font-weight:600; font-size:14.5px; color:var(--navy); }
+  .nav-hamburger{ display:none; background:none; border:none; cursor:pointer; padding:6px; flex-shrink:0; }
+  .nav-hamburger svg{ width:25px; height:25px; color:var(--navy); display:block; }
   .lang-switch{ display:flex; gap:4px; background:#fff; border:1px solid var(--line); border-radius:20px; padding:3px; }
   .lang-switch button{
     font-family:'Poppins',sans-serif; font-weight:700; font-size:12px; padding:6px 12px; border-radius:16px;
@@ -122,7 +124,15 @@
   .footer-bottom{ border-top:1px solid rgba(255,255,255,.12); padding-top:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; font-size:13px; color:#9FB3AE; }
 
   @media (max-width: 860px){
-    .nav-links{ display:none; }
+    .nav-hamburger{ display:flex; align-items:center; justify-content:center; }
+    .nav-links{
+      display:none; position:absolute; top:100%; left:0; right:0; background:var(--cream);
+      flex-direction:column; align-items:stretch; gap:0; padding:8px 24px 16px;
+      box-shadow:0 12px 24px rgba(15,61,46,.12); border-bottom:1px solid var(--line);
+    }
+    .nav-links.nav-open{ display:flex; }
+    .nav-links a{ padding:14px 0; border-bottom:1px solid var(--line); font-size:16px; }
+    .nav-links a:last-child{ border-bottom:none; }
     .hero-grid{ grid-template-columns:1fr; }
     .hero h1{ font-size:38px; }
     .hero-sub{ font-size:19px; }
@@ -138,13 +148,16 @@
     .footer-grid{ grid-template-columns:1fr; gap:28px; }
   }
   @media (max-width: 520px){
-    .nav{ padding:14px 16px; gap:6px; }
+    .nav{ padding:12px 14px; gap:4px; }
+    .nav-right{ gap:6px !important; }
     .nav-brand{ flex-shrink:0; }
-    .nav-brand span{ font-size:15px; }
-    .nav-brand img{ width:26px; height:26px; }
+    .nav-brand span{ font-size:14px; }
+    .nav-brand img{ width:24px; height:24px; }
+    .nav-hamburger{ padding:4px; }
+    .nav-hamburger svg{ width:21px; height:21px; }
     .lang-switch{ padding:2px; }
-    .lang-switch button{ padding:5px 7px; font-size:10.5px; }
-    .nav-cta{ padding:8px 12px; font-size:11.5px; white-space:nowrap; }
+    .lang-switch button{ padding:4px 5px; font-size:10px; }
+    .nav-cta{ padding:7px 9px; font-size:10.5px; white-space:nowrap; }
     .wrap{ padding:0 20px; }
     .hero{ padding:40px 0 28px; }
     .hero h1{ font-size:32px; }
@@ -248,12 +261,15 @@
 <header>
   <div class="nav">
     <a href="index.html" class="nav-brand" data-page="home"><img src="icon-512.png" alt="MICISTO"><span>MICISTO</span></a>
-    <div class="nav-links">
+    <div class="nav-links" id="nav-links">
       <a href="hizmetler.html" data-page="services" data-i18n="navServices">Hizmetler</a>
       <a href="nasil-calisir.html" class="nav-active" data-page="howItWorks" data-i18n="navHow">Nasıl Çalışır</a>
       <a href="micistorad-ol.html" data-page="becomeStaff" data-i18n="navStaff">MICISTORad Ol</a>
     </div>
-    <div style="display:flex; align-items:center; gap:16px;">
+    <div class="nav-right" style="display:flex; align-items:center; gap:16px;">
+      <button class="nav-hamburger" id="nav-hamburger" aria-label="Meni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
       <div class="lang-switch">
         <button data-lang="me">CG</button>
         <button data-lang="en">EN</button>
@@ -661,6 +677,18 @@ if(contactForm){
 }
 
 // Bu dosya /kako-funkcionise.html - Karadagca slug, o yuzden varsayilan dil Karadagca.
+// Mobilde hamburger menu ac/kapa.
+const navHamburger = document.getElementById('nav-hamburger');
+const navLinksEl = document.getElementById('nav-links');
+if(navHamburger && navLinksEl){
+  navHamburger.addEventListener('click', () => {
+    navLinksEl.classList.toggle('nav-open');
+  });
+  navLinksEl.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', () => navLinksEl.classList.remove('nav-open'));
+  });
+}
+
 applyLang('me');
 </script>
 
