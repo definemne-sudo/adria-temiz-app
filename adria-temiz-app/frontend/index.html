@@ -1517,7 +1517,14 @@ const ERROR_TRANSLATIONS = {
 };
 
 function t(key, vars){
-  let str = (TRANSLATIONS[state.lang] && TRANSLATIONS[state.lang][key]) || TRANSLATIONS.tr[key] || key;
+  // NOT: burada "||" degil "!== undefined" kontrolu kullanmak onemli -
+  // baska turlu, bilincli olarak bos birakilmis bir ceviri (orn. TR'de
+  // acceptTermsPrefix gibi, dilbilgisi geregi gereksiz olan bir alan)
+  // "falsy" sayilip yanlislikla anahtarin kendisini (orn. "acceptTermsPrefix"
+  // yazisinin ekranda cikmasi) gosterebiliyordu.
+  const langVal = TRANSLATIONS[state.lang] ? TRANSLATIONS[state.lang][key] : undefined;
+  const trVal = TRANSLATIONS.tr[key];
+  let str = langVal !== undefined ? langVal : (trVal !== undefined ? trVal : key);
   if(vars) Object.keys(vars).forEach(k => { str = str.split('{{'+k+'}}').join(vars[k]); });
   return str;
 }
