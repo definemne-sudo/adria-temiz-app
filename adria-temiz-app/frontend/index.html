@@ -1540,7 +1540,7 @@ function commonAreaSubLabel(key){
 const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 
 const EDIT_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14.5-4.7L21 4l-1 4.2A8 8 0 1 1 4 12z"/></svg>';
+const SYNC_ICON_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="17" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/><path d="M9 15.2l1.8 1.8L15 13"/></svg>';
 
 // Karadağ'ın başlıca belediye/şehirleri - kayıt akışında şehir artık elle
 // yazılmıyor, bu listeden seçiliyor. Koordinatlar, harita üzerinde o şehri
@@ -1716,6 +1716,18 @@ let state = {
   regBathroomCount: 1,
   regPropertyName: '',
   regPropertyCity: '',
+  // "Mulklerim" sekmesinden mulk eklerken kullanilan, kayit akisiyla ayni
+  // 2 adimli (detaylar + adres) yapiyi kullanan alanlar. regSizeSqm,
+  // regBedroomCount, regBathroomCount, regPropertyAddress, regPropertyCity,
+  // regLat, regLng kayit akisiyla ORTAK kullaniliyor (ikisi ayni anda acik
+  // olmadigi icin sorun olmuyor) - modal her acildiginda sifirlaniyor.
+  addPropertyStep: 'details',
+  addPropName: '',
+  addPropBuildingName: '',
+  addPropIcalUrl: '',
+  addPropFloorCount: '',
+  addPropSqmPerFloor: '',
+  addPropElevatorCapacity: '',
   joinTeamGender: '',
   joinTeamHasExperience: null,
   joinTeamCity: '',
@@ -3195,11 +3207,43 @@ function renderModal(){
     </div>`;
   }
   if(state.modal === 'add-property'){
+    const isCommonArea = state.propertyCategory === 'common_area';
+
+    if(state.addPropertyStep === 'address'){
+      return `
+      <div class="modal-backdrop" id="modal-backdrop">
+        <div class="modal" style="max-width:560px;">
+          <button type="button" id="add-property-back" class="hint" style="background:none; border:none; padding:0; margin-bottom:14px; cursor:pointer; color:var(--sage-dark); font-weight:600;">‹ ${t('backBtn')}</button>
+          <h3>${t('addPropertyModalTitle')}</h3>
+          <form id="property-address-step-form">
+            <div class="field"><label>${t('propertyAddressLabel')}</label><input id="addprop-address-input" name="address" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+            <div class="field">
+              <label>${t('propertyCityLabel')}</label>
+              <select id="modal-property-city" name="city" required>
+                <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
+                ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label>${t('propertyLocationLabel')}</label>
+              <div id="modal-map" class="mini-map" style="height:220px;"></div>
+              <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
+            </div>
+            <div class="actions">
+              <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+              <button type="submit" class="btn ochre">${t('addBtn')}</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+    }
+
+    // state.addPropertyStep === 'details' (varsayilan ilk adim)
     return `
     <div class="modal-backdrop" id="modal-backdrop">
-      <div class="modal" style="max-width:700px;">
+      <div class="modal" style="max-width:560px;">
         <h3>${t('addPropertyModalTitle')}</h3>
-        <form id="property-form">
+        <form id="property-details-step-form">
           <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('propertyCategoryLabel')}</div>
           <div class="option-row">
             <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
@@ -3207,48 +3251,23 @@ function renderModal(){
             <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
             ${state.user.accountType==='company' ? `<div class="choice ${state.propertyCategory==='common_area'?'selected':''}" data-property-category="common_area">${t('categoryCommonArea')}</div>` : ''}
           </div>
-          <div class="two-col">
-            <div>
-              ${state.propertyCategory==='common_area' ? `
-                <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
-                <div class="field">
-                  <label>${t('propertyCityLabel')}</label>
-                  <select id="modal-property-city" name="city" required>
-                    <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
-                    ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
-                  </select>
-                </div>
-                <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
-                <div class="hint" style="margin:14px 0 10px;">${t('commonAreaPropertyHint')}</div>
-                <div class="field"><label>${t('floorCountLabel')}</label><input name="floorCount" type="number" min="1" placeholder="5" /></div>
-                <div class="field"><label>${t('sqmPerFloorLabel')}</label><input name="sqmPerFloor" type="number" min="1" placeholder="18" /></div>
-                <div class="field"><label>${t('elevatorCapacityLabel')}</label><input name="elevatorCapacity" type="number" min="1" placeholder="8" /></div>
-              ` : `
-                <div class="field"><label>${t('propertyNameLabel')}</label><input name="name" required placeholder="${t('propertyNamePlaceholder')}" /></div>
-                ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input name="buildingName" placeholder="${t('buildingNamePlaceholder')}" /></div>` : ''}
-                <div class="field">
-                  <label>${t('propertyCityLabel')}</label>
-                  <select id="modal-property-city" name="city" required>
-                    <option value="" ${!state.regPropertyCity?'selected':''} disabled>${t('selectCityPlaceholder')}</option>
-                    ${MONTENEGRO_CITIES.map(c => `<option value="${c.name}" ${state.regPropertyCity===c.name?'selected':''}>${c.name}</option>`).join('')}
-                  </select>
-                </div>
-                <div class="field"><label>${t('propertyAddressLabel')}</label><input name="address" placeholder="${t('propertyAddressPlaceholder')}" /></div>
-                <div class="field"><label>${t('propertySizeLabel')}</label><input name="sizeSqm" type="number" min="1" placeholder="75" /></div>
-                ${state.propertyCategory!=='office' ? `<div class="field"><label>${t('icalOptionalLabel')}</label><input name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" /></div>` : ''}
-              `}
-            </div>
-            <div>
-              <div class="field">
-                <label>${t('propertyLocationLabel')}</label>
-                <div id="modal-map" class="mini-map" style="height:220px;"></div>
-                <div class="map-hint">${state.regLat ? t('mapHintSelected', { lat: state.regLat.toFixed(5), lng: state.regLng.toFixed(5) }) : t('mapHintDefault')}</div>
-              </div>
-            </div>
-          </div>
+          ${isCommonArea ? `
+            <div class="field"><label>${t('propertyNameLabel')}</label><input id="addprop-name-input" name="name" required placeholder="${t('propertyNamePlaceholder')}" value="${state.addPropName}" /></div>
+            <div class="hint" style="margin:14px 0 10px;">${t('commonAreaPropertyHint')}</div>
+            <div class="field"><label>${t('floorCountLabel')}</label><input id="addprop-floorcount-input" name="floorCount" type="number" min="1" placeholder="5" value="${state.addPropFloorCount}" /></div>
+            <div class="field"><label>${t('sqmPerFloorLabel')}</label><input id="addprop-sqmperfloor-input" name="sqmPerFloor" type="number" min="1" placeholder="18" value="${state.addPropSqmPerFloor}" /></div>
+            <div class="field"><label>${t('elevatorCapacityLabel')}</label><input id="addprop-elevator-input" name="elevatorCapacity" type="number" min="1" placeholder="8" value="${state.addPropElevatorCapacity}" /></div>
+          ` : `
+            <div class="field"><label>${t('propertyNameLabel')}</label><input id="addprop-name-input" name="name" required placeholder="${t('propertyNamePlaceholder')}" value="${state.addPropName}" /></div>
+            ${state.user.accountType==='company' ? `<div class="field"><label>${t('buildingNameLabel')}</label><input id="addprop-buildingname-input" name="buildingName" placeholder="${t('buildingNamePlaceholder')}" value="${state.addPropBuildingName}" /></div>` : ''}
+            <div class="field"><label>${t('propertySizeLabel')}</label><input id="addprop-size-input" name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
+            ${renderRoomStepper('bedroom', t('bedroomCountLabel'), state.regBedroomCount)}
+            ${renderRoomStepper('bathroom', t('bathroomCountLabel'), state.regBathroomCount)}
+            ${state.propertyCategory!=='office' ? `<div class="field" style="margin-top:12px;"><label>${t('icalOptionalLabel')}</label><input id="addprop-ical-input" name="icalUrl" placeholder="https://www.airbnb.com/calendar/ical/....ics" value="${state.addPropIcalUrl}" /></div>` : ''}
+          `}
           <div class="actions">
             <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
-            <button type="submit" class="btn ochre">${t('addBtn')}</button>
+            <button type="submit" class="btn ochre">${t('continueBtn')}</button>
           </div>
         </form>
       </div>
@@ -3259,6 +3278,7 @@ function renderModal(){
     const p = allProps.find(x => x.id === state.editPropertyId);
     if(!p) return '';
     const isCommonArea = p.category === 'common_area';
+    const isOffice = p.category === 'office';
     return `
     <div class="modal-backdrop" id="modal-backdrop">
       <div class="modal" style="max-width:700px;">
@@ -3280,6 +3300,16 @@ function renderModal(){
                 <div class="field"><label>${t('sqmPerFloorLabel')}</label><input name="sqmPerFloor" type="number" min="1" value="${p.sqm_per_floor || ''}" /></div>
                 <div class="field"><label>${t('elevatorCapacityLabel')}</label><input name="elevatorCapacity" type="number" min="1" value="${p.elevator_capacity || ''}" /></div>
               `}
+              ${!isCommonArea && !isOffice ? `
+                <div class="field" style="margin-top:12px;">
+                  <label>${t('icalUrlLabel')}</label>
+                  <div style="display:flex; gap:8px;">
+                    <input id="edit-property-ical" name="icalUrl" placeholder="${t('icalUrlPlaceholder')}" value="${p.ical_url || ''}" style="flex:1;" />
+                    <button type="button" class="icon-btn-sm" id="edit-property-sync-btn" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}" title="${t('syncDemoBtn')}" style="flex-shrink:0;">${SYNC_ICON_SVG}</button>
+                  </div>
+                  <div class="hint" style="margin-top:6px;">${p.ical_url ? t('icalLinked') : t('icalNotLinked')}</div>
+                </div>
+              ` : ''}
             </div>
             <div>
               <div class="field">
@@ -3824,7 +3854,7 @@ function attachHandlers(){
   };
 
   const addPropBtn = document.getElementById('add-property');
-  if(addPropBtn) addPropBtn.onclick = () => { state.modal = 'add-property'; state.regLat = null; state.regLng = null; state.propertyCategory = 'apartment'; state.regPropertyCity = ''; render(); };
+  if(addPropBtn) addPropBtn.onclick = () => { resetAddPropertyState(); state.modal = 'add-property'; state.propertyCategory = 'apartment'; state.regPropertyCity = ''; render(); };
 
   const bulkAddOpen = document.getElementById('bulk-add-open');
   if(bulkAddOpen) bulkAddOpen.onclick = () => {
@@ -3886,18 +3916,31 @@ function attachHandlers(){
     }catch(err){ showToast(err.message); }
   };
 
+  // Mulk ekleme modali her acildiginda onceki denemeden kalan verileri
+  // temizleyen ortak fonksiyon - 4 farkli yerden (ana buton, bos durum
+  // linki, ofis/ortak alan kisayollari) cagriliyor.
+  function resetAddPropertyState(){
+    state.addPropertyStep = 'details';
+    state.addPropName = ''; state.addPropBuildingName = ''; state.addPropIcalUrl = '';
+    state.addPropFloorCount = ''; state.addPropSqmPerFloor = ''; state.addPropElevatorCapacity = '';
+    state.regSizeSqm = ''; state.regBedroomCount = 1; state.regBathroomCount = 1;
+    state.regPropertyAddress = ''; state.regLat = null; state.regLng = null;
+  }
+
   const gotoAddProperty = document.getElementById('goto-add-property');
-  if(gotoAddProperty) gotoAddProperty.onclick = () => { state.page='properties'; state.modal='add-property'; render(); };
+  if(gotoAddProperty) gotoAddProperty.onclick = () => { resetAddPropertyState(); state.page='properties'; state.modal='add-property'; render(); };
 
   const gotoAddPropertyOffice = document.getElementById('goto-add-property-office');
   if(gotoAddPropertyOffice) gotoAddPropertyOffice.onclick = () => {
-    state.propertyCategory = 'office'; state.regLat = null; state.regLng = null;
+    resetAddPropertyState();
+    state.propertyCategory = 'office';
     state.modal = 'add-property'; render();
   };
 
   const gotoAddPropertyCommonArea = document.getElementById('goto-add-property-common-area');
   if(gotoAddPropertyCommonArea) gotoAddPropertyCommonArea.onclick = () => {
-    state.propertyCategory = 'common_area'; state.regLat = null; state.regLng = null;
+    resetAddPropertyState();
+    state.propertyCategory = 'common_area';
     state.regPropertyCity = '';
     state.modal = 'add-property'; render();
   };
@@ -4182,6 +4225,7 @@ function attachHandlers(){
         name: fd.name, city: fd.city, address: fd.address || null,
         sizeSqm: fd.sizeSqm || null, floorCount: fd.floorCount || null,
         sqmPerFloor: fd.sqmPerFloor || null, elevatorCapacity: fd.elevatorCapacity || null,
+        icalUrl: fd.icalUrl || null,
         latitude: state.regLat, longitude: state.regLng,
       })});
       state.modal = null; state.editPropertyId = null;
@@ -4211,25 +4255,72 @@ function attachHandlers(){
     }
   };
 
-  const propForm = document.getElementById('property-form');
-  if(propForm) propForm.onsubmit = async (e) => {
+  // ADIM 1 (detaylar): input'lari state'e canli yaziyoruz ki 2. adima
+  // gecince (render tetiklendiginde) degerler kaybolmasin - kayit
+  // akisindaki ayni yontem.
+  const addPropNameInput = document.getElementById('addprop-name-input');
+  if(addPropNameInput) addPropNameInput.oninput = () => { state.addPropName = addPropNameInput.value; };
+  const addPropBuildingInput = document.getElementById('addprop-buildingname-input');
+  if(addPropBuildingInput) addPropBuildingInput.oninput = () => { state.addPropBuildingName = addPropBuildingInput.value; };
+  const addPropIcalInput = document.getElementById('addprop-ical-input');
+  if(addPropIcalInput) addPropIcalInput.oninput = () => { state.addPropIcalUrl = addPropIcalInput.value; };
+  const addPropSizeInput = document.getElementById('addprop-size-input');
+  if(addPropSizeInput) addPropSizeInput.oninput = () => { state.regSizeSqm = addPropSizeInput.value; };
+  const addPropFloorInput = document.getElementById('addprop-floorcount-input');
+  if(addPropFloorInput) addPropFloorInput.oninput = () => { state.addPropFloorCount = addPropFloorInput.value; };
+  const addPropSqmPerFloorInput = document.getElementById('addprop-sqmperfloor-input');
+  if(addPropSqmPerFloorInput) addPropSqmPerFloorInput.oninput = () => { state.addPropSqmPerFloor = addPropSqmPerFloorInput.value; };
+  const addPropElevatorInput = document.getElementById('addprop-elevator-input');
+  if(addPropElevatorInput) addPropElevatorInput.oninput = () => { state.addPropElevatorCapacity = addPropElevatorInput.value; };
+  const addPropAddressInput = document.getElementById('addprop-address-input');
+  if(addPropAddressInput) addPropAddressInput.oninput = () => { state.regPropertyAddress = addPropAddressInput.value; };
+
+  const propDetailsStepForm = document.getElementById('property-details-step-form');
+  if(propDetailsStepForm) propDetailsStepForm.onsubmit = (e) => {
     e.preventDefault();
-    const fd = Object.fromEntries(new FormData(propForm));
+    const fd = Object.fromEntries(new FormData(propDetailsStepForm));
+    // Adim 1 tamamlandi, degerleri state'e yaz, adim 2'ye (adres+harita) gec.
+    if(state.propertyCategory === 'common_area'){
+      state.addPropName = fd.name;
+      state.addPropFloorCount = fd.floorCount || '';
+      state.addPropSqmPerFloor = fd.sqmPerFloor || '';
+      state.addPropElevatorCapacity = fd.elevatorCapacity || '';
+    } else {
+      state.addPropName = fd.name;
+      state.addPropBuildingName = fd.buildingName || '';
+      state.regSizeSqm = fd.sizeSqm;
+      state.addPropIcalUrl = fd.icalUrl || '';
+    }
+    state.addPropertyStep = 'address';
+    render();
+    window.scrollTo(0, 0);
+  };
+
+  const addPropBack = document.getElementById('add-property-back');
+  if(addPropBack) addPropBack.onclick = () => { state.addPropertyStep = 'details'; render(); window.scrollTo(0, 0); };
+
+  // ADIM 2 (adres+harita): nihai POST burada gonderiliyor.
+  const propAddressStepForm = document.getElementById('property-address-step-form');
+  if(propAddressStepForm) propAddressStepForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(propAddressStepForm));
     const isCommonArea = state.propertyCategory === 'common_area';
     await api('/properties', { method:'POST', body: JSON.stringify({
-      name: fd.name,
+      name: state.addPropName,
       city: fd.city || null, address: fd.address || null,
       category: state.propertyCategory,
-      buildingName: isCommonArea ? null : (fd.buildingName || null),
+      buildingName: isCommonArea ? null : (state.addPropBuildingName || null),
       latitude: state.regLat, longitude: state.regLng,
-      sizeSqm: isCommonArea ? null : (fd.sizeSqm || null),
-      icalUrl: isCommonArea ? null : (fd.icalUrl || null),
-      floorCount: isCommonArea ? (fd.floorCount || null) : null,
-      sqmPerFloor: isCommonArea ? (fd.sqmPerFloor || null) : null,
-      elevatorCapacity: isCommonArea ? (fd.elevatorCapacity || null) : null,
+      sizeSqm: isCommonArea ? null : (state.regSizeSqm || null),
+      bedroomCount: isCommonArea ? null : (state.regBedroomCount || null),
+      bathroomCount: isCommonArea ? null : (state.regBathroomCount || null),
+      icalUrl: isCommonArea ? null : (state.addPropIcalUrl || null),
+      floorCount: isCommonArea ? (state.addPropFloorCount || null) : null,
+      sqmPerFloor: isCommonArea ? (state.addPropSqmPerFloor || null) : null,
+      elevatorCapacity: isCommonArea ? (state.addPropElevatorCapacity || null) : null,
     })});
     state.modal = null;
-    state.regLat = null; state.regLng = null;
+    resetAddPropertyState();
     await loadAll();
   };
 
