@@ -220,6 +220,24 @@ tr: {
   navMarketing: "Marketing",
   navAnalytics: "Analytics",
   navCoverage: "Coverage",
+  navPerformance: "Performans",
+  performanceTitle: "Performans",
+  performanceSubtitle: "Personel puanlamaları ve müşteri sipariş/referans verileri.",
+  performanceSubStaff: "Personel Performansı",
+  performanceSubCustomers: "Müşteri Performansı",
+  companyAvgScoreTitle: "Genel Kalite Puanımız",
+  companyAvgScoreHint: "Tüm değerlendirmelerin (temizlik + personel) ortalaması.",
+  colStaffNamePerf: "Personel",
+  colServiceAvg: "Temizlik Ort.",
+  colStaffAvg: "Kendisi Ort.",
+  colOverallAvg: "Genel Ort.",
+  colRatingCount: "Değerlendirme",
+  emptyStaffPerformance: "Henüz değerlendirilmiş personel yok.",
+  colCustomerNamePerf: "Müşteri",
+  colOrderCount: "Sipariş Sayısı",
+  colReferralUsedCount: "Referans Kullanımı",
+  emptyCustomerPerformance: "Henüz müşteri yok.",
+  performanceAutoRefreshHint: "Bu liste otomatik olarak yenilenir.",
   analyticsTitle: "Analytics",
   analyticsSubtitle: "Hizmet popülerliği, müşteri elde tutma, şehir talebi ve personel trendleri.",
   servicesPopularityTitle: "En Çok Satılan Hizmetler",
@@ -556,6 +574,24 @@ en: {
   navMarketing: "Marketing",
   navAnalytics: "Analytics",
   navCoverage: "Coverage",
+  navPerformance: "Performance",
+  performanceTitle: "Performance",
+  performanceSubtitle: "Staff ratings and customer order/referral data.",
+  performanceSubStaff: "Staff Performance",
+  performanceSubCustomers: "Customer Performance",
+  companyAvgScoreTitle: "Our Overall Quality Score",
+  companyAvgScoreHint: "Average of all ratings (cleaning + staff).",
+  colStaffNamePerf: "Staff",
+  colServiceAvg: "Cleaning Avg.",
+  colStaffAvg: "Own Avg.",
+  colOverallAvg: "Overall Avg.",
+  colRatingCount: "Ratings",
+  emptyStaffPerformance: "No rated staff yet.",
+  colCustomerNamePerf: "Customer",
+  colOrderCount: "Order Count",
+  colReferralUsedCount: "Referrals Used",
+  emptyCustomerPerformance: "No customers yet.",
+  performanceAutoRefreshHint: "This list refreshes automatically.",
   analyticsTitle: "Analytics",
   analyticsSubtitle: "Service popularity, customer retention, city demand and staff trends.",
   servicesPopularityTitle: "Best-Selling Services",
@@ -888,6 +924,24 @@ me: {
   navMarketing: "Marketing",
   navAnalytics: "Analitika",
   navCoverage: "Pokrivenost",
+  navPerformance: "Performanse",
+  performanceTitle: "Performanse",
+  performanceSubtitle: "Ocjene osoblja i podaci o narudžbama/preporukama klijenata.",
+  performanceSubStaff: "Performanse osoblja",
+  performanceSubCustomers: "Performanse klijenata",
+  companyAvgScoreTitle: "Naš ukupni kvalitet",
+  companyAvgScoreHint: "Prosjek svih ocjena (čišćenje + osoblje).",
+  colStaffNamePerf: "Osoblje",
+  colServiceAvg: "Prosj. čišćenja",
+  colStaffAvg: "Sopstveni prosj.",
+  colOverallAvg: "Ukupan prosj.",
+  colRatingCount: "Ocjene",
+  emptyStaffPerformance: "Još nema ocijenjenog osoblja.",
+  colCustomerNamePerf: "Klijent",
+  colOrderCount: "Broj narudžbi",
+  colReferralUsedCount: "Korišćene preporuke",
+  emptyCustomerPerformance: "Još nema klijenata.",
+  performanceAutoRefreshHint: "Ova lista se automatski osvježava.",
   analyticsTitle: "Analitika",
   analyticsSubtitle: "Popularnost usluga, zadržavanje klijenata, potražnja po gradovima i trendovi osoblja.",
   servicesPopularityTitle: "Najprodavanije usluge",
@@ -1261,6 +1315,9 @@ let state = {
   staffTrend: null,
   serviceAreas: null,
   coverageBalance: null,
+  performanceSubPage: 'staff',
+  staffPerformance: null,
+  customerPerformance: null,
   activeChatUserId: null,
   chatMessages: null,
   authError: '',
@@ -1327,6 +1384,7 @@ const NAV_ICONS = {
   marketing: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>`,
   analytics: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>`,
   coverage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>`,
+  performance: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l3 6.1 6.7.9-4.9 4.7 1.2 6.6L12 17.7l-6 3.1 1.2-6.6-4.9-4.7 6.7-.9z"/></svg>`,
 };
 
 function navItem(page, icon, label, badgeCount){
@@ -1351,6 +1409,7 @@ function renderPanel(){
     ${navItem('marketing', 'marketing', T.navMarketing)}
     ${navItem('analytics', 'analytics', T.navAnalytics)}
     ${navItem('coverage', 'coverage', T.navCoverage)}
+    ${navItem('performance', 'performance', T.navPerformance)}
     ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
@@ -1374,6 +1433,7 @@ function renderPanel(){
       : state.page==='marketing' ? renderMarketing()
       : state.page==='analytics' ? renderAnalytics()
       : state.page==='coverage' ? renderCoverage()
+      : state.page==='performance' ? renderPerformance()
       : state.page==='settings' ? renderSettings()
       : state.page==='support' ? renderSupport()
       : renderApplications()}
@@ -2296,6 +2356,83 @@ function renderCoverage(){
   `;
 }
 
+/* ================== PERFORMANS PANELİ (personel + müşteri) ================== */
+// Personel Performansı: her personel için temizlik puanı ortalaması
+// (service_score) ve kendisine verilen puan ortalaması (staff_score) ayrı
+// ayrı, ikisinin ortalaması da "Genel Ort." olarak gösteriliyor. Üstteki
+// tek kart, TÜM değerlendirmelerin (tüm personel, iki puan türü birlikte)
+// ortalaması - şirketin genel kalite puanı.
+// Müşteri Performansı: sipariş sayısına göre çoktan aza sıralı, referans
+// kodu kullanım sayısıyla birlikte. Sayfa açıkken otomatik yenilenir.
+function renderPerformance(){
+  return `
+  <div class="page-head"><div><h2>${T.performanceTitle}</h2><p>${T.performanceSubtitle}</p></div></div>
+  <div style="display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid var(--line); padding-bottom:12px;">
+    <button class="btn ${state.performanceSubPage==='staff'?'ochre':'ghost'} btn-sm" data-performance-subpage="staff">${T.performanceSubStaff}</button>
+    <button class="btn ${state.performanceSubPage==='customers'?'ochre':'ghost'} btn-sm" data-performance-subpage="customers">${T.performanceSubCustomers}</button>
+  </div>
+  ${state.performanceSubPage==='staff' ? renderStaffPerformance() : renderCustomerPerformance()}
+  `;
+}
+
+function renderStaffPerformance(){
+  const d = state.staffPerformance;
+  return `
+  <div class="panel-card" style="max-width:340px; margin-bottom:20px; text-align:center;">
+    <div style="font-size:11px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:6px;">${T.companyAvgScoreTitle}</div>
+    ${!d ? `<div style="padding:10px 0; color:var(--muted); font-size:13px;">…</div>` : `
+      <div style="font-family:'Fraunces',serif; font-size:44px; color:var(--ochre);">${d.companyAvg !== null ? d.companyAvg : '—'}<span style="font-size:18px; color:var(--muted);">/10</span></div>
+      <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">${T.companyAvgScoreHint}</div>
+    `}
+  </div>
+  <div class="panel-card">
+    ${!d ? `<div class="empty-state" style="margin:0;">…</div>` : d.staff.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyStaffPerformance}</div>` : `
+      <table>
+        <thead><tr>
+          <th>${T.colStaffNamePerf}</th><th>${T.colServiceAvg}</th><th>${T.colStaffAvg}</th><th>${T.colOverallAvg}</th><th>${T.colRatingCount}</th>
+        </tr></thead>
+        <tbody>
+          ${d.staff.map(s => `
+            <tr>
+              <td><strong>${s.name}</strong></td>
+              <td>${s.serviceAvg !== null ? s.serviceAvg + '/10' : '—'}</td>
+              <td>${s.staffAvg !== null ? s.staffAvg + '/10' : '—'}</td>
+              <td><strong style="color:var(--ochre);">${s.overallAvg !== null ? s.overallAvg + '/10' : '—'}</strong></td>
+              <td>${s.ratingCount}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+  </div>
+  `;
+}
+
+function renderCustomerPerformance(){
+  const d = state.customerPerformance;
+  return `
+  <div class="hint" style="margin:-4px 0 14px;">${T.performanceAutoRefreshHint}</div>
+  <div class="panel-card">
+    ${!d ? `<div class="empty-state" style="margin:0;">…</div>` : d.customers.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyCustomerPerformance}</div>` : `
+      <table>
+        <thead><tr>
+          <th>${T.colCustomerNamePerf}</th><th>${T.colOrderCount}</th><th>${T.colReferralUsedCount}</th>
+        </tr></thead>
+        <tbody>
+          ${d.customers.map(c => `
+            <tr>
+              <td><strong>${c.company_name || c.name}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${c.account_type==='company' ? T.typeCompany : T.typeIndividual}</span></td>
+              <td>${c.orderCount}</td>
+              <td>${c.referralUsedCount}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `}
+  </div>
+  `;
+}
+
 function renderSettings(){
   const s = state.settingsData;
   const admins = state.adminsList;
@@ -2723,6 +2860,33 @@ async function loadCoverage(){
   render();
 }
 
+async function loadStaffPerformance(){
+  state.staffPerformance = await api('/admin/performance/staff');
+  render();
+}
+async function loadCustomerPerformance(){
+  state.customerPerformance = await api('/admin/performance/customers');
+  render();
+}
+async function loadPerformanceSubPage(){
+  if(state.performanceSubPage === 'staff') await loadStaffPerformance();
+  else await loadCustomerPerformance();
+}
+
+// Müşteri Performansı listesi, sayfa açıkken düzenli olarak kendini
+// yeniler (yeni sipariş/referans kullanımı geldikçe elle yenilemeye gerek
+// kalmasın diye) - Dashboard'daki canlı harita ile aynı desen.
+let performancePollInterval = null;
+function startPerformancePolling(){
+  stopPerformancePolling();
+  performancePollInterval = setInterval(() => {
+    if(state.page === 'performance' && state.token) loadPerformanceSubPage().catch(() => {});
+  }, 30000);
+}
+function stopPerformancePolling(){
+  if(performancePollInterval){ clearInterval(performancePollInterval); performancePollInterval = null; }
+}
+
 async function loadSettings(){
   state.settingsData = await api('/admin/settings');
   render();
@@ -2771,6 +2935,13 @@ function attachHandlers(){
     if(state.page === 'marketing') await loadMarketingSubPage();
     if(state.page === 'analytics') await loadAnalytics();
     if(state.page === 'coverage') await loadCoverage();
+    if(state.page === 'performance'){ await loadPerformanceSubPage(); startPerformancePolling(); }
+    else stopPerformancePolling();
+  });
+
+  document.querySelectorAll('[data-performance-subpage]').forEach(el => el.onclick = async () => {
+    state.performanceSubPage = el.dataset.performanceSubpage;
+    await loadPerformanceSubPage();
   });
 
   document.querySelectorAll('[data-finance-subpage]').forEach(el => el.onclick = async () => {
@@ -3100,6 +3271,7 @@ function attachHandlers(){
   if(logout) logout.onclick = () => {
     stopLiveMapPolling();
     stopChatPolling();
+    stopPerformancePolling();
     localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
     state.token = null; state.user = null; render();
   };
