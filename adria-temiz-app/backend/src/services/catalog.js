@@ -84,15 +84,27 @@ function getPricingValue(key, fallback = 0) {
 
 // Bir hizmetin görev listesini (checklist) döner - hem admin panelinden
 // yönetiliyor hem artık müşteri uygulamasında "Checklist'i Gör" ekranında
-// gösteriliyor.
-function getChecklist(serviceKey) {
+// gösteriliyor. "lang" gecerli degilse (tr/en/me disinda) ya da hic
+// verilmezse Turkce'ye duser - boylece eski cagrilar (lang'siz) da
+// kirilmadan calismaya devam eder.
+function getChecklist(serviceKey, lang) {
+  const validLang = ['tr', 'en', 'me'].includes(lang) ? lang : 'tr';
+  const column = `item_text_${validLang}`;
   return db
-    .prepare('SELECT id, item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
+    .prepare(`SELECT id, ${column} AS item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC`)
+    .all(serviceKey);
+}
+
+// Admin paneli icin - checklist maddelerini UC DILDE BIRDEN dondurur
+// (duzenleme ekraninda TR/EN/ME kutularini doldurmak icin kullanilir).
+function getChecklistAllLangs(serviceKey) {
+  return db
+    .prepare('SELECT id, item_text_tr, item_text_en, item_text_me, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
     .all(serviceKey);
 }
 
 // Yapısal tanımı + canlı fiyatlandırmayı birleştirip tek bir nesne döner.
-function getService(key) {
+function getService(key, lang) {
   const def = SERVICE_DEFS.find((s) => s.key === key);
   if (!def) throw new Error('Geçersiz hizmet türü.');
   if (def.isGroup) return def;
@@ -106,11 +118,11 @@ function getService(key) {
     extraRate: getPricingValue(`${key}.extraRate`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
-    checklist: getChecklist(key),
+    checklist: getChecklist(key, lang),
   };
 }
 
-function getCommonAreaSubOption(key) {
+function getCommonAreaSubOption(key, lang) {
   const def = COMMON_AREA_SUB_DEFS.find((s) => s.key === key);
   if (!def) throw new Error('Geçersiz ortak alan alt seçeneği.');
   return {
@@ -121,24 +133,24 @@ function getCommonAreaSubOption(key) {
     ratePerCapacity: getPricingValue(`${key}.ratePerCapacity`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
-    checklist: getChecklist(key),
+    checklist: getChecklist(key, lang),
   };
 }
 
-function getAddon(key) {
+function getAddon(key, lang) {
   const def = ADDON_DEFS.find((a) => a.key === key);
   if (!def) throw new Error('Geçersiz ekstra hizmet.');
-  return { ...def, rate: getPricingValue(`${key}.rate`), checklist: getChecklist(key) };
+  return { ...def, rate: getPricingValue(`${key}.rate`), checklist: getChecklist(key, lang) };
 }
 
-function getAllServices() {
-  return SERVICE_DEFS.map((s) => getService(s.key));
+function getAllServices(lang) {
+  return SERVICE_DEFS.map((s) => getService(s.key, lang));
 }
-function getAllCommonAreaSubOptions() {
-  return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key));
+function getAllCommonAreaSubOptions(lang) {
+  return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key, lang));
 }
-function getAllAddons() {
-  return ADDON_DEFS.map((a) => getAddon(a.key));
+function getAllAddons(lang) {
+  return ADDON_DEFS.map((a) => getAddon(a.key, lang));
 }
 function getSuppliesFees() {
   return {
@@ -153,7 +165,11 @@ function calcPrice(serviceKey, { sizeSqm } = {}) {
   const price = sqm <= service.thresholdSqm
     ? service.flatPrice
     : service.flatPrice + (sqm - service.thresholdSqm) * service.extraRate;
-  return Math.max(service.min, Math.round(price / 5) * 5);
+  // ONEMLI: fiyat en yakin 5'e degil, kurusa (2 ondalik basamaga) yuvarlanir
+  // - admin panelindeki parametrelere gore TAM/NET rakam uretmek icin.
+  // Eskiden Math.round(price/5)*5 kullaniliyordu, bu da GERCEK rezervasyon
+  // fiyatini (sadece onizlemeyi degil) bloklar halinde yanlis yuvarliyordu.
+  return Math.max(service.min, Math.round(price * 100) / 100);
 }
 
 // Tek bir ortak alan alt seçeneğinin fiyatı. Sabit bir "başlangıç ücreti"
@@ -171,7 +187,8 @@ function calcCommonAreaSubPrice(key, params = {}) {
   } else if (sub.paramType === 'elevator') {
     price += (Number(params.elevatorCapacity) || 0) * sub.ratePerCapacity;
   }
-  return Math.max(sub.min, Math.round(price / 5) * 5);
+  // ONEMLI: burada da ayni duzeltme - en yakin 5 yerine kurusa yuvarlama.
+  return Math.max(sub.min, Math.round(price * 100) / 100);
 }
 
 // selections: [{ key, floorCount?, sqmPerFloor?, elevatorCapacity? }]
@@ -234,12 +251,16 @@ module.exports = {
   // Geriye dönük uyumluluk için düz diziler de export ediliyor (mevcut
   // kodun SERVICES/COMMON_AREA_SUB_OPTIONS/ADDONS'u doğrudan kullandığı
   // yerler için) - ama bunlar artık GETTER, her erişimde canlı hesaplanıyor.
+  // NOT: Bu getter'lar lang parametresi ALMIYOR (geriye donuk uyumluluk
+  // icin), bu yuzden hep Turkce checklist doner - lang'e duyarli yerlerde
+  // getAllServices(lang) / getAllCommonAreaSubOptions(lang) / getAllAddons(lang)
+  // fonksiyonlari DOGRUDAN cagrilmali.
   get SERVICES() { return getAllServices(); },
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
   getCommissionRate, getPayoutCycleDays,
-  getService, getAddon, getCommonAreaSubOption, getChecklist,
+  getService, getAddon, getCommonAreaSubOption, getChecklist, getChecklistAllLangs,
   getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
   calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
