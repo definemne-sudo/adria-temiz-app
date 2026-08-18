@@ -2861,11 +2861,15 @@ async function loadCoverage(){
 }
 
 async function loadStaffPerformance(){
-  state.staffPerformance = await api('/admin/performance/staff');
+  try{
+    state.staffPerformance = await api('/admin/performance/staff');
+  }catch(err){ showToast(err.message); }
   render();
 }
 async function loadCustomerPerformance(){
-  state.customerPerformance = await api('/admin/performance/customers');
+  try{
+    state.customerPerformance = await api('/admin/performance/customers');
+  }catch(err){ showToast(err.message); }
   render();
 }
 async function loadPerformanceSubPage(){
