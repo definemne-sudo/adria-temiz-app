@@ -412,7 +412,10 @@ tr: {
   saveBtn: "Kaydet",
   savedToast: "Fiyatlandırma güncellendi.",
   checklistTitle: "Görev Listesi (Checklist)",
-  addChecklistItemPlaceholder: "Yeni görev ekle…",
+  addChecklistItemPlaceholderTr: "Yeni görev ekle (Türkçe)…",
+  addChecklistItemPlaceholderEn: "Yeni görev ekle (İngilizce)…",
+  addChecklistItemPlaceholderMe: "Yeni görev ekle (Karadağca)…",
+  checklistLangMissing: "— (girilmedi)",
   addBtn: "Ekle",
   noChecklistItems: "Henüz görev eklenmedi.",
   addonsPricingTitle: "Ekstra Hizmet Fiyatları",
@@ -1745,19 +1748,27 @@ function renderServicePricingBlock(s, fields){
     </form>
     <div style="font-size:11px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${T.checklistTitle}</div>
     ${checklist.length === 0 ? `<div style="font-size:12.5px; color:var(--muted); margin-bottom:10px;">${T.noChecklistItems}</div>` : `
-      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;">
         ${checklist.map((item,i) => `
-          <div style="display:flex; align-items:center; gap:6px; font-size:13px;">
-            <span style="flex:1;">${item.item_text}</span>
-            <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="up" ${i===0?'disabled':''}>↑</button>
-            <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="down" ${i===checklist.length-1?'disabled':''}>↓</button>
-            <button type="button" class="checklist-icon-btn" data-delete-item="${item.id}" style="color:var(--danger);">✕</button>
+          <div style="display:flex; align-items:flex-start; gap:8px; font-size:12.5px; background:var(--cream); border-radius:8px; padding:9px 11px;">
+            <div style="flex:1; display:flex; flex-direction:column; gap:3px; min-width:0;">
+              <div><span style="font-weight:700; color:var(--sage-dark); margin-right:6px;">TR</span>${item.item_text_tr || `<span style="color:var(--muted); font-style:italic;">${T.checklistLangMissing}</span>`}</div>
+              <div><span style="font-weight:700; color:var(--sage-dark); margin-right:6px;">EN</span>${item.item_text_en || `<span style="color:var(--muted); font-style:italic;">${T.checklistLangMissing}</span>`}</div>
+              <div><span style="font-weight:700; color:var(--sage-dark); margin-right:6px;">CG</span>${item.item_text_me || `<span style="color:var(--muted); font-style:italic;">${T.checklistLangMissing}</span>`}</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px; flex-shrink:0;">
+              <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="up" ${i===0?'disabled':''}>↑</button>
+              <button type="button" class="checklist-icon-btn" data-move-item="${item.id}" data-move-dir="down" ${i===checklist.length-1?'disabled':''}>↓</button>
+              <button type="button" class="checklist-icon-btn" data-delete-item="${item.id}" style="color:var(--danger);">✕</button>
+            </div>
           </div>
         `).join('')}
       </div>
     `}
-    <form data-add-checklist="${s.key}" style="display:flex; gap:6px;">
-      <input name="itemText" placeholder="${T.addChecklistItemPlaceholder}" style="flex:1; padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
+    <form data-add-checklist="${s.key}" style="display:flex; flex-direction:column; gap:6px;">
+      <input name="itemTextTr" placeholder="${T.addChecklistItemPlaceholderTr}" required style="padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
+      <input name="itemTextEn" placeholder="${T.addChecklistItemPlaceholderEn}" style="padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
+      <input name="itemTextMe" placeholder="${T.addChecklistItemPlaceholderMe}" style="padding:7px 10px; border:1px solid var(--line); border-radius:6px; font-family:inherit; font-size:13px;" />
       <button class="btn ghost btn-sm" type="submit">${T.addBtn}</button>
     </form>
   `;
@@ -3040,9 +3051,12 @@ function attachHandlers(){
     e.preventDefault();
     const key = form.dataset.addChecklist;
     const fd = Object.fromEntries(new FormData(form));
-    if(!fd.itemText.trim()) return;
+    if(!fd.itemTextTr || !fd.itemTextTr.trim()) return;
     try{
-      await api(`/admin/services/${key}/checklist`, { method:'POST', body: JSON.stringify({ itemText: fd.itemText }) });
+      await api(`/admin/services/${key}/checklist`, { method:'POST', body: JSON.stringify({
+        itemTextTr: fd.itemTextTr, itemTextEn: fd.itemTextEn, itemTextMe: fd.itemTextMe,
+      })});
+      form.reset();
       await loadServicesData();
     }catch(err){ showToast(err.message); }
   });
