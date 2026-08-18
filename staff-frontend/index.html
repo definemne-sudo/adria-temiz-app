@@ -217,7 +217,7 @@ const API = (location.hostname === 'localhost' || location.hostname === '127.0.0
 
 // Gizlilik Politikası ve Kullanım Koşulları metni tek kaynakta (müşteri
 // uygulaması) tutuluyor - burada tekrar etmek yerine oraya link veriyoruz.
-const LEGAL_BASE_URL = 'https://adria-temiz-app.vercel.app';
+const LEGAL_BASE_URL = 'https://app.micisto.com';
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -355,6 +355,8 @@ const TRANSLATIONS = {
     emptyHistory: "Bu dönemde tamamlanan iş yok.",
     navRatings: "Değerlendirme",
     ratingsSummary: "{{total}} değerlendirmenin ortalaması",
+    ratingLabelService: "Temizlik:",
+    ratingLabelYou: "Sana:",
     ratingsListTitle: "İş Bazında Değerlendirmeler",
     emptyRatings: "Bu dönemde değerlendirme yok.",
     emptyCalendarDay: "Bu gün için onaylanmış bir işin yok.",
@@ -507,6 +509,8 @@ const TRANSLATIONS = {
     emptyHistory: "No jobs completed in this period.",
     navRatings: "Ratings",
     ratingsSummary: "average of {{total}} ratings",
+    ratingLabelService: "Cleaning:",
+    ratingLabelYou: "You:",
     ratingsListTitle: "Ratings by Job",
     emptyRatings: "No ratings in this period.",
     emptyCalendarDay: "You have no confirmed jobs for this day.",
@@ -659,6 +663,8 @@ const TRANSLATIONS = {
     emptyHistory: "Nema završenih poslova u ovom periodu.",
     navRatings: "Ocjene",
     ratingsSummary: "prosjek {{total}} ocjena",
+    ratingLabelService: "Čišćenje:",
+    ratingLabelYou: "Tebi:",
     ratingsListTitle: "Ocjene po poslu",
     emptyRatings: "Nema ocjena u ovom periodu.",
     emptyCalendarDay: "Nemaš potvrđenih poslova za ovaj dan.",
@@ -1082,6 +1088,13 @@ function ratingsPeriodLabel(d){
 function renderRatingRow(r){
   const icon = serviceIconSrc(r.service_key);
   const dateLabel = new Date((r.completed_at||'').replace(' ','T')).toLocaleDateString(LOCALES[state.lang], { day:'numeric', month:'short' });
+  // "Kendi puanı" artık TEK bir puan degil - temizlige verilen puan
+  // (service_score) ile personele verilen puanin (staff_score) ortalamasi.
+  // Ikisi de varsa ortalamasini, sadece biri varsa onu gosteriyoruz.
+  const hasService = r.service_score !== null && r.service_score !== undefined;
+  const hasStaff = r.staff_score !== null && r.staff_score !== undefined;
+  const combined = hasService && hasStaff ? Math.round(((r.service_score + r.staff_score) / 2) * 10) / 10
+    : hasStaff ? r.staff_score : (hasService ? r.service_score : null);
   return `
   <div class="job-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
     <div class="job-icon" style="width:38px; height:38px; flex-shrink:0;">${icon ? `<img src="${icon}" alt="" />` : `<span style="font-size:18px;">🧹</span>`}</div>
@@ -1089,8 +1102,12 @@ function renderRatingRow(r){
       <div style="font-size:13px; font-weight:700; color:var(--navy);">${jobServiceLabel(r)}</div>
       <div style="font-size:11.5px; color:var(--muted);">${r.property_name} · ${dateLabel}</div>
       ${r.staff_feedback ? `<div style="font-size:11.5px; color:var(--muted); margin-top:3px; font-style:italic;">"${r.staff_feedback}"</div>` : ''}
+      <div style="display:flex; gap:10px; margin-top:5px;">
+        <span style="font-size:10.5px; color:var(--muted);">${t('ratingLabelService')} <strong style="color:var(--navy);">${hasService ? r.service_score : '—'}</strong></span>
+        <span style="font-size:10.5px; color:var(--muted);">${t('ratingLabelYou')} <strong style="color:var(--navy);">${hasStaff ? r.staff_score : '—'}</strong></span>
+      </div>
     </div>
-    <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ochre); flex-shrink:0;">${r.staff_score}<span style="font-size:12px; color:var(--muted); font-family:Inter;">/10</span></div>
+    <div style="font-family:'Fraunces',serif; font-size:20px; font-weight:600; color:var(--ochre); flex-shrink:0;">${combined !== null ? combined : '—'}<span style="font-size:12px; color:var(--muted); font-family:Inter;">/10</span></div>
   </div>`;
 }
 
@@ -1099,6 +1116,23 @@ function renderRatings(){
   if(!d){
     return `<div class="empty-state">…</div>`;
   }
+  // Ozet puan: backend'in gonderdigi tek alana guvenmek yerine, elimizdeki
+  // ratings listesinden (temizlik + personel puani ortalamasi) istemci
+  // tarafinda hesapliyoruz - boylece backend hangi alani "avgScore" olarak
+  // dondurursek dondursun, gosterilen sayi her zaman dogru tanimla eslesir.
+  const combinedScores = d.ratings
+    .map(r => {
+      const hasService = r.service_score !== null && r.service_score !== undefined;
+      const hasStaff = r.staff_score !== null && r.staff_score !== undefined;
+      if(hasService && hasStaff) return (r.service_score + r.staff_score) / 2;
+      if(hasStaff) return r.staff_score;
+      if(hasService) return r.service_score;
+      return null;
+    })
+    .filter(v => v !== null);
+  const combinedAvg = combinedScores.length
+    ? Math.round((combinedScores.reduce((a,b) => a+b, 0) / combinedScores.length) * 10) / 10
+    : null;
   return `
   <div class="option-row" style="margin-bottom:14px;">
     <div class="choice ${state.ratingsPeriod==='week'?'selected':''}" data-ratings-period="week">${t('weekLabel')}</div>
@@ -1114,7 +1148,7 @@ function renderRatings(){
     ${d.totalRated === 0 ? `
       <div style="font-size:13px; color:var(--muted); padding:8px 0;">${t('emptyRatings')}</div>
     ` : `
-      <div style="font-family:'Fraunces',serif; font-size:40px; color:var(--ochre);">${d.avgScore}<span style="font-size:18px; color:var(--muted);">/10</span></div>
+      <div style="font-family:'Fraunces',serif; font-size:40px; color:var(--ochre);">${combinedAvg !== null ? combinedAvg : '—'}<span style="font-size:18px; color:var(--muted);">/10</span></div>
       <div style="font-size:12px; color:var(--muted); margin-top:4px;">${t('ratingsSummary', { total: d.totalRated })}</div>
     `}
   </div>
