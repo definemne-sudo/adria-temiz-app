@@ -258,6 +258,30 @@ CREATE TABLE IF NOT EXISTS service_areas (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `);
+// --- Checklist maddelerine dil bazli sutunlar (migration) ---------------
+// Eskiden "item_text" tek dildeydi (Turkce varsayilan). Artik 3 ayri
+// sutun var. Mevcut veriler otomatik olarak Turkce sutununa tasinir.
+function ensureChecklistLangColumns() {
+  const cols = db.prepare("PRAGMA table_info(service_checklists)").all();
+  const names = cols.map((c) => c.name);
+  if (!names.includes('item_text_tr')) {
+    db.exec("ALTER TABLE service_checklists ADD COLUMN item_text_tr TEXT");
+  }
+  if (!names.includes('item_text_en')) {
+    db.exec("ALTER TABLE service_checklists ADD COLUMN item_text_en TEXT");
+  }
+  if (!names.includes('item_text_me')) {
+    db.exec("ALTER TABLE service_checklists ADD COLUMN item_text_me TEXT");
+  }
+  // Eski "item_text" sutunundaki mevcut veriyi Turkce sutununa tasi
+  // (sadece henuz tasinmamis satirlar icin).
+  db.exec(`
+    UPDATE service_checklists
+    SET item_text_tr = item_text
+    WHERE item_text_tr IS NULL AND item_text IS NOT NULL
+  `);
+}
+ensureChecklistLangColumns();
 
 module.exports = db;
 
