@@ -7,7 +7,6 @@ const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 
 const router = express.Router();
-
 router.use(requireAuth);
 
 // Tüm admin route'ları için ortak yetki kontrolü.
@@ -399,9 +398,7 @@ const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor
 
 // NOT: getChecklist artık services/catalog.js'te - burada import ediliyor
 // (müşteri uygulaması da aynı fonksiyonu kullanıyor, tek doğru kaynak).
-// Admin paneli düzenleme ekranı için getChecklistAllLangs kullanılıyor -
-// bu, TR/EN/ME metinlerini BİRLİKTE döner (tek dil değil), böylece admin
-// panelinde 3 dil kutusu aynı anda doldurulabiliyor.
+// Admin paneli duzenleme ekrani icin UC DIL BIRDEN donuyor (tek dil degil).
 
 router.get('/services', (req, res) => {
   const services = getAllServices().map((s) => ({ ...s, checklist: s.isGroup ? [] : getChecklistAllLangs(s.key) }));
@@ -435,10 +432,9 @@ router.put('/services/:key/pricing', (req, res) => {
 });
 
 // Yeni bir checklist maddesi ekler - ARTIK 3 DİLDE BİRDEN (itemTextTr
-// zorunlu, itemTextEn/itemTextMe opsiyonel ama admin panelindeki form
-// ikisini de gönderecek şekilde tasarlanmalı). Türkçe metin girilip diğer
-// ikisi boş bırakılırsa, o diller için checklist boş görünür - admin
-// panelindeki 3 kutuyu doldurmak asıl doğru kullanım.
+// zorunlu, itemTextEn/itemTextMe opsiyonel). NOT: eski "item_text" sütunu
+// hâlâ NOT NULL kısıtlamasına sahip olduğu için, geriye dönük uyumluluk
+// amacıyla oraya da Türkçe metni yazıyoruz (aksi halde INSERT hata verir).
 router.post('/services/:key/checklist', (req, res) => {
   const { key } = req.params;
   const { itemTextTr, itemTextEn, itemTextMe } = req.body;
@@ -446,8 +442,8 @@ router.post('/services/:key/checklist', (req, res) => {
 
   const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM service_checklists WHERE service_key = ?').get(key).m;
   const id = uuid();
-  db.prepare('INSERT INTO service_checklists (id, service_key, item_text_tr, item_text_en, item_text_me, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, key, itemTextTr.trim(), (itemTextEn || '').trim() || null, (itemTextMe || '').trim() || null, maxOrder + 1);
+  db.prepare('INSERT INTO service_checklists (id, service_key, item_text, item_text_tr, item_text_en, item_text_me, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(id, key, itemTextTr.trim(), itemTextTr.trim(), (itemTextEn || '').trim() || null, (itemTextMe || '').trim() || null, maxOrder + 1);
   res.status(201).json(db.prepare('SELECT * FROM service_checklists WHERE id = ?').get(id));
 });
 
