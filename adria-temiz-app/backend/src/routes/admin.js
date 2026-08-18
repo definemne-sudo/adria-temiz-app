@@ -5,6 +5,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
+const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -326,7 +327,7 @@ router.get('/revenue', (req, res) => {
   const series = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
-    d.setDate(d.getDate() - i);
+    d.setUTCDate(d.getUTCDate() - i);
     const key = d.toISOString().slice(0, 10);
     series.push({ date: key, total: byDay[key] || 0 });
   }
@@ -490,25 +491,26 @@ router.post('/services/checklist/:itemId/move', (req, res) => {
 
 // --- Finans -----------------------------------------------------------------
 
+// ONEMLI: financeCalc.js'teki ayni prensip burada da gecerli - SQLite'in
+// date() fonksiyonu UTC calisir, bu yuzden JS tarafi da UTC kullanmali
+// (aksi halde personel tarafiyla admin tarafi farkli "bugun" gorebilir).
 function getFinancePeriodRange(period, offset) {
   const now = new Date();
   if (period === 'month') {
-    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    const start = new Date(target.getFullYear(), target.getMonth(), 1);
-    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0);
+    const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+    const start = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), 1));
+    const end = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0));
     return { start, end };
   }
-  const day = now.getDay();
+  const day = now.getUTCDay();
   const diffToMonday = (day === 0 ? -6 : 1 - day);
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diffToMonday + offset * 7);
-  monday.setHours(0, 0, 0, 0);
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday + offset * 7));
   const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
   return { start: monday, end: sunday };
 }
 function toDateKey(d) {
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  const y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, '0'), day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 
@@ -579,6 +581,53 @@ router.get('/finance', (req, res) => {
     totalRevenue, totalCommission, totalPayout, commissionRate: getCommissionRate(),
     paymentBreakdown, staffSettlements, jobCount: jobs.length,
   });
+});
+
+// --- Personel bazlı mutabakat (ödeme dönemleri) ------------------------------
+// ONEMLI: Burada getStaffPeriods/getStaffLifetimeTotal - personelin KENDI
+// finans ekraninda (jobs.js /finance-summary) kullandigi AYNI fonksiyonlar.
+// Admin ve personel taraflari boylece garantili olarak ayni sayilari gorur
+// (iki ayri hesaplama mantigi degil, tek ortak kaynak).
+router.get('/finance/staff', (req, res) => {
+  const staffRows = db.prepare(`SELECT id, name, current_city FROM users WHERE account_type = 'staff' ORDER BY name ASC`).all();
+  const staff = staffRows.map((s) => {
+    const periods = getStaffPeriods(s.id);
+    const unpaidPeriodCount = periods.filter((p) => !p.isPaid && (p.owedToStaff > 0 || p.owedToBusiness > 0)).length;
+    return {
+      id: s.id, name: s.name, current_city: s.current_city,
+      totalEarned: getStaffLifetimeTotal(s.id),
+      unpaidPeriodCount,
+    };
+  });
+  res.json({ staff });
+});
+
+router.get('/finance/staff/:id/periods', (req, res) => {
+  const staffRow = db.prepare(`SELECT id, name FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
+  if (!staffRow) return res.status(404).json({ error: 'Personel bulunamadı.' });
+  const periods = getStaffPeriods(req.params.id);
+  res.json({ staff: staffRow, periods });
+});
+
+// Personel kendi "Ödememi Aldım" derken de, admin burada "Ödendi
+// İşaretle" derken de AYNI staff_payment_marks kaydına, AYNI upsert
+// desenine yazılıyor (bkz. jobs.js /finance/mark-received) - iki taraf da
+// aynı mutabakat gerçeğini görür.
+router.post('/finance/staff/:id/periods/mark-paid', (req, res) => {
+  const { periodStart, periodEnd, amount } = req.body || {};
+  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'Dönem bilgisi eksik.' });
+  db.prepare(
+    `INSERT INTO staff_payment_marks (id, staff_id, period_start, period_end, amount)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(staff_id, period_start) DO UPDATE SET amount = excluded.amount, paid_at = datetime('now')`
+  ).run(uuid(), req.params.id, periodStart, periodEnd, Number(amount) || 0);
+  res.json({ message: 'Ödendi olarak işaretlendi.' });
+});
+
+router.post('/finance/staff/:id/periods/unmark-paid', (req, res) => {
+  const { periodStart } = req.body || {};
+  db.prepare('DELETE FROM staff_payment_marks WHERE staff_id = ? AND period_start = ?').run(req.params.id, periodStart);
+  res.json({ message: 'Ödeme işareti geri alındı.' });
 });
 
 // --- Ayarlar (Settings) ------------------------------------------------------
