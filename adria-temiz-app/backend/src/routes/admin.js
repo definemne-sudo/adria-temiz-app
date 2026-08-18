@@ -722,4 +722,64 @@ router.put('/account/password', (req, res) => {
   res.json({ message: 'Şifre güncellendi.' });
 });
 
+// --- Performans Paneli (personel + müşteri) ---------------------------------
+// NOT: service_score (temizliğe verilen puan) ve staff_score (personele
+// verilen puan) ayrı sütunlar. Şirket geneli "Genel Kalite Puanımız" kartı,
+// personel ortalamalarının ortalaması DEĞİL - her işin kendi puanı üzerinden
+// hesaplanıyor (çok değerlendirmesi olan personel, az olana göre daha doğru
+// ağırlıkta sayılsın diye).
+router.get('/performance/staff', (req, res) => {
+  const staffRows = db.prepare(`SELECT id, name FROM users WHERE account_type = 'staff' ORDER BY name ASC`).all();
+  const jobRows = db.prepare(`
+    SELECT assigned_staff_id, service_score, staff_score
+    FROM cleaning_jobs
+    WHERE assigned_staff_id IS NOT NULL AND (service_score IS NOT NULL OR staff_score IS NOT NULL)
+  `).all();
+
+  const byStaff = {};
+  const allCombinedScores = [];
+  jobRows.forEach((j) => {
+    if (!byStaff[j.assigned_staff_id]) {
+      byStaff[j.assigned_staff_id] = { serviceSum: 0, serviceCount: 0, staffSum: 0, staffCount: 0 };
+    }
+    const b = byStaff[j.assigned_staff_id];
+    if (j.service_score !== null) { b.serviceSum += j.service_score; b.serviceCount += 1; }
+    if (j.staff_score !== null) { b.staffSum += j.staff_score; b.staffCount += 1; }
+    if (j.service_score !== null && j.staff_score !== null) allCombinedScores.push((j.service_score + j.staff_score) / 2);
+    else if (j.staff_score !== null) allCombinedScores.push(j.staff_score);
+    else if (j.service_score !== null) allCombinedScores.push(j.service_score);
+  });
+
+  const staff = staffRows.map((s) => {
+    const b = byStaff[s.id] || { serviceSum: 0, serviceCount: 0, staffSum: 0, staffCount: 0 };
+    const serviceAvg = b.serviceCount ? Math.round((b.serviceSum / b.serviceCount) * 10) / 10 : null;
+    const staffAvg = b.staffCount ? Math.round((b.staffSum / b.staffCount) * 10) / 10 : null;
+    const overallAvg = (serviceAvg !== null && staffAvg !== null)
+      ? Math.round(((serviceAvg + staffAvg) / 2) * 10) / 10
+      : (staffAvg !== null ? staffAvg : serviceAvg);
+    const ratingCount = Math.max(b.serviceCount, b.staffCount);
+    return { id: s.id, name: s.name, serviceAvg, staffAvg, overallAvg, ratingCount };
+  }).sort((a, b) => (b.overallAvg ?? -1) - (a.overallAvg ?? -1));
+
+  const companyAvg = allCombinedScores.length
+    ? Math.round((allCombinedScores.reduce((a, b) => a + b, 0) / allCombinedScores.length) * 10) / 10
+    : null;
+
+  res.json({ companyAvg, staff });
+});
+
+router.get('/performance/customers', (req, res) => {
+  const rows = db.prepare(`
+    SELECT u.id, u.name, u.company_name, u.account_type,
+      (SELECT COUNT(*) FROM cleaning_jobs j JOIN properties p ON p.id = j.property_id WHERE p.owner_id = u.id) AS orderCount,
+      (SELECT COUNT(*) FROM promo_code_redemptions r
+         JOIN promo_codes pc ON pc.id = r.promo_code_id
+         WHERE r.customer_id = u.id AND pc.source = 'referral') AS referralUsedCount
+    FROM users u
+    WHERE u.account_type IN ('individual','company')
+    ORDER BY orderCount DESC
+  `).all();
+  res.json({ customers: rows });
+});
+
 module.exports = router;
