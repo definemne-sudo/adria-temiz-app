@@ -1,8 +1,17 @@
 const db = require('../db');
 const { calcNetEarning, getPayoutCycleDays } = require('./catalog');
 
+// ONEMLI: SQLite'in date(completed_at) fonksiyonu HER ZAMAN UTC kullanir.
+// Bu yuzden JS tarafinda "bugun" / "donem sinirlari" hesaplanirken de
+// mutlaka UTC metodlari (getUTCFullYear, getUTCDate vb.) kullanilmali.
+// Yerel saat dilimi metodlari (getFullYear, getDate) kullanilirsa, sunucu
+// UTC disinda bir saat diliminde calisiyorsa ya da gun sinirina yakin bir
+// anda calisilirsa, JS'in "bugun" dedigi tarih ile SQL'in "bugun" dedigi
+// tarih bir gun kayabilir - bu da bugun tamamlanan bir isin, hesaplanan
+// donem araligina hic girmemesine (ve o donemin sifir gorunmesine) yol
+// acar. Bu fonksiyon artik SADECE UTC kullaniyor.
 function toDateKey(d) {
-  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  const y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, '0'), day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
 function round2(n) { return Math.round(n * 100) / 100; }
@@ -39,11 +48,13 @@ function getStaffPeriods(staffId) {
 
   const periods = [];
   const cycleDays = getPayoutCycleDays();
-  let periodStart = new Date(firstJob.d + 'T00:00:00');
+  // 'Z' eki ile UTC olarak parse ediyoruz (aksi halde JS bunu yerel saat
+  // dilimiyle yorumlar - sunucu UTC disindaysa firstJob.d'nin gunu kayabilir).
+  let periodStart = new Date(firstJob.d + 'T00:00:00Z');
   const today = new Date();
   while (periodStart <= today) {
     const periodEnd = new Date(periodStart);
-    periodEnd.setDate(periodEnd.getDate() + cycleDays - 1);
+    periodEnd.setUTCDate(periodEnd.getUTCDate() + cycleDays - 1);
     const startKey = toDateKey(periodStart);
     const endKey = toDateKey(periodEnd);
     const stats = calcStaffRange(staffId, startKey, endKey);
@@ -52,7 +63,7 @@ function getStaffPeriods(staffId) {
       periodStart: startKey, periodEnd: endKey, ...stats,
       isPaid: !!mark, paidAt: mark ? mark.paid_at : null,
     });
-    periodStart.setDate(periodStart.getDate() + cycleDays);
+    periodStart.setUTCDate(periodStart.getUTCDate() + cycleDays);
   }
   return periods.reverse();
 }
