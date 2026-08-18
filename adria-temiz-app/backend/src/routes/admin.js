@@ -4,42 +4,9 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 
 const router = express.Router();
-
-// ===========================================================================
-// GEÇİCİ KURTARMA ENDPOINT'İ — admin şifresi/kullanıcı adı unutulduğunda yeni
-// bir admin hesabı oluşturmak için. requireAuth'tan ÖNCE tanımlandığı için
-// giriş yapmadan erişilebiliyor, bu yüzden bir secret ile korunuyor.
-// KULLANDIKTAN HEMEN SONRA BU BLOĞU SİL VE DEPLOY ET - kalıcı kalırsa
-// güvenlik açığı oluşturur.
-router.get('/bootstrap-recovery', (req, res) => {
-  const SECRET = 'micisto-recovery-2026-x7k9';
-  const { secret, name, username, password } = req.query;
-  if (secret !== SECRET) {
-    return res.status(403).json({ error: 'Geçersiz secret.' });
-  }
-  if (!name || !username || !password) {
-    return res.status(400).json({ error: 'name, username, password query parametreleri gerekli.' });
-  }
-  if (password.length < 6) {
-    return res.status(400).json({ error: 'Şifre en az 6 karakter olmalı.' });
-  }
-  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username.trim());
-  if (existing) {
-    return res.status(409).json({ error: 'Bu kullanıcı adı zaten alınmış, farklı bir kullanıcı adı dene.' });
-  }
-  const id = uuid();
-  const passwordHash = bcrypt.hashSync(password, 10);
-  const placeholderPhone = `admin-${id.slice(0, 8)}`;
-  db.prepare(
-    `INSERT INTO users (id, phone, name, account_type, username, password_hash, profile_completed)
-     VALUES (?, ?, ?, 'admin', ?, ?, 1)`
-  ).run(id, placeholderPhone, name.trim(), username.trim(), passwordHash);
-  res.json({ message: 'Admin hesabı oluşturuldu. Şimdi bu endpoint bloğunu koddan sil ve tekrar deploy et.', username: username.trim() });
-});
-// ===========================================================================
 
 router.use(requireAuth);
 
@@ -432,10 +399,13 @@ const PRICING_FIELDS = ['base', 'rate', 'min', 'estimatedMinutes', 'ratePerFloor
 
 // NOT: getChecklist artık services/catalog.js'te - burada import ediliyor
 // (müşteri uygulaması da aynı fonksiyonu kullanıyor, tek doğru kaynak).
+// Admin paneli düzenleme ekranı için getChecklistAllLangs kullanılıyor -
+// bu, TR/EN/ME metinlerini BİRLİKTE döner (tek dil değil), böylece admin
+// panelinde 3 dil kutusu aynı anda doldurulabiliyor.
 
 router.get('/services', (req, res) => {
-  const services = getAllServices().map((s) => ({ ...s, checklist: s.isGroup ? [] : getChecklist(s.key) }));
-  const commonAreaSubOptions = getAllCommonAreaSubOptions().map((s) => ({ ...s, checklist: getChecklist(s.key) }));
+  const services = getAllServices().map((s) => ({ ...s, checklist: s.isGroup ? [] : getChecklistAllLangs(s.key) }));
+  const commonAreaSubOptions = getAllCommonAreaSubOptions().map((s) => ({ ...s, checklist: getChecklistAllLangs(s.key) }));
   const addons = getAllAddons();
   const suppliesFees = getSuppliesFees();
   res.json({ services, commonAreaSubOptions, addons, suppliesFees });
@@ -464,15 +434,20 @@ router.put('/services/:key/pricing', (req, res) => {
   res.json({ message: 'Fiyatlandırma güncellendi.' });
 });
 
+// Yeni bir checklist maddesi ekler - ARTIK 3 DİLDE BİRDEN (itemTextTr
+// zorunlu, itemTextEn/itemTextMe opsiyonel ama admin panelindeki form
+// ikisini de gönderecek şekilde tasarlanmalı). Türkçe metin girilip diğer
+// ikisi boş bırakılırsa, o diller için checklist boş görünür - admin
+// panelindeki 3 kutuyu doldurmak asıl doğru kullanım.
 router.post('/services/:key/checklist', (req, res) => {
   const { key } = req.params;
-  const { itemText } = req.body;
-  if (!itemText || !itemText.trim()) return res.status(400).json({ error: 'Görev metni boş olamaz.' });
+  const { itemTextTr, itemTextEn, itemTextMe } = req.body;
+  if (!itemTextTr || !itemTextTr.trim()) return res.status(400).json({ error: 'Türkçe görev metni boş olamaz.' });
 
   const maxOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) AS m FROM service_checklists WHERE service_key = ?').get(key).m;
   const id = uuid();
-  db.prepare('INSERT INTO service_checklists (id, service_key, item_text, sort_order) VALUES (?, ?, ?, ?)')
-    .run(id, key, itemText.trim(), maxOrder + 1);
+  db.prepare('INSERT INTO service_checklists (id, service_key, item_text_tr, item_text_en, item_text_me, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(id, key, itemTextTr.trim(), (itemTextEn || '').trim() || null, (itemTextMe || '').trim() || null, maxOrder + 1);
   res.status(201).json(db.prepare('SELECT * FROM service_checklists WHERE id = ?').get(id));
 });
 
