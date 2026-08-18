@@ -313,6 +313,25 @@ ensureColumn('cleaning_jobs', 'staff_score', 'INTEGER');
 // harita/ETA/iletişim butonunun görünmesi bu alana bağlı.
 ensureColumn('cleaning_jobs', 'headed_out_at', 'TEXT');
 
+// --- Checklist maddelerine dil bazli sutunlar (migration) ---------------
+// Eskiden "item_text" tek dildeydi (Turkce varsayilan). Artik 3 ayri
+// sutun var. Mevcut veriler otomatik olarak Turkce sutununa tasinir.
+// ONEMLI: bu fonksiyon her sunucu baslangicinda calisir (idempotent) -
+// sutunlar zaten varsa ensureColumn (yukarida tanimli) sessizce atlar.
+function ensureChecklistLangColumns() {
+  ensureColumn('service_checklists', 'item_text_tr', 'TEXT');
+  ensureColumn('service_checklists', 'item_text_en', 'TEXT');
+  ensureColumn('service_checklists', 'item_text_me', 'TEXT');
+  // Eski "item_text" sutunundaki mevcut veriyi Turkce sutununa tasi
+  // (sadece henuz tasinmamis satirlar icin).
+  db.exec(`
+    UPDATE service_checklists
+    SET item_text_tr = item_text
+    WHERE item_text_tr IS NULL AND item_text IS NOT NULL
+  `);
+}
+ensureChecklistLangColumns();
+
 // --- Fiyatlandırma varsayımlarını bir kez tohumla ---------------------------
 // Tablo boşsa (ilk kurulum) kod içindeki başlangıç değerlerini ekler - admin
 // panelinde "boş" değil, mevcut gerçek değerlerle karşılaşır. Zaten bir
