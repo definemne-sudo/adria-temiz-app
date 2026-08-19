@@ -308,8 +308,14 @@ const TRANSLATIONS = {
     navFinance: "Finans",
     totalEarnedLabel: "Toplam Kazancın",
     currentPeriodEarnedLabel: "Bu Dönemki Kazancın",
+    tapForDetailsHint: "Detaylar ve mutabakat için dokun",
     financeJobCount: "İş sayısı",
     financeOwedToYou: "Sana ödenecek",
+    financeGrossRevenue: "Brüt ciro",
+    financeCashHeld: "Nakit (sende kalan)",
+    financeCardHeld: "Kart/Fatura (MICISTO'da kalan)",
+    financeStaffEarning: "Gerçek kazancın",
+    financeBusinessEarning: "MICISTO'nun kazancı",
     financeYouOwe: "Sistemin alacağı",
     financeNetLabel: "Net",
     markReceivedBtn: "Ödememi Aldım",
@@ -462,8 +468,14 @@ const TRANSLATIONS = {
     navFinance: "Finance",
     totalEarnedLabel: "Total Earned",
     currentPeriodEarnedLabel: "This Period's Earnings",
+    tapForDetailsHint: "Tap for details and settlement",
     financeJobCount: "Jobs",
     financeOwedToYou: "Owed to you",
+    financeGrossRevenue: "Gross revenue",
+    financeCashHeld: "Cash (kept by you)",
+    financeCardHeld: "Card/Invoice (kept by MICISTO)",
+    financeStaffEarning: "Your real earning",
+    financeBusinessEarning: "MICISTO's earning",
     financeYouOwe: "Owed to system",
     financeNetLabel: "Net",
     markReceivedBtn: "I Received My Payment",
@@ -616,8 +628,14 @@ const TRANSLATIONS = {
     navFinance: "Finansije",
     totalEarnedLabel: "Ukupno zarađeno",
     currentPeriodEarnedLabel: "Zarada ovog perioda",
+    tapForDetailsHint: "Dodirni za detalje i obračun",
     financeJobCount: "Broj poslova",
     financeOwedToYou: "Duguje ti se",
+    financeGrossRevenue: "Bruto prihod",
+    financeCashHeld: "Gotovina (kod tebe)",
+    financeCardHeld: "Kartica/Faktura (kod MICISTO)",
+    financeStaffEarning: "Tvoja stvarna zarada",
+    financeBusinessEarning: "MICISTO zarada",
     financeYouOwe: "Duguješ sistemu",
     financeNetLabel: "Neto",
     markReceivedBtn: "Primio/la sam isplatu",
@@ -1173,6 +1191,21 @@ function renderFinancePeriodCard(p, isCurrent){
       <span>${t('financeJobCount')}</span><span>${p.jobCount}</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0;">
+      <span>${t('financeGrossRevenue')}</span><span>${p.grossRevenue.toFixed(2)} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0;">
+      <span>${t('financeCashHeld')}</span><span>${p.cashHeld.toFixed(2)} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0;">
+      <span>${t('financeCardHeld')}</span><span>${p.cardHeld.toFixed(2)} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; font-weight:600; color:var(--navy); padding:6px 0; margin-top:4px; border-top:1px solid var(--line);">
+      <span>${t('financeStaffEarning')}</span><span>${p.staffEarning.toFixed(2)} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0;">
+      <span>${t('financeBusinessEarning')}</span><span>${p.businessEarning.toFixed(2)} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0; margin-top:4px;">
       <span>${t('financeOwedToYou')}</span><span>${p.owedToStaff.toFixed(2)} €</span>
     </div>
     <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--muted); padding:4px 0;">
@@ -1473,9 +1506,11 @@ function renderHome(){
   `;
 }
 
-// Toplam (ömür boyu) kazanç + son ödemeden bugüne birikmiş kazanç - iki
-// kart yan yana. financeData henüz yüklenmediyse (ilk render) sessizce
-// atlanıyor, loadAll() tamamlanınca otomatik görünür.
+// Toplam (ömür boyu) kazanç + bu dönemki GERÇEK kazanç (nakit dahil,
+// mutabakat bakiyesiyle KARIŞTIRILMAMALI - bkz. financeCalc.js) - iki kart
+// yan yana. İkinci karta tıklayınca detaylı kırılım için Finans sekmesine
+// (mutabakat ekranına) yönlendiriyoruz. financeData henüz yüklenmediyse
+// (ilk render) sessizce atlanıyor, loadAll() tamamlanınca otomatik görünür.
 function renderTotalsCards(){
   const f = state.financeData;
   if(!f) return '';
@@ -1485,9 +1520,10 @@ function renderTotalsCards(){
       <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em;">${t('totalEarnedLabel')}</div>
       <div style="font-family:'Fraunces',serif; font-size:24px; color:var(--navy); margin-top:4px;">${f.totalEarned.toFixed(2)} €</div>
     </div>
-    <div class="job-card" style="text-align:center; padding:14px 10px;">
+    <div class="job-card" id="current-period-card" style="text-align:center; padding:14px 10px; cursor:pointer;">
       <div style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em;">${t('currentPeriodEarnedLabel')}</div>
-      <div style="font-family:'Fraunces',serif; font-size:24px; color:var(--ochre); margin-top:4px;">${f.owedToStaffPending.toFixed(2)} €</div>
+      <div style="font-family:'Fraunces',serif; font-size:24px; color:var(--ochre); margin-top:4px;">${f.staffEarningPending.toFixed(2)} €</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:2px;">${t('tapForDetailsHint')}</div>
     </div>
   </div>
   `;
@@ -1830,6 +1866,11 @@ function attachHandlers(){
   if(ratingsPrev) ratingsPrev.onclick = async () => { state.ratingsOffset -= 1; await loadRatings(); };
   const ratingsNext = document.getElementById('ratings-next');
   if(ratingsNext) ratingsNext.onclick = async () => { state.ratingsOffset += 1; await loadRatings(); };
+
+  // "Bu Dönemki Kazancın" kartına tıklayınca detaylı kırılım için
+  // doğrudan Finans sekmesine (mutabakat ekranına) yönlendiriyoruz.
+  const currentPeriodCard = document.getElementById('current-period-card');
+  if(currentPeriodCard) currentPeriodCard.onclick = () => { state.page = 'finance'; render(); };
 
   const logout = document.getElementById('logout');
   if(logout) logout.onclick = () => {
