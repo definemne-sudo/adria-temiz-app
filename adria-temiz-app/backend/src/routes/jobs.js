@@ -636,7 +636,12 @@ router.get('/finance-summary', (req, res) => {
   const owedToStaffPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToStaff, 0));
   const owedToBusinessPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToBusiness, 0));
   const pendingNet = round2(owedToStaffPending - owedToBusinessPending);
-  res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet });
+  // staffEarningPending: personelin bu odenmemis donem(ler)deki GERCEK
+  // kazanci (nakit dahil, odeme yontemi farketmeksizin) - "Bu donemki
+  // kazancin" karti bunu gosterir, mutabakat (owedToStaffPending) ile
+  // KARISTIRILMAMALI - ikisi kasitli olarak farkli rakamlardir.
+  const staffEarningPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.staffEarning, 0));
+  res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet, staffEarningPending });
 });
 
 // Personel "Ödememi Aldım" dediğinde, admin'in "Ödendi İşaretle" dediğinde
