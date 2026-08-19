@@ -16,18 +16,47 @@ function toDateKey(d) {
 }
 function round2(n) { return Math.round(n * 100) / 100; }
 
+// Bir personelin belirli bir tarih aralığındaki TÜM finansal kırılımını
+// hesaplar. Ayrım şu:
+// - staffEarning: personelin bu aralıkta yaptığı işlerden GERÇEK kazancı
+//   (ödeme yöntemi ne olursa olsun - nakit dahil). Personelin kendi
+//   ekranındaki "Bu dönemki kazancın" kartı bunu gösterir.
+// - owedToStaff / owedToBusiness / netSettlement: MUTABAKAT - yani şu an
+//   kimin kimde parası var, kim kime ne kadar ödeyecek. Nakit işlerde para
+//   zaten personelde olduğu için o iş için "owedToStaff" ARTMAZ (personel
+//   zaten almış) - bunun yerine personel, o işin komisyon payını işletmeye
+//   borçlanır (owedToBusiness). Bu yüzden tamamen nakit bir dönemde
+//   netSettlement 0 ya da negatif çıkabilir - bu bir hata değil, personel
+//   parayı zaten elden aldığı için işletmenin ayrıca ödeyecek bir şeyi
+//   kalmamış demektir. "Kazanç" ile "mutabakat" kasıtlı olarak FARKLI
+//   iki rakamdır.
 function calcStaffRange(staffId, startKey, endKey) {
   const jobs = db
     .prepare(`SELECT price, payment_method FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done' AND date(completed_at) BETWEEN ? AND ?`)
     .all(staffId, startKey, endKey);
   let owedToStaff = 0, owedToBusiness = 0;
+  let grossRevenue = 0, cashHeld = 0, cardHeld = 0, staffEarning = 0, businessEarning = 0;
   jobs.forEach((j) => {
     const net = calcNetEarning(j.price);
-    if (j.payment_method === 'cash') owedToBusiness += (j.price - net);
-    else owedToStaff += net;
+    const commission = j.price - net;
+    grossRevenue += j.price;
+    staffEarning += net;
+    businessEarning += commission;
+    if (j.payment_method === 'cash') {
+      cashHeld += j.price;
+      owedToBusiness += commission;
+    } else {
+      cardHeld += j.price;
+      owedToStaff += net;
+    }
   });
   return {
     jobCount: jobs.length,
+    grossRevenue: round2(grossRevenue),
+    cashHeld: round2(cashHeld),
+    cardHeld: round2(cardHeld),
+    staffEarning: round2(staffEarning),
+    businessEarning: round2(businessEarning),
     owedToStaff: round2(owedToStaff),
     owedToBusiness: round2(owedToBusiness),
     netSettlement: round2(owedToStaff - owedToBusiness),
