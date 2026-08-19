@@ -373,6 +373,12 @@ tr: {
   settlementHint: "Nakit işlerde para personelde — bize komisyonu ödemeli. Kart/fatura işlerinde para bizde — biz personele net kazancını ödemeliyiz.",
   colStaffName: "Personel",
   colCashJobs: "Nakit İşler",
+  financeJobCountLabel: "İş sayısı",
+  financeGrossRevenueLabel: "Brüt ciro",
+  financeCashHeldLabel: "Nakit (personelde kalan)",
+  financeCardHeldLabel: "Kart/Fatura (MICISTO'da kalan)",
+  financeStaffEarningLabel: "Personelin gerçek kazancı",
+  financeBusinessEarningLabel: "MICISTO'nun kazancı",
   colCardInvoiceJobs: "Kart/Fatura İşleri",
   colNetSettlement: "Net Durum",
   settlementBusinessOwes: "Biz {{amount}}€ borçluyuz",
@@ -727,6 +733,12 @@ en: {
   settlementHint: "On cash jobs, the money is with the staff — they owe us the commission. On card/invoice jobs, the money is with us — we owe the staff their net earnings.",
   colStaffName: "Staff",
   colCashJobs: "Cash Jobs",
+  financeJobCountLabel: "Job count",
+  financeGrossRevenueLabel: "Gross revenue",
+  financeCashHeldLabel: "Cash (kept by staff)",
+  financeCardHeldLabel: "Card/Invoice (kept by MICISTO)",
+  financeStaffEarningLabel: "Staff's real earning",
+  financeBusinessEarningLabel: "MICISTO's earning",
   colCardInvoiceJobs: "Card/Invoice Jobs",
   colNetSettlement: "Net Status",
   settlementBusinessOwes: "We owe {{amount}}€",
@@ -1077,6 +1089,12 @@ me: {
   settlementHint: "Kod gotovinskih poslova novac je kod osoblja — oni nama duguju proviziju. Kod poslova karticom/fakturom novac je kod nas — mi dugujemo osoblju njihovu neto zaradu.",
   colStaffName: "Osoblje",
   colCashJobs: "Gotovinski poslovi",
+  financeJobCountLabel: "Broj poslova",
+  financeGrossRevenueLabel: "Bruto prihod",
+  financeCashHeldLabel: "Gotovina (kod osoblja)",
+  financeCardHeldLabel: "Kartica/Faktura (kod MICISTO)",
+  financeStaffEarningLabel: "Stvarna zarada osoblja",
+  financeBusinessEarningLabel: "MICISTO zarada",
   colCardInvoiceJobs: "Poslovi karticom/fakturom",
   colNetSettlement: "Neto stanje",
   settlementBusinessOwes: "Mi dugujemo {{amount}}€",
@@ -1965,33 +1983,64 @@ function renderStaffPeriods(){
   <button class="btn ghost btn-sm" id="back-to-staff-list" style="margin-bottom:14px;">‹ ${T.financeBackToStaff}</button>
   <h3 style="margin-bottom:14px;">${data.staff.name}</h3>
   ${data.periods.length === 0 ? `<div class="empty-state">${T.financeNoPeriodsYet}</div>` : `
-    <table>
-      <thead><tr>
-        <th>${T.colPeriod}</th><th>${T.colCashJobs}</th><th>${T.colCardInvoiceJobs}</th><th>${T.colNetSettlement}</th><th>${T.colPaidStatus}</th><th></th>
-      </tr></thead>
-      <tbody>
-        ${data.periods.map(p => `
-          <tr>
-            <td>${new Date(p.periodStart+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})} – ${new Date(p.periodEnd+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
-            <td>${p.owedToBusiness} €</td>
-            <td>${p.owedToStaff} €</td>
-            <td>
-              ${p.netSettlement > 0 ? `<span style="color:var(--sage-dark); font-weight:700;">${tt('settlementBusinessOwes',{amount:p.netSettlement})}</span>`
-                : p.netSettlement < 0 ? `<span style="color:var(--danger); font-weight:700;">${tt('settlementStaffOwes',{amount:Math.abs(p.netSettlement)})}</span>`
-                : `<span style="color:var(--muted);">${T.settlementEven}</span>`}
-            </td>
-            <td>${p.isPaid ? `<span class="status-pill status-done">${T.paidLabel}</span>` : `<span class="status-pill" style="background:#F2DADA; color:#A13A3A;">${T.unpaidLabel}</span>`}</td>
-            <td>
-              ${p.isPaid
-                ? `<button type="button" class="btn ghost btn-sm" data-unmark-paid="${p.periodStart}">${T.undoBtn}</button>`
-                : `<button type="button" class="btn ochre btn-sm" data-mark-paid="${p.periodStart}" data-mark-paid-end="${p.periodEnd}" data-mark-paid-amount="${p.netSettlement}">${T.markPaidBtn}</button>`}
-            </td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+    <div style="display:flex; flex-direction:column; gap:12px; max-width:480px;">
+      ${data.periods.map(p => renderAdminPeriodCard(p)).join('')}
+    </div>
   `}
   `;
+}
+
+// Personel tarafındaki (staff-frontend) mutabakat kartıyla BİREBİR AYNI
+// kırılımı gösteriyor - admin ile personelin gördüğü sayılar arasında
+// hiçbir fark olmamalı, ikisi de aynı financeCalc.js fonksiyonundan geliyor.
+function renderAdminPeriodCard(p){
+  const isPositive = p.netSettlement >= 0;
+  return `
+  <div class="panel-card" style="padding:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div style="font-size:13.5px; font-weight:700; color:var(--navy);">
+        ${new Date(p.periodStart+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})} – ${new Date(p.periodEnd+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}
+      </div>
+      ${p.isPaid ? `<span class="status-pill status-done">${T.paidLabel}</span>` : `<span class="status-pill" style="background:#F2DADA; color:#A13A3A;">${T.unpaidLabel}</span>`}
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.financeJobCountLabel}</span><span>${p.jobCount}</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.financeGrossRevenueLabel}</span><span>${p.grossRevenue} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.financeCashHeldLabel}</span><span>${p.cashHeld} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.financeCardHeldLabel}</span><span>${p.cardHeld} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:13px; font-weight:600; color:var(--navy); padding:6px 0; margin-top:4px; border-top:1px solid var(--line);">
+      <span>${T.financeStaffEarningLabel}</span><span>${p.staffEarning} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.financeBusinessEarningLabel}</span><span>${p.businessEarning} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0; margin-top:4px;">
+      <span>${T.colCashJobs}</span><span>${p.owedToBusiness} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--muted); padding:3px 0;">
+      <span>${T.colCardInvoiceJobs}</span><span>${p.owedToStaff} €</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:14.5px; font-weight:700; padding-top:8px; margin-top:6px; border-top:1px dashed var(--line);">
+      <span>${T.colNetSettlement}</span>
+      <span>
+        ${p.netSettlement > 0 ? `<span style="color:var(--sage-dark);">${tt('settlementBusinessOwes',{amount:p.netSettlement})}</span>`
+          : p.netSettlement < 0 ? `<span style="color:var(--danger);">${tt('settlementStaffOwes',{amount:Math.abs(p.netSettlement)})}</span>`
+          : `<span style="color:var(--muted);">${T.settlementEven}</span>`}
+      </span>
+    </div>
+    <div style="margin-top:10px;">
+      ${p.isPaid
+        ? `<button type="button" class="btn ghost btn-sm" style="width:100%;" data-unmark-paid="${p.periodStart}">${T.undoBtn}</button>`
+        : `<button type="button" class="btn ochre btn-sm" style="width:100%;" data-mark-paid="${p.periodStart}" data-mark-paid-end="${p.periodEnd}" data-mark-paid-amount="${p.netSettlement}">${T.markPaidBtn}</button>`}
+    </div>
+  </div>`;
 }
 
 /* ---- Alt sayfa: İptal/İadeler ---- */
