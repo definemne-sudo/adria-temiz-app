@@ -69,7 +69,7 @@
   .nav-item svg{ width:16px; height:16px; flex-shrink:0; opacity:.85; }
   .nav-item.active{ background:rgba(255,255,255,.12); color:#fff; }
   .nav-item.active svg{ opacity:1; }
-  .nav-item .badge-count{ background:var(--ochre); color:#fff; font-size:9.5px; font-weight:700; border-radius:20px; padding:1px 6px; margin-left:auto; }
+  .nav-item .badge-count{ background:#E5342B; color:#fff; font-size:9.5px; font-weight:700; border-radius:20px; padding:1px 6px; margin-left:auto; }
   .sidebar .spacer{flex:1;}
   .lang-switch{display:flex; gap:4px; margin-top:10px; margin-bottom:12px;}
   .lang-switch button{
@@ -487,6 +487,10 @@ tr: {
   revenueOverviewTitle: "Ciro Görünümü (Son 7 Gün)",
   revenueVsPrevious: "önceki döneme göre",
   navSupport: "Destek",
+  newOrderNotifTitle: "Yeni Sipariş",
+  newOrderNotifBody: "Yeni bir sipariş geldi, kontrol et.",
+  newChatNotifTitle: "Yeni Mesaj",
+  newChatNotifBody: "Bir müşteriden yeni destek mesajı geldi.",
   supportTitle: "Destek Sohbetleri",
   supportSubtitle: "Müşterilerin gönderdiği mesajlar.",
   noChats: "Henüz mesaj yok.",
@@ -844,6 +848,10 @@ en: {
   revenueOverviewTitle: "Revenue Overview (Last 7 Days)",
   revenueVsPrevious: "vs previous period",
   navSupport: "Support",
+  newOrderNotifTitle: "New Booking",
+  newOrderNotifBody: "A new booking just came in, take a look.",
+  newChatNotifTitle: "New Message",
+  newChatNotifBody: "A customer sent a new support message.",
   supportTitle: "Support Chats",
   supportSubtitle: "Messages sent by customers.",
   noChats: "No messages yet.",
@@ -1200,6 +1208,10 @@ me: {
   revenueOverviewTitle: "Pregled prihoda (posljednjih 7 dana)",
   revenueVsPrevious: "u odnosu na prethodni period",
   navSupport: "Podrška",
+  newOrderNotifTitle: "Nova narudžba",
+  newOrderNotifBody: "Stigla je nova narudžba, provjeri.",
+  newChatNotifTitle: "Nova poruka",
+  newChatNotifBody: "Klijent je poslao novu poruku podrške.",
   supportTitle: "Razgovori podrške",
   supportSubtitle: "Poruke koje su poslali klijenti.",
   noChats: "Još nema poruka.",
@@ -1419,7 +1431,7 @@ function renderPanel(){
   <div class="sidebar">
     <div class="brand">${BRAND_MARK.replace('<svg ', '<svg width="30" height="30" ')}<h1>MICISTOMan</h1></div>
     ${navItem('dashboard', 'dashboard', T.navDashboard)}
-    ${navItem('bookings', 'bookings', T.navBookings)}
+    ${navItem('bookings', 'bookings', T.navBookings, state.dashboard && state.dashboard.stats.pendingJobs)}
     ${navItem('workers', 'workers', T.navWorkers)}
     ${navItem('customers', 'customers', T.navCustomers)}
     ${navItem('services', 'services', T.navServices)}
@@ -2777,6 +2789,99 @@ async function loadLiveLocations(){
   render();
 }
 
+// ============================================================================
+// SESLİ UYARI + MASAÜSTÜ BİLDİRİMİ
+// ============================================================================
+// Yeni sipariş ya da yeni destek mesajı geldiğinde, admin panelin hangi
+// sayfasında olursa olsun (hatta başka bir sekme/uygulamaya bakıyorken bile)
+// haberdar olsun diye: 1) kısa bir bip sesi çalar, 2) tarayıcı izin verdiyse
+// masaüstü bildirimi gösterir. Harici bir ses dosyasına ihtiyaç yok - Web
+// Audio API ile anlık üretiliyor.
+function playAlertBeep(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const playTone = (freq, startTime, duration) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = freq;
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + startTime);
+      gain.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+      osc.start(ctx.currentTime + startTime);
+      osc.stop(ctx.currentTime + startTime + duration + 0.02);
+    };
+    // iki kisa, yukselen ton - dikkat cekici ama rahatsiz etmeyen bir "ding-dong"
+    playTone(880, 0, 0.16);
+    playTone(1175, 0.16, 0.2);
+  }catch(e){ /* tarayici ses calmaya izin vermiyorsa sessizce gec */ }
+}
+
+// Tarayici masaustu bildirim izni - ilk girişte bir kez sorulur. Kullanici
+// reddederse bir daha sormuyoruz (tarayicinin kendi davranisi), sadece
+// sesli uyari calismaya devam eder.
+function requestNotificationPermission(){
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().catch(() => {});
+  }
+}
+function showDesktopNotification(title, body){
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  try{
+    const n = new Notification(title, { body, icon: 'icon-micisto-512.png' });
+    n.onclick = () => { window.focus(); n.close(); };
+  }catch(e){}
+}
+
+// Global arka plan kontrolu: sayfa hangi sekmede olursa olsun (Dashboard,
+// Finans, Ayarlar fark etmez) 15 saniyede bir bekleyen siparis ve okunmamis
+// mesaj sayisini kontrol eder. Sayi ONCEKINE gore ARTMISSA (yeni bir kayit
+// geldiyse) sesli + masaustu uyari tetiklenir. İlk kontrolde (referans deger
+// henuz yokken) alarm CALINMAZ - sayfa yeni acildiginda var olan bekleyen
+// siparisler icin gereksiz bip calmasin diye.
+let globalAlertPollInterval = null;
+let lastKnownPendingJobs = null;
+let lastKnownUnreadChats = null;
+
+async function checkForNewAlerts(){
+  if(!state.token) return;
+  try{
+    const data = await api('/admin/dashboard');
+    const newPendingJobs = data.stats.pendingJobs;
+    const newUnreadChats = data.stats.unreadChats;
+
+    if(lastKnownPendingJobs !== null && newPendingJobs > lastKnownPendingJobs){
+      playAlertBeep();
+      showDesktopNotification(T.newOrderNotifTitle, T.newOrderNotifBody);
+    }
+    if(lastKnownUnreadChats !== null && newUnreadChats > lastKnownUnreadChats){
+      playAlertBeep();
+      showDesktopNotification(T.newChatNotifTitle, T.newChatNotifBody);
+    }
+    lastKnownPendingJobs = newPendingJobs;
+    lastKnownUnreadChats = newUnreadChats;
+
+    // Nav rozetlerinin (Siparişler/Destek) hangi sayfada olursak olalım
+    // güncel kalması için dashboard verisini de tazeliyoruz.
+    if(state.dashboard){
+      state.dashboard.stats.pendingJobs = newPendingJobs;
+      state.dashboard.stats.unreadChats = newUnreadChats;
+      render();
+    }
+  }catch(e){ /* sessizce geç, bir sonraki denemede tekrar dener */ }
+}
+
+function startGlobalAlertPolling(){
+  stopGlobalAlertPolling();
+  globalAlertPollInterval = setInterval(checkForNewAlerts, 15000);
+}
+function stopGlobalAlertPolling(){
+  if(globalAlertPollInterval){ clearInterval(globalAlertPollInterval); globalAlertPollInterval = null; }
+  lastKnownPendingJobs = null;
+  lastKnownUnreadChats = null;
+}
+
 // WebSocket kurmadan "canlı" hissi vermek için basit periyodik yenileme -
 // yalnızca admin Dashboard'dayken çalışır, başka sayfaya geçince durur
 // (gereksiz istek atmasın diye).
@@ -2970,6 +3075,10 @@ function attachHandlers(){
     try{ await loadRevenue(); }catch(err){ console.error('loadRevenue hata:', err); }
     try{ await loadLiveLocations(); startLiveMapPolling(); }catch(err){ console.error('loadLiveLocations hata:', err); }
     try{ await loadApplications(); }catch(err){ console.error('loadApplications hata:', err); }
+    // Sesli uyarı + masaüstü bildirimi: hangi sayfada olursak olalım
+    // arka planda çalışsın diye giriş sonrası hemen başlatıyoruz.
+    requestNotificationPermission();
+    startGlobalAlertPolling();
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
@@ -3325,6 +3434,7 @@ function attachHandlers(){
     stopLiveMapPolling();
     stopChatPolling();
     stopPerformancePolling();
+    stopGlobalAlertPolling();
     localStorage.removeItem('adminToken'); localStorage.removeItem('adminUser');
     state.token = null; state.user = null; render();
   };
@@ -3400,6 +3510,8 @@ function attachHandlers(){
     try{ await loadRevenue(); }catch(err){ console.error('loadRevenue hata:', err); }
     try{ await loadLiveLocations(); startLiveMapPolling(); }catch(err){ console.error('loadLiveLocations hata:', err); }
     try{ await loadApplications(); }catch(err){ console.error('loadApplications hata:', err); }
+    requestNotificationPermission();
+    startGlobalAlertPolling();
   }
 })();
 </script>
