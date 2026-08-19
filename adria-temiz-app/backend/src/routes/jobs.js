@@ -494,20 +494,43 @@ router.get('/ratings', (req, res) => {
   const startKey = toDateKey(start);
   const endKey = toDateKey(end);
 
+  // ONEMLI: service_score (temizlige verilen puan) da SELECT'e dahil -
+  // personel artik SADECE kendisine verilen puani degil, temizlige
+  // verilen puani da goruyor. WHERE kosulu da artik iki puandan HERHANGI
+  // BIRI varsa isi listeye aliyor (eskiden sadece staff_score
+  // doluysa listeleniyordu - sadece service_score girilmis bir degerlendirme
+  // tamamen kayboluyordu).
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.service_params, j.completed_at, j.staff_score, j.staff_feedback,
+      `SELECT j.id, j.service_key, j.service_params, j.completed_at,
+              j.service_score, j.service_feedback, j.staff_score, j.staff_feedback,
               p.name AS property_name, p.city AS property_city
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status = 'done' AND j.staff_score IS NOT NULL
+       WHERE j.assigned_staff_id = ? AND j.status = 'done'
+         AND (j.staff_score IS NOT NULL OR j.service_score IS NOT NULL)
          AND date(j.completed_at) BETWEEN ? AND ?
        ORDER BY j.completed_at DESC`
     )
     .all(req.user.id, startKey, endKey);
 
   const totalRated = rows.length;
-  const avgScore = totalRated ? Math.round((rows.reduce((sum, r) => sum + r.staff_score, 0) / totalRated) * 10) / 10 : null;
+  // Genel ortalama: her isin kendi ici ortalamasi (iki puan da varsa
+  // ortalamalari, sadece biri varsa o) uzerinden hesaplaniyor - staff-frontend
+  // ile birebir ayni mantik, iki taraf da ayni sayiyi gorur.
+  const combinedScores = rows
+    .map((r) => {
+      const hasService = r.service_score !== null && r.service_score !== undefined;
+      const hasStaff = r.staff_score !== null && r.staff_score !== undefined;
+      if (hasService && hasStaff) return (r.service_score + r.staff_score) / 2;
+      if (hasStaff) return r.staff_score;
+      if (hasService) return r.service_score;
+      return null;
+    })
+    .filter((v) => v !== null);
+  const avgScore = combinedScores.length
+    ? Math.round((combinedScores.reduce((a, b) => a + b, 0) / combinedScores.length) * 10) / 10
+    : null;
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
