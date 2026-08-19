@@ -250,7 +250,46 @@ const NAV_ICONS = {
 // Dağıtım motoru şehir eşleşmesiyle çalışıyor - personelin hangi şehirde
 // çalıştığını seçmesi gerekiyor (otomatik ters coğrafi kodlama için ücretli
 // bir harita API'si gerekir, şimdilik personel kendi seçiyor).
-const MONTENEGRO_CITIES = ['Podgorica','Budva','Kotor','Tivat','Bar','Herceg Novi','Nikšić','Cetinje','Ulcinj','Igalo'];
+// ONEMLI: Bu liste musteri tarafiyla (frontend/index.html) BIREBIR AYNI
+// olmali - aksi halde personelin "current_city"si ile mulkun "city"si asla
+// eslesmez, dispatch (yeni is bildirimi) hic calismaz. Eskiden burada 10
+// sehirlik, koordinatsiz, kismen farkli isimli (orn. "Igalo" - musteri
+// tarafinda hic yok) ayri bir liste vardi - bu YAPISAL BIR HATAYDI.
+const MONTENEGRO_CITIES = [
+  { name: 'Podgorica', lat: 42.4304, lng: 19.2594 },
+  { name: 'Nikšić', lat: 42.7731, lng: 18.9447 },
+  { name: 'Herceg Novi', lat: 42.4531, lng: 18.5375 },
+  { name: 'Budva', lat: 42.2864, lng: 18.8400 },
+  { name: 'Bar', lat: 42.0930, lng: 19.0904 },
+  { name: 'Cetinje', lat: 42.3906, lng: 18.9243 },
+  { name: 'Bijelo Polje', lat: 43.0367, lng: 19.7475 },
+  { name: 'Kotor', lat: 42.4247, lng: 18.7712 },
+  { name: 'Tivat', lat: 42.4364, lng: 18.6961 },
+  { name: 'Ulcinj', lat: 41.9297, lng: 19.2044 },
+  { name: 'Rožaje', lat: 42.8408, lng: 20.1667 },
+  { name: 'Pljevlja', lat: 43.3567, lng: 19.3583 },
+  { name: 'Danilovgrad', lat: 42.5539, lng: 19.1064 },
+  { name: 'Berane', lat: 42.8461, lng: 19.8681 },
+  { name: 'Kolašin', lat: 42.8236, lng: 19.5203 },
+  { name: 'Mojkovac', lat: 42.9611, lng: 19.5836 },
+  { name: 'Plav', lat: 42.5972, lng: 19.9433 },
+  { name: 'Žabljak', lat: 43.1544, lng: 19.1225 },
+  { name: 'Petnjica', lat: 42.9006, lng: 19.9078 },
+  { name: 'Gusinje', lat: 42.5578, lng: 19.8339 },
+  { name: 'Plužine', lat: 43.1533, lng: 18.8467 },
+  { name: 'Šavnik', lat: 42.9578, lng: 19.0967 },
+  { name: 'Andrijevica', lat: 42.7358, lng: 19.7897 },
+];
+// Verilen GPS konumuna en yakin Karadag sehrini bulur - personel "Cevrimici
+// Ol" dedigi anda, elle sehir secmesine GEREK KALMADAN otomatik hesaplanir.
+function nearestMontenegroCity(lat, lng){
+  let best = null, bestDist = Infinity;
+  for(const c of MONTENEGRO_CITIES){
+    const d = Math.hypot(c.lat - lat, c.lng - lng);
+    if(d < bestDist){ bestDist = d; best = c; }
+  }
+  return best ? best.name : null;
+}
 
 const COUNTRY_CODES = [
   { flag:'🇲🇪', name:'Crna Gora', code:'+382' },
@@ -1460,9 +1499,14 @@ async function ensurePushSubscription(){
   }catch(e){ return false; }
 }
 
-// Çevrimiçi olma akışı: konumu al, push aboneliğini kaydet, sunucuya
+// Çevrimiçi olma akışı: konumu al, o konumdan en yakın MICISTO hizmet
+// şehrini OTOMATİK hesapla, push aboneliğini kaydet, sunucuya
 // isOnline+konum+şehir bilgisini gönder. Konum alınamazsa çevrimiçi
 // olmuyoruz (personelin nereye yakın olduğunu bilemeyiz).
+// ONEMLI: sehir artik personelin elle sectigi/kaydettigi eski bir deger
+// DEGIL - her cevrimici olusta GPS'ten TAZE hesaplaniyor. Boylece hem
+// "hic sehir secilmemis" durumu yapisal olarak imkansiz hale geliyor, hem
+// de sehirler arasi seyahat eden personel icin de dogru calisiyor.
 async function goOnlineWithLocation(){
   const loc = await requestMyLocation();
   if(!loc){
@@ -1471,12 +1515,14 @@ async function goOnlineWithLocation(){
     return;
   }
   state.myLocation = loc;
+  const detectedCity = nearestMontenegroCity(loc.lat, loc.lng);
   await ensurePushSubscription();
   try{
     await api('/auth/staff-status', { method:'PATCH', body: JSON.stringify({
-      isOnline: true, lat: loc.lat, lng: loc.lng, city: state.user.city,
+      isOnline: true, lat: loc.lat, lng: loc.lng, city: detectedCity,
     })});
     state.user.isOnline = true;
+    state.user.city = detectedCity;
     storeSession(state.token, state.user, state.keepSignedIn);
     await loadAll();
   }catch(err){ showToast(err.message); render(); }
@@ -1890,27 +1936,11 @@ function attachHandlers(){
       }catch(err){ showToast(err.message); render(); }
       return;
     }
-    // Çevrimiçi olmak icin: sehir bilinmiyorsa once sec, sonra konum al,
-    // push aboneligini kaydet, en son sunucuya bildir.
-    if(!state.user.city){
-      onlineToggle.checked = false; // secim onaylanana kadar anahtari geri al
-      state.showCityPicker = true;
-      render();
-      return;
-    }
+    // Çevrimiçi olmak için: konumu al, en yakın MICISTO şehrini otomatik
+    // hesapla, push aboneliğini kaydet, sunucuya bildir. Artık elle şehir
+    // seçmeye GEREK YOK - goOnlineWithLocation() bunu GPS'ten kendisi bulur.
     await goOnlineWithLocation();
   };
-
-  const confirmCity = document.getElementById('confirm-city');
-  if(confirmCity) confirmCity.onclick = async () => {
-    const city = document.getElementById('city-select').value;
-    state.user.city = city;
-    storeSession(state.token, state.user, state.keepSignedIn);
-    state.showCityPicker = false;
-    await goOnlineWithLocation();
-  };
-  const cityBackdrop = document.getElementById('city-backdrop');
-  if(cityBackdrop) cityBackdrop.onclick = (e) => { if(e.target===cityBackdrop){ state.showCityPicker=false; render(); } };
 
   const checkOffersBtn = document.getElementById('check-offers-btn');
   if(checkOffersBtn) checkOffersBtn.onclick = async () => {
