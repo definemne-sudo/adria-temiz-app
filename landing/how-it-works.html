@@ -274,6 +274,7 @@
         <button data-lang="me">CG</button>
         <button data-lang="en">EN</button>
         <button data-lang="tr" class="active">TR</button>
+        <button data-lang="ru">RU</button>
       </div>
       <a href="https://app.micisto.com" class="nav-cta" data-i18n="navCta">Uygulamayı Aç</a>
     </div>
@@ -409,10 +410,10 @@
 // index.html, hizmetler.html/services.html/usluge.html ve gelecekteki
 // tum sayfalarda BIREBIR AYNI bu obje bulunmali.
 const PAGE_ROUTES = {
-  home: { tr: 'index.html', en: 'index.html', me: 'index.html' },
-  services: { tr: 'hizmetler.html', en: 'services.html', me: 'usluge.html' },
-  howItWorks: { tr: 'nasil-calisir.html', en: 'how-it-works.html', me: 'kako-funkcionise.html' },
-  becomeStaff: { tr: 'micistorad-ol.html', en: 'become-micistorad.html', me: 'postani-micistorad.html' },
+  home: { tr: 'index.html', en: 'index.html', me: 'index.html', ru: 'index.html' },
+  services: { tr: 'hizmetler.html', en: 'services.html', me: 'usluge.html', ru: 'uslugi.html' },
+  howItWorks: { tr: 'nasil-calisir.html', en: 'how-it-works.html', me: 'kako-funkcionise.html', ru: 'kak-eto-rabotaet.html' },
+  becomeStaff: { tr: 'micistorad-ol.html', en: 'become-micistorad.html', me: 'postani-micistorad.html', ru: 'stan-micistorad.html' },
 };
 // Bu dosyanin PAGE_ROUTES icindeki kendi kimligi - her sayfada degisir.
 const CURRENT_PAGE = 'howItWorks';
