@@ -183,6 +183,7 @@
         <button data-lang="me" class="active">CG</button>
         <button data-lang="en">EN</button>
         <button data-lang="tr">TR</button>
+        <button data-lang="ru">RU</button>
       </div>
       <a href="https://app.micisto.com" class="nav-cta" data-i18n="navCta">Uygulamayı Aç</a>
     </div>
@@ -369,10 +370,10 @@
 // index.html, hizmetler.html/services.html/usluge.html ve gelecekteki
 // tum sayfalarda BIREBIR AYNI bu obje bulunmali.
 const PAGE_ROUTES = {
-  home: { tr: 'index.html', en: 'index.html', me: 'index.html' },
-  services: { tr: 'hizmetler.html', en: 'services.html', me: 'usluge.html' },
-  howItWorks: { tr: 'nasil-calisir.html', en: 'how-it-works.html', me: 'kako-funkcionise.html' },
-  becomeStaff: { tr: 'micistorad-ol.html', en: 'become-micistorad.html', me: 'postani-micistorad.html' },
+  home: { tr: 'index.html', en: 'index.html', me: 'index.html', ru: 'index.html' },
+  services: { tr: 'hizmetler.html', en: 'services.html', me: 'usluge.html', ru: 'uslugi.html' },
+  howItWorks: { tr: 'nasil-calisir.html', en: 'how-it-works.html', me: 'kako-funkcionise.html', ru: 'kak-eto-rabotaet.html' },
+  becomeStaff: { tr: 'micistorad-ol.html', en: 'become-micistorad.html', me: 'postani-micistorad.html', ru: 'stan-micistorad.html' },
 };
 // Bu dosyanin PAGE_ROUTES icindeki kendi kimligi - her sayfada degisir.
 const CURRENT_PAGE = 'home';
@@ -458,6 +459,33 @@ const TRANSLATIONS = {
     footerTagline: "Pijaca usluga čišćenja u Crnoj Gori.", footerColProduct: "Proizvod", footerColLegal: "Pravno",
     footerPrivacy: "Politika Privatnosti", footerTerms: "Uslovi Korišćenja", footerRights: "Sva prava zadržana.", footerLocation: "Dizajnirano u Crnoj Gori 🇲🇪",
     screenshotSrc: "real-services-screen-me.png",
+  },
+  ru: {
+    pageTitle: "MICISTO — Приложение для уборки в Черногории",
+    navServices: "Услуги", navHow: "Как это работает", navStaff: "Стать MICISTORad", navCta: "Открыть приложение",
+    heroEyebrow: "ПРИЛОЖЕНИЕ ДЛЯ УБОРКИ В ЧЕРНОГОРИИ",
+    heroHeadline: "Один клик —<br><em>чистый дом.</em>",
+    heroSub: "Проверенные и обученные профессиональные клинеры, отслеживание в реальном времени — для всех, кому нужна уборка.",
+    heroCtaPrimary: "Заказать сейчас →", heroCtaSecondary: "Как это работает?",
+    proof1: "Проверенная команда", proof2: "Прозрачные цены", proof3: "Отслеживание в реальном времени",
+    trustEyebrow: "ПОЧЕМУ MICISTO",
+    trustHeadline: "Доверяй системе,<br><em>а не удаче.</em>",
+    pillar1Title: "Одинаковое качество", pillar1Desc: "Кто бы ни пришёл — тот же стандарт и процесс работы.",
+    pillar2Title: "Прозрачная цена", pillar2Desc: "Вы знаете стоимость ещё до оформления заказа.",
+    pillar3Title: "Никаких поисков", pillar3Desc: "Больше не нужно искать клинера и спрашивать у знакомых.",
+    svcEyebrow: "УСЛУГИ", svcHeadline: "Выберите подходящую услугу",
+    svc1Title: "Уборка Airbnb/Booking", svc1Desc: "Быстрая уборка между выездом и заездом гостей.", svc1Price: "От 40 €",
+    svc2Title: "Генеральная уборка", svc2Desc: "Уборка с учётом всех деталей: шкафы, духовка, окна.", svc2Price: "От 55 €",
+    svc3Title: "Уборка офиса", svc3Desc: "Профессиональная уборка рабочих пространств.", svc3Price: "От 35 €",
+    svc4Title: "Уборка общих зон", svc4Desc: "Уборка лестниц, коридоров, лифтов.", svc4Price: "По квадратным метрам",
+    howEyebrow: "КАК ЭТО РАБОТАЕТ", howHeadline: "Услуга у вашей двери за 3 шага",
+    how1Title: "Выберите услугу", how1Desc: "Выберите нужную услугу и объект, укажите время.",
+    how2Title: "Подтвердите", how2Desc: "Узнайте цену и подтвердите заказ — без скрытых платежей.",
+    how3Title: "Следите и расслабьтесь", how3Desc: "Отслеживайте местоположение персонала в пути, получите уведомление по завершении.",
+    staffHeadline: "Присоединяйся к команде MICISTORad, будь сам себе боссом!", staffLine1: "Присоединяйся к команде MICISTORad, работай когда и сколько хочешь!", staffLine2: "Подай заявку, получи одобрение, начни зарабатывать сразу!", staffCta: "Стать MICISTORad →",
+    footerTagline: "Маркетплейс клининговых услуг Черногории.", footerColProduct: "Продукт", footerColLegal: "Правовая информация",
+    footerPrivacy: "Политика конфиденциальности", footerTerms: "Условия использования", footerRights: "Все права защищены.", footerLocation: "Разработано в Черногории 🇲🇪",
+    screenshotSrc: "real-services-screen-en.png",
   },
 };
 
