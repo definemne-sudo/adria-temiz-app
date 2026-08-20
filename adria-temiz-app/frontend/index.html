@@ -2689,7 +2689,7 @@ function renderConfigStep(service, props, selectedProperty){
       <div class="field">
         <label>${t('bookingBuildingLabel')}</label>
         <select id="booking-ca-property-select">
-          ${commonAreaProps.map(p => `<option value="${p.id}" ${p.id===selectedCaProperty.id?'selected':''}>${p.name}</option>`).join('')}
+          ${commonAreaProps.map(p => `<option value="${p.id}" ${p.id===selectedCaProperty.id?'selected':''}>${propertyDisplayName(p)}</option>`).join('')}
         </select>
       </div>
       ` : ''}
@@ -2772,7 +2772,7 @@ function renderConfigStep(service, props, selectedProperty){
       <div class="field">
         <label>${t('bookingPropertyLabel')}</label>
         <select id="booking-property-select">
-          ${effectiveProps.map(p => `<option value="${p.id}" ${p.id===effectiveSelectedProperty.id?'selected':''}>${p.name}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
+          ${effectiveProps.map(p => `<option value="${p.id}" ${p.id===effectiveSelectedProperty.id?'selected':''}>${propertyDisplayName(p)}${p.size_sqm ? ' ('+p.size_sqm+' m²)' : ''}</option>`).join('')}
         </select>
       </div>
     ` : ''}
@@ -2933,7 +2933,7 @@ function renderPropertyUnitRow(p){
   <div style="display:flex; align-items:center; gap:10px; padding:10px 0; border-top:1px solid var(--line);">
     <div style="width:34px; height:34px; border-radius:9px; overflow:hidden; flex-shrink:0;"><img src="${categoryIconSrc(p.category)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></div>
     <div style="flex:1; min-width:0;">
-      <div style="font-size:13px; font-weight:600;">${p.name}</div>
+      <div style="font-size:13px; font-weight:600;">${propertyDisplayName(p)}</div>
       <div style="font-size:11.5px; color:var(--muted);">${categoryLabel(p.category)}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.address ? ' · ' + p.address : ''}</div>
     </div>
     <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
@@ -2996,7 +2996,7 @@ function renderProperties(){
       ${individualProps.map(p => `
         <div class="card">
           <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
-          <h3>${p.name}</h3>
+          <h3>${propertyDisplayName(p)}</h3>
           <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}</div>
           <button class="btn ochre" style="width:100%; margin-bottom:8px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
           <div style="display:flex; justify-content:center; gap:8px;">
@@ -3013,6 +3013,13 @@ function renderProperties(){
 function categoryLabel(cat){
   const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice', common_area:'categoryCommonArea' };
   return t(map[cat] || 'categoryApartment');
+}
+// Mulk ismi bos ise (orn. kayit s\u0131ras\u0131nda kullan\u0131c\u0131 isim girmediyse),
+// ANLIK olarak o anki dile gore kategori ad\u0131n\u0131 fallback olarak g\u00f6steriyoruz.
+// Bu, categoryLabel() gibi HER render'da state.lang'e g\u00f6re yeniden hesaplan\u0131r -
+// eskiden oldugu gibi cevrilmis bir metni veritaban\u0131na KALICI yazmiyoruz.
+function propertyDisplayName(p){
+  return (p.name && p.name.trim()) ? p.name : categoryLabel(p.category);
 }
 
 function serviceName(key){
@@ -4076,7 +4083,16 @@ function attachHandlers(){
       name: state.regName, accountType: 'individual',
       referredByCode: fd.referredByCode ? fd.referredByCode.trim() : null,
       property: {
-        name: t('category' + state.propertyCategory.charAt(0).toUpperCase() + state.propertyCategory.slice(1)) || 'Evim',
+        // ONEMLI: Burada eskiden t('categoryApartment') gibi O ANKI dile
+        // gore CEVRILMIS bir metin isim olarak kaydediliyordu - bu metin
+        // veritabanina donduruldugu haliyle KALICI olarak yaziliyordu, yani
+        // kullanici sonradan dili degistirse bile mulk ismi hep ILK
+        // kaydedildigi dilde donuk kal\u0131yordu (tam da bu hatayi yaratan
+        // sebep). Artik isim bos birakiliyor - goruntuleme taraf\u0131 (bkz.
+        // propertyDisplayName()) bos ise anlik olarak o anki dile gore
+        // kategori adini hesaplayip gosteriyor, boylece her zaman guncel dil
+        // ile eslesiyor.
+        name: '',
         city: fd.propertyCity || null,
         address: fd.propertyAddress || null,
         category: state.propertyCategory,
