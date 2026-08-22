@@ -2244,7 +2244,7 @@ function renderComingSoon(){
       <div class="auth-panel-stack">
         <div class="auth-lang-above">${langSwitch()}</div>
         <div class="auth-card" style="text-align:center;">
-          <div style="font-size:76px; margin-bottom:18px;">🧹</div>
+          <div style="font-size:76px; margin-bottom:18px;">🚀</div>
           <h2 style="margin-bottom:14px; font-size:32px;">${t('comingSoonTitle')}</h2>
           <p class="hint" style="margin-bottom:28px; font-size:16px; line-height:1.6;">${t('comingSoonMessage')}</p>
           <button type="button" id="coming-soon-join-team" class="btn ghost" style="width:100%; color:var(--sage-dark); border-color:var(--sage);">${t('comingSoonStaffCta')}</button>
@@ -4929,9 +4929,13 @@ if(isIos() && !isRunningStandalone() && !wasRecentlyDismissed()){
   // Yatirimci demo erisimi: URL'de ?preview=ANAHTAR varsa ve dogruysa,
   // bu tarayicida KALICI olarak hatirla - bir daha bu parametreye gerek
   // kalmadan normal siteye girilebilir.
+  // Test/sifirlama icin: ?preview=lock ile bu tarayicidaki onizleme
+  // erisimini KALDIRIRSIN - tekrar "Cok Yakinda" ekranini gormek icin.
   const previewParam = new URLSearchParams(location.search).get('preview');
   if(previewParam === PREVIEW_ACCESS_KEY){
     localStorage.setItem('previewAccess', 'true');
+  } else if(previewParam === 'lock'){
+    localStorage.removeItem('previewAccess');
   }
   if(state.token && !state.user){
     localStorage.removeItem('token'); state.token = null;
