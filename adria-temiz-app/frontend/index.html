@@ -445,6 +445,24 @@ if ('serviceWorker' in navigator) {
 /* ================== CEVIRILER ================== */
 const LOCALES = { tr:'tr-TR', en:'en-GB', me:'sr-Latn-ME', ru:'ru-RU' };
 
+// GECICI ANAHTAR: true oldugu surece musteri girisi/kaydi TAMAMEN kapali,
+// sadece "Cok Yakinda" ekrani + personel basvuru formu calisir. SMS ve
+// kredi karti entegrasyonlari tamamlanip musteri tarafi acilmaya hazir
+// oldugunda, bu degeri false yapip yeniden deploy etmen yeterli - baska
+// hicbir kod degisikligi gerekmez.
+const MAINTENANCE_MODE = true;
+
+// YATIRIMCI DEMO ERISIMI: MAINTENANCE_MODE acikken bile, bu gizli anahtari
+// bilen (sadece SEN) tam calisan uygulamayi gorebilir/gosterebilir.
+// Kullanimi: https://app.micisto.com/?preview=ANAHTAR seklinde bir kere
+// acilinca, o TARAYICIDA kalici olarak hatirlanir (localStorage) - bir
+// daha linke ihtiyac olmadan normal siteye girip demo yapabilirsin.
+// Baskasiyla PAYLASMADIGIN surece bu link/anahtar disinda kimse gormez.
+const PREVIEW_ACCESS_KEY = 'TJGe5uBTBJjsDsrhbD0fw6Qw';
+function hasPreviewAccess(){
+  return localStorage.getItem('previewAccess') === 'true';
+}
+
 // Gizlilik Politikası ve Kullanım Koşulları - tam metin, hem kayıt öncesi
 // (auth ekranı alt linkleri) hem kayıt sırasında (zorunlu onay kutusu) hem
 // giriş yaptıktan sonra (Profil ekranı) erişilebiliyor.
@@ -608,6 +626,9 @@ const COUNTRY_CODES = [
 const TRANSLATIONS = {
   tr: {
     tagline: "Tek tıkla, temiz ev.",
+    comingSoonTitle: "Çok Yakında Hizmetinizde",
+    comingSoonMessage: "MICISTO uygulaması şu anda son hazırlıklarını tamamlıyor. Çok yakında burada olacağız!",
+    comingSoonStaffCta: "MICISTORad Olmak İster misin? Hemen Başvur",
     installTitle: "MICISTO'yu Yükle",
     installSubAndroid: "Ana ekranına ekle, daha hızlı eriş.",
     installSubIos: "Paylaş → Ana Ekrana Ekle ile yükle.",
@@ -884,6 +905,9 @@ const TRANSLATIONS = {
   },
   ru: {
     tagline: "Чистый дом одним нажатием.",
+    comingSoonTitle: "Совсем скоро",
+    comingSoonMessage: "Приложение MICISTO завершает последние приготовления. Мы будем здесь очень скоро!",
+    comingSoonStaffCta: "Хочешь стать MICISTORad? Подай заявку",
     installTitle: "Установить MICISTO",
     installSubAndroid: "Добавьте на главный экран для быстрого доступа.",
     installSubIos: "Установите через Поделиться → На экран «Домой».",
@@ -1160,6 +1184,9 @@ const TRANSLATIONS = {
   },
   en: {
     tagline: "One click, a clean home.",
+    comingSoonTitle: "Coming Very Soon",
+    comingSoonMessage: "The MICISTO app is putting the finishing touches in place. We'll be here very soon!",
+    comingSoonStaffCta: "Want to become MICISTORad? Apply Now",
     installTitle: "Install MICISTO",
     installSubAndroid: "Add to your home screen for quick access.",
     installSubIos: "Tap Share → Add to Home Screen.",
@@ -1436,6 +1463,9 @@ const TRANSLATIONS = {
   },
   me: {
     tagline: "Jedan klik, čist dom.",
+    comingSoonTitle: "Uskoro Dostupno",
+    comingSoonMessage: "Aplikacija MICISTO završava posljednje pripreme. Uskoro smo tu!",
+    comingSoonStaffCta: "Želiš postati MICISTORad? Prijavi se odmah",
     installTitle: "Instaliraj MICISTO",
     installSubAndroid: "Dodaj na početni ekran za brz pristup.",
     installSubIos: "Dodirni Podijeli → Dodaj na početni ekran.",
@@ -2063,7 +2093,7 @@ function render(){
   if(state.legalPage){
     html = renderLegalPage();
   } else if(!(state.token && state.user)){
-    html = renderAuth();
+    html = (MAINTENANCE_MODE && !hasPreviewAccess()) ? renderComingSoon() : renderAuth();
   } else if(state.ratingJob){
     html = renderRatingScreen();
   } else {
@@ -2193,6 +2223,36 @@ function renderLegalPage(){
     </div>
   </div>
   `;
+}
+
+// GECICI: Musteri uygulamasi henuz herkese acilmadi (SMS ve kredi karti
+// entegrasyonlari tamamlanana kadar). Bu ekran, normal giris/kayit
+// formunun (renderAuth) YERINE gosteriliyor - ama personel basvuru modali
+// (state.modal==='join-team') bu ekranin USTUNDE hala calisiyor, cunku
+// renderModal() cagrisini aynen koruyoruz. Boylece landing page'deki
+// "MICISTORad Ol" linki (?modal=join-team) sorunsuz calismaya devam eder.
+function renderComingSoon(){
+  return `
+  <div class="auth-wrap">
+    ${AUTH_BG_MOTIF}
+    <div class="auth-left">
+      <div class="brand">${BRAND_MARK}<h1>MICISTO</h1></div>
+      <p class="auth-headline">"${t('tagline')}"</p>
+      <div class="auth-accent-rule"></div>
+    </div>
+    <div class="auth-right">
+      <div class="auth-panel-stack">
+        <div class="auth-lang-above">${langSwitch()}</div>
+        <div class="auth-card" style="text-align:center;">
+          <div style="font-size:76px; margin-bottom:18px;">🧹</div>
+          <h2 style="margin-bottom:14px; font-size:32px;">${t('comingSoonTitle')}</h2>
+          <p class="hint" style="margin-bottom:28px; font-size:16px; line-height:1.6;">${t('comingSoonMessage')}</p>
+          <button type="button" id="coming-soon-join-team" class="btn ghost" style="width:100%; color:var(--sage-dark); border-color:var(--sage);">${t('comingSoonStaffCta')}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  ${state.modal ? renderModal() : ''}`;
 }
 
 function renderAuth(){
@@ -3916,8 +3976,7 @@ function attachHandlers(){
   const joinTeamAcceptTerms = document.getElementById('join-team-accept-terms');
   if(joinTeamAcceptTerms) joinTeamAcceptTerms.onchange = () => { state.joinTeamAcceptedTerms = joinTeamAcceptTerms.checked; render(); };
 
-  const joinTeamLink = document.getElementById('join-team-link');
-  if(joinTeamLink) joinTeamLink.onclick = () => {
+  function openJoinTeamModal(){
     state.modal = 'join-team'; state.authError = '';
     state.joinTeamGender = ''; state.joinTeamHasExperience = null; state.joinTeamCity = '';
     state.joinTeamName = ''; state.joinTeamNationality = '';
@@ -3925,7 +3984,11 @@ function attachHandlers(){
     state.joinTeamExperienceYears = ''; state.joinTeamMessage = ''; state.joinTeamLanguages = [];
     state.joinTeamAcceptedTerms = false;
     render();
-  };
+  }
+  const joinTeamLink = document.getElementById('join-team-link');
+  if(joinTeamLink) joinTeamLink.onclick = openJoinTeamModal;
+  const comingSoonJoinTeam = document.getElementById('coming-soon-join-team');
+  if(comingSoonJoinTeam) comingSoonJoinTeam.onclick = openJoinTeamModal;
 
   const joinTeamCountryCode = document.getElementById('join-team-country-code');
   if(joinTeamCountryCode) joinTeamCountryCode.onchange = () => {
@@ -4863,6 +4926,13 @@ if(isIos() && !isRunningStandalone() && !wasRecentlyDismissed()){
 }
 
 (async function init(){
+  // Yatirimci demo erisimi: URL'de ?preview=ANAHTAR varsa ve dogruysa,
+  // bu tarayicida KALICI olarak hatirla - bir daha bu parametreye gerek
+  // kalmadan normal siteye girilebilir.
+  const previewParam = new URLSearchParams(location.search).get('preview');
+  if(previewParam === PREVIEW_ACCESS_KEY){
+    localStorage.setItem('previewAccess', 'true');
+  }
   if(state.token && !state.user){
     localStorage.removeItem('token'); state.token = null;
   }
