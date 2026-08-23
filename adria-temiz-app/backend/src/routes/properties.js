@@ -29,16 +29,19 @@ router.post('/', (req, res) => {
   const {
     name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName,
     floorCount, sqmPerFloor, elevatorCapacity,
+    // Tekne (yelkenli) mulkune ozgu alanlar - digerlerinde hepsi null gelir.
+    boatClass, boatType, cabinCount, lengthFt, hasCanvas, berthNumber,
   } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
-  const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(category) ? category : 'apartment';
+  const finalCategory = ['apartment', 'house', 'office', 'common_area', 'boat'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
     `INSERT INTO properties
        (id, owner_id, name, category, building_name, address, city, latitude, longitude,
-        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
+        boat_class, boat_type, cabin_count, length_ft, has_canvas, berth_number)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id, req.user.id, name, finalCategory, buildingName || null, address || null, city || null,
     latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
@@ -46,7 +49,13 @@ router.post('/', (req, res) => {
     floorCount ? Number(floorCount) : null,
     sqmPerFloor ? Number(sqmPerFloor) : null,
     elevatorCapacity ? Number(elevatorCapacity) : null,
-    icalUrl || null
+    icalUrl || null,
+    finalCategory === 'boat' ? (boatClass || 'sailboat') : null,
+    finalCategory === 'boat' ? (boatType || null) : null,
+    finalCategory === 'boat' && cabinCount ? Number(cabinCount) : null,
+    finalCategory === 'boat' && lengthFt ? Number(lengthFt) : null,
+    finalCategory === 'boat' ? (hasCanvas ? 1 : 0) : null,
+    finalCategory === 'boat' ? (berthNumber || null) : null
   );
 
   res.status(201).json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
@@ -126,6 +135,9 @@ router.put('/:id', (req, res) => {
   const {
     name, address, city, sizeSqm, latitude, longitude, buildingName,
     floorCount, sqmPerFloor, elevatorCapacity, bedroomCount, bathroomCount,
+    // Tekne mulkune ozgu alanlar - diger kategorilerde undefined gelir,
+    // COALESCE sayesinde mevcut deger korunur.
+    boatType, cabinCount, lengthFt, hasCanvas, berthNumber,
   } = req.body;
 
   db.prepare(
@@ -134,7 +146,10 @@ router.put('/:id', (req, res) => {
        size_sqm = COALESCE(?, size_sqm), latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
        building_name = COALESCE(?, building_name), floor_count = COALESCE(?, floor_count),
        sqm_per_floor = COALESCE(?, sqm_per_floor), elevator_capacity = COALESCE(?, elevator_capacity),
-       bedroom_count = COALESCE(?, bedroom_count), bathroom_count = COALESCE(?, bathroom_count)
+       bedroom_count = COALESCE(?, bedroom_count), bathroom_count = COALESCE(?, bathroom_count),
+       boat_type = COALESCE(?, boat_type), cabin_count = COALESCE(?, cabin_count),
+       length_ft = COALESCE(?, length_ft), has_canvas = COALESCE(?, has_canvas),
+       berth_number = COALESCE(?, berth_number)
      WHERE id = ?`
   ).run(
     name || null, address || null, city || null,
@@ -142,6 +157,9 @@ router.put('/:id', (req, res) => {
     buildingName || null, floorCount ? Number(floorCount) : null,
     sqmPerFloor ? Number(sqmPerFloor) : null, elevatorCapacity ? Number(elevatorCapacity) : null,
     bedroomCount ? Number(bedroomCount) : null, bathroomCount ? Number(bathroomCount) : null,
+    boatType || null, cabinCount ? Number(cabinCount) : null,
+    lengthFt ? Number(lengthFt) : null, hasCanvas === undefined ? null : (hasCanvas ? 1 : 0),
+    berthNumber || null,
     id
   );
   res.json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
