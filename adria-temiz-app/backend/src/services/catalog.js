@@ -33,6 +33,40 @@ const SERVICE_DEFS = [
     isGroup: true, // fiyat sabit değil, alt seçimlere göre hesaplanır
     accountTypes: ['company'],
   },
+  {
+    key: 'boat',
+    name: 'Tekne Temizliği',
+    description: 'Dış, iç ve kanvas/tente bakımından istediklerini seç.',
+    isGroup: true, // ortak alan gibi, fiyat alt secimlere gore hesaplanir
+    accountTypes: ['individual', 'company'],
+  },
+];
+
+// ONEMLI: 50ft ve uzeri teknelerde otomatik fiyat GOSTERILMEZ - musteri
+// "Fiyat Teklifi Al" ile admin'e yonlendirilir (bkz. musteri uygulamasi
+// renderConfigStep). Bu esik degeri hem frontend hem backend'de ayni
+// olmali; degistirilirse iki tarafta da guncellenmeli.
+const BOAT_QUOTE_REQUIRED_LENGTH_FT = 50;
+
+const BOAT_SUB_DEFS = [
+  {
+    key: 'boat_exterior',
+    name: 'Dış Temizlik',
+    description: 'Gövde, güverte, tik ahşap, paslanmaz çelik ve cam temizliği.',
+    paramType: 'boat_length', // { lengthFt }
+  },
+  {
+    key: 'boat_interior',
+    name: 'İç Temizlik',
+    description: 'Kabin, mutfak (galley), banyo (head) ve zemin temizliği.',
+    paramType: 'boat_length', // { lengthFt }
+  },
+  {
+    key: 'boat_canvas',
+    name: 'Kanvas / Tente Bakımı',
+    description: 'Bimini ve tente kanvasının nazik, deniz tipi ürünle temizliği.',
+    paramType: 'boat_length', // { lengthFt } - yalnizca has_canvas=true olan teknelerde gosterilir
+  },
 ];
 
 const COMMON_AREA_SUB_DEFS = [
@@ -137,6 +171,28 @@ function getCommonAreaSubOption(key, lang) {
   };
 }
 
+// NOT: Fiyatlandirma formulu (ratePerFt vb.) henuz netlesmedi - kullaniciyla
+// birlikte ayri bir turda belirlenecek. Su an icin pricing_settings'ten
+// deger okunmaya CALISILIYOR ama hicbir varsayilan tohumlanmadi (db.js'te
+// DEFAULT_PRICING'e boat.* eklenmedi), yani su an base/ratePerFt 0 donuyor.
+// Bu bilerek boyle - musteri uygulamasi bu yuzden tekne hizmetleri icin
+// fiyat onizlemesi GOSTERMIYOR (bkz. frontend renderConfigStep), sadece
+// alt hizmet secimini/checklist'i gosteriyor. Fiyatlandirma netlesince
+// sadece pricing_settings'e boat_exterior.base vb. degerler eklenmesi
+// yeterli olacak, kod degisikligi gerekmeyecek.
+function getBoatSubOption(key, lang) {
+  const def = BOAT_SUB_DEFS.find((s) => s.key === key);
+  if (!def) throw new Error('Geçersiz tekne alt seçeneği.');
+  return {
+    ...def,
+    base: getPricingValue(`${key}.base`),
+    ratePerFt: getPricingValue(`${key}.ratePerFt`),
+    min: getPricingValue(`${key}.min`),
+    estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
+    checklist: getChecklist(key, lang),
+  };
+}
+
 function getAddon(key, lang) {
   const def = ADDON_DEFS.find((a) => a.key === key);
   if (!def) throw new Error('Geçersiz ekstra hizmet.');
@@ -148,6 +204,9 @@ function getAllServices(lang) {
 }
 function getAllCommonAreaSubOptions(lang) {
   return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key, lang));
+}
+function getAllBoatSubOptions(lang) {
+  return BOAT_SUB_DEFS.map((s) => getBoatSubOption(s.key, lang));
 }
 function getAllAddons(lang) {
   return ADDON_DEFS.map((a) => getAddon(a.key, lang));
@@ -243,6 +302,13 @@ function estimateJobMinutes(serviceKey, serviceParams) {
       catch (e) { return sum; }
     }, 0);
   }
+  if (serviceKey === 'boat') {
+    const selections = (serviceParams && serviceParams.selections) || [];
+    return selections.reduce((sum, sel) => {
+      try { return sum + (getBoatSubOption(sel.key).estimatedMinutes || 0); }
+      catch (e) { return sum; }
+    }, 0);
+  }
   try { return getService(serviceKey).estimatedMinutes || 0; }
   catch (e) { return 0; }
 }
@@ -260,8 +326,9 @@ module.exports = {
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
   getCommissionRate, getPayoutCycleDays,
-  getService, getAddon, getCommonAreaSubOption, getChecklist, getChecklistAllLangs,
-  getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
+  getService, getAddon, getCommonAreaSubOption, getBoatSubOption, getChecklist, getChecklistAllLangs,
+  getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
   calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
+  BOAT_QUOTE_REQUIRED_LENGTH_FT,
 };
