@@ -746,6 +746,20 @@ const TRANSLATIONS = {
     categoryHouse: "Müstakil Ev / Villa",
     categoryOffice: "Ofis / İşyeri",
     categoryCommonArea: "Ortak Alan (Bina geneli)",
+    categoryBoat: "Tekne (Yelkenli)",
+    boatClassLabel: "Tekne Sınıfı",
+    boatClassSailboat: "Yelkenli",
+    boatTypeLabel: "Yelkenli Tipi",
+    boatTypeMonohull: "Monohull",
+    boatTypeCatamaran: "Katamaran",
+    cabinCountLabel: "Kamara Sayısı",
+    boatLengthLabel: "Uzunluk (ft)",
+    hasCanvasLabel: "Kanvas / Tente var mı?",
+    marinaNameLabel: "Marina Adı",
+    marinaNamePlaceholder: "örn. Porto Montenegro",
+    berthNumberLabel: "Palamar / Yanaşma No (opsiyonel)",
+    berthNumberPlaceholder: "örn. B-14",
+    cabinCountShort: "kamara",
     propertyNameLabel: "Mülk adı",
     propertyNamePlaceholder: "örn. Budva Sahil Daire",
     propertyCityLabel: "Şehir",
@@ -1025,6 +1039,20 @@ const TRANSLATIONS = {
     categoryHouse: "Дом / Вилла",
     categoryOffice: "Офис / Рабочее место",
     categoryCommonArea: "Общая зона (всё здание)",
+    categoryBoat: "Лодка (Парусная)",
+    boatClassLabel: "Класс судна",
+    boatClassSailboat: "Парусная яхта",
+    boatTypeLabel: "Тип парусника",
+    boatTypeMonohull: "Монокорпус",
+    boatTypeCatamaran: "Катамаран",
+    cabinCountLabel: "Количество кают",
+    boatLengthLabel: "Длина (футы)",
+    hasCanvasLabel: "Есть тент/навес?",
+    marinaNameLabel: "Название марины",
+    marinaNamePlaceholder: "напр. Porto Montenegro",
+    berthNumberLabel: "Номер причала (необязательно)",
+    berthNumberPlaceholder: "напр. B-14",
+    cabinCountShort: "каюты",
     propertyNameLabel: "Название объекта",
     propertyNamePlaceholder: "напр. Квартира на побережье в Будве",
     propertyCityLabel: "Город",
@@ -1304,6 +1332,20 @@ const TRANSLATIONS = {
     categoryHouse: "House/Villa",
     categoryOffice: "Office/Shop",
     categoryCommonArea: "Common Area (Whole Building)",
+    categoryBoat: "Boat (Sailboat)",
+    boatClassLabel: "Boat Class",
+    boatClassSailboat: "Sailboat",
+    boatTypeLabel: "Sailboat Type",
+    boatTypeMonohull: "Monohull",
+    boatTypeCatamaran: "Catamaran",
+    cabinCountLabel: "Cabin Count",
+    boatLengthLabel: "Length (ft)",
+    hasCanvasLabel: "Has Canvas/Bimini?",
+    marinaNameLabel: "Marina Name",
+    marinaNamePlaceholder: "e.g. Porto Montenegro",
+    berthNumberLabel: "Berth Number (optional)",
+    berthNumberPlaceholder: "e.g. B-14",
+    cabinCountShort: "cabins",
     propertyNameLabel: "Property name",
     propertyNamePlaceholder: "e.g. Budva Seaside Apartment",
     propertyCityLabel: "City",
@@ -1583,6 +1625,20 @@ const TRANSLATIONS = {
     categoryHouse: "Kuća/Villa",
     categoryOffice: "Poslovni prostor",
     categoryCommonArea: "Zajednički prostor (cijela zgrada)",
+    categoryBoat: "Brod (Jedrilica)",
+    boatClassLabel: "Klasa plovila",
+    boatClassSailboat: "Jedrilica",
+    boatTypeLabel: "Tip jedrilice",
+    boatTypeMonohull: "Monohull",
+    boatTypeCatamaran: "Katamaran",
+    cabinCountLabel: "Broj kabina",
+    boatLengthLabel: "Dužina (ft)",
+    hasCanvasLabel: "Ima li kanvas/tendu?",
+    marinaNameLabel: "Naziv marine",
+    marinaNamePlaceholder: "npr. Porto Montenegro",
+    berthNumberLabel: "Broj veza (opciono)",
+    berthNumberPlaceholder: "npr. B-14",
+    cabinCountShort: "kabine",
     propertyNameLabel: "Naziv nekretnine",
     propertyNamePlaceholder: "npr. Apartman Budva more",
     propertyCityLabel: "Grad",
@@ -1959,7 +2015,7 @@ function addonIcon(key){
 // olmadan da "özel" hissettiren bir dokunuş).
 const AVATAR_PALETTE = ['#1D9E73','#0F3D2E','#2FBE8F','#3D6B57','#5B7A6C','#0C7A5C'];
 function categoryIconSrc(cat){
-  const map = { apartment:'icon-property-apartment.png', house:'icon-property-house.png', office:'icon-property-office.png', common_area:'icon-service-common-area.png' };
+  const map = { apartment:'icon-property-apartment.png', house:'icon-property-house.png', office:'icon-property-office.png', common_area:'icon-service-common-area.png', boat:'icon-property-boat.png' };
   return map[cat] || map.apartment;
 }
 
@@ -2046,6 +2102,11 @@ let state = {
   addPropFloorCount: '',
   addPropSqmPerFloor: '',
   addPropElevatorCapacity: '',
+  addPropBoatType: 'monohull',
+  addPropCabinCount: '',
+  addPropLengthFt: '',
+  addPropHasCanvas: false,
+  addPropBerthNumber: '',
   joinTeamGender: '',
   joinTeamHasExperience: null,
   joinTeamCity: '',
@@ -2994,7 +3055,7 @@ function renderPropertyUnitRow(p){
     <div style="width:34px; height:34px; border-radius:9px; overflow:hidden; flex-shrink:0;"><img src="${categoryIconSrc(p.category)}" alt="" style="width:100%;height:100%;object-fit:cover;" /></div>
     <div style="flex:1; min-width:0;">
       <div style="font-size:13px; font-weight:600;">${propertyDisplayName(p)}</div>
-      <div style="font-size:11.5px; color:var(--muted);">${categoryLabel(p.category)}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.address ? ' · ' + p.address : ''}</div>
+      <div style="font-size:11.5px; color:var(--muted);">${propertyMetaLine(p)}</div>
     </div>
     <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
       <button class="btn ochre btn-sm" style="width:auto; padding:6px 12px; font-size:11.5px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
@@ -3057,7 +3118,7 @@ function renderProperties(){
         <div class="card">
           <div class="property-avatar"><img src="${categoryIconSrc(p.category)}" alt="" /></div>
           <h3>${propertyDisplayName(p)}</h3>
-          <div class="meta" style="margin-bottom:14px;">${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}</div>
+          <div class="meta" style="margin-bottom:14px;">${propertyMetaLine(p)}</div>
           <button class="btn ochre" style="width:100%; margin-bottom:8px;" data-book="${p.id}">${t('requestServiceBtn')}</button>
           <div style="display:flex; justify-content:center; gap:8px;">
             ${p.category!=='office' ? `<button type="button" class="icon-btn-sm" data-sync="${p.id}" data-current-ical="${p.ical_url || ''}" title="${t('syncDemoBtn')}">${SYNC_ICON_SVG}</button>` : ''}
@@ -3071,7 +3132,7 @@ function renderProperties(){
 }
 
 function categoryLabel(cat){
-  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice', common_area:'categoryCommonArea' };
+  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice', common_area:'categoryCommonArea', boat:'categoryBoat' };
   return t(map[cat] || 'categoryApartment');
 }
 // Mulk ismi bos ise (orn. kayit s\u0131ras\u0131nda kullan\u0131c\u0131 isim girmediyse),
@@ -3080,6 +3141,20 @@ function categoryLabel(cat){
 // eskiden oldugu gibi cevrilmis bir metni veritaban\u0131na KALICI yazmiyoruz.
 function propertyDisplayName(p){
   return (p.name && p.name.trim()) ? p.name : categoryLabel(p.category);
+}
+// Mulk kartinda gosterilen ikinci satir - kategoriye gore icerigi farkli.
+// Tekne icin sehir/m² yerine Marina + Palamar No + uzunluk/kamara gosterilir,
+// cunku bu bilgiler tekne icin anlamli, sehir/m² ise anlamsiz.
+function propertyMetaLine(p){
+  if(p.category === 'boat'){
+    const parts = [categoryLabel(p.category)];
+    if(p.address) parts.push(p.address); // Marina adi 'address' alaninda saklaniyor
+    if(p.berth_number) parts.push(p.berth_number);
+    if(p.length_ft) parts.push(p.length_ft + ' ft');
+    if(p.cabin_count) parts.push(p.cabin_count + ' ' + t('cabinCountShort'));
+    return parts.join(' · ');
+  }
+  return `${categoryLabel(p.category)} · ${p.city || t('cityUnknown')}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}${p.category!=='office' ? (p.ical_url ? ' · ' + t('icalLinked') : ' · ' + t('icalNotLinked')) : ''}`;
 }
 
 function serviceName(key){
@@ -3571,6 +3646,7 @@ function renderModal(){
   }
   if(state.modal === 'add-property'){
     const isCommonArea = state.propertyCategory === 'common_area';
+    const isBoat = state.propertyCategory === 'boat';
 
     if(state.addPropertyStep === 'address'){
       return `
@@ -3579,7 +3655,12 @@ function renderModal(){
           <button type="button" id="add-property-back" class="hint" style="background:none; border:none; padding:0; margin-bottom:14px; cursor:pointer; color:var(--sage-dark); font-weight:600;">‹ ${t('backBtn')}</button>
           <h3>${t('addPropertyModalTitle')}</h3>
           <form id="property-address-step-form">
-            <div class="field"><label>${t('propertyAddressLabel')}</label><input id="addprop-address-input" name="address" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+            ${isBoat ? `
+              <div class="field"><label>${t('marinaNameLabel')}</label><input id="addprop-address-input" name="address" placeholder="${t('marinaNamePlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+              <div class="field"><label>${t('berthNumberLabel')}</label><input name="berthNumber" placeholder="${t('berthNumberPlaceholder')}" value="${state.addPropBerthNumber}" /></div>
+            ` : `
+              <div class="field"><label>${t('propertyAddressLabel')}</label><input id="addprop-address-input" name="address" placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+            `}
             <div class="field">
               <label>${t('propertyCityLabel')}</label>
               <select id="modal-property-city" name="city" required>
@@ -3613,8 +3694,30 @@ function renderModal(){
             <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
             <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
             ${state.user.accountType==='company' ? `<div class="choice ${state.propertyCategory==='common_area'?'selected':''}" data-property-category="common_area">${t('categoryCommonArea')}</div>` : ''}
+            <div class="choice ${state.propertyCategory==='boat'?'selected':''}" data-property-category="boat">${t('categoryBoat')}</div>
           </div>
-          ${isCommonArea ? `
+          ${isBoat ? `
+            <div class="field"><label>${t('propertyNameLabel')}</label><input id="addprop-name-input" name="name" required placeholder="${t('propertyNamePlaceholder')}" value="${state.addPropName}" /></div>
+            <div class="field">
+              <label>${t('boatClassLabel')}</label>
+              <select id="addprop-boatclass-input" name="boatClass">
+                <option value="sailboat" selected>${t('boatClassSailboat')}</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>${t('boatTypeLabel')}</label>
+              <select id="addprop-boattype-input" name="boatType">
+                <option value="monohull" ${state.addPropBoatType!=='catamaran'?'selected':''}>${t('boatTypeMonohull')}</option>
+                <option value="catamaran" ${state.addPropBoatType==='catamaran'?'selected':''}>${t('boatTypeCatamaran')}</option>
+              </select>
+            </div>
+            <div class="field"><label>${t('cabinCountLabel')}</label><input id="addprop-cabincount-input" name="cabinCount" type="number" min="1" placeholder="3" value="${state.addPropCabinCount}" /></div>
+            <div class="field"><label>${t('boatLengthLabel')}</label><input id="addprop-lengthft-input" name="lengthFt" type="number" min="1" required placeholder="38" value="${state.addPropLengthFt}" /></div>
+            <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; margin:4px 0 14px;">
+              <input type="checkbox" id="addprop-hascanvas-input" ${state.addPropHasCanvas?'checked':''} />
+              <span>${t('hasCanvasLabel')}</span>
+            </label>
+          ` : isCommonArea ? `
             <div class="field"><label>${t('propertyNameLabel')}</label><input id="addprop-name-input" name="name" required placeholder="${t('propertyNamePlaceholder')}" value="${state.addPropName}" /></div>
             <div class="hint" style="margin:14px 0 10px;">${t('commonAreaPropertyHint')}</div>
             <div class="field"><label>${t('floorCountLabel')}</label><input id="addprop-floorcount-input" name="floorCount" type="number" min="1" placeholder="5" value="${state.addPropFloorCount}" /></div>
@@ -4299,6 +4402,8 @@ function attachHandlers(){
     state.addPropertyStep = 'details';
     state.addPropName = ''; state.addPropBuildingName = ''; state.addPropIcalUrl = '';
     state.addPropFloorCount = ''; state.addPropSqmPerFloor = ''; state.addPropElevatorCapacity = '';
+    state.addPropBoatType = 'monohull'; state.addPropCabinCount = ''; state.addPropLengthFt = '';
+    state.addPropHasCanvas = false; state.addPropBerthNumber = '';
     state.regSizeSqm = ''; state.regBedroomCount = 1; state.regBathroomCount = 1;
     state.regPropertyAddress = ''; state.regLat = null; state.regLng = null;
   }
@@ -4648,8 +4753,18 @@ function attachHandlers(){
   if(addPropSqmPerFloorInput) addPropSqmPerFloorInput.oninput = () => { state.addPropSqmPerFloor = addPropSqmPerFloorInput.value; };
   const addPropElevatorInput = document.getElementById('addprop-elevator-input');
   if(addPropElevatorInput) addPropElevatorInput.oninput = () => { state.addPropElevatorCapacity = addPropElevatorInput.value; };
+  const addPropBoatTypeInput = document.getElementById('addprop-boattype-input');
+  if(addPropBoatTypeInput) addPropBoatTypeInput.onchange = () => { state.addPropBoatType = addPropBoatTypeInput.value; };
+  const addPropCabinCountInput = document.getElementById('addprop-cabincount-input');
+  if(addPropCabinCountInput) addPropCabinCountInput.oninput = () => { state.addPropCabinCount = addPropCabinCountInput.value; };
+  const addPropLengthFtInput = document.getElementById('addprop-lengthft-input');
+  if(addPropLengthFtInput) addPropLengthFtInput.oninput = () => { state.addPropLengthFt = addPropLengthFtInput.value; };
+  const addPropHasCanvasInput = document.getElementById('addprop-hascanvas-input');
+  if(addPropHasCanvasInput) addPropHasCanvasInput.onchange = () => { state.addPropHasCanvas = addPropHasCanvasInput.checked; };
   const addPropAddressInput = document.getElementById('addprop-address-input');
   if(addPropAddressInput) addPropAddressInput.oninput = () => { state.regPropertyAddress = addPropAddressInput.value; };
+  const addPropBerthInput = document.querySelector('#property-address-step-form [name="berthNumber"]');
+  if(addPropBerthInput) addPropBerthInput.oninput = () => { state.addPropBerthNumber = addPropBerthInput.value; };
 
   const propDetailsStepForm = document.getElementById('property-details-step-form');
   if(propDetailsStepForm) propDetailsStepForm.onsubmit = (e) => {
@@ -4661,6 +4776,12 @@ function attachHandlers(){
       state.addPropFloorCount = fd.floorCount || '';
       state.addPropSqmPerFloor = fd.sqmPerFloor || '';
       state.addPropElevatorCapacity = fd.elevatorCapacity || '';
+    } else if(state.propertyCategory === 'boat'){
+      state.addPropName = fd.name;
+      state.addPropBoatType = fd.boatType || 'monohull';
+      state.addPropCabinCount = fd.cabinCount || '';
+      state.addPropLengthFt = fd.lengthFt;
+      state.addPropHasCanvas = !!document.getElementById('addprop-hascanvas-input')?.checked;
     } else {
       state.addPropName = fd.name;
       state.addPropBuildingName = fd.buildingName || '';
@@ -4681,19 +4802,27 @@ function attachHandlers(){
     e.preventDefault();
     const fd = Object.fromEntries(new FormData(propAddressStepForm));
     const isCommonArea = state.propertyCategory === 'common_area';
+    const isBoat = state.propertyCategory === 'boat';
     await api('/properties', { method:'POST', body: JSON.stringify({
       name: state.addPropName,
       city: fd.city || null, address: fd.address || null,
       category: state.propertyCategory,
-      buildingName: isCommonArea ? null : (state.addPropBuildingName || null),
+      buildingName: (isCommonArea || isBoat) ? null : (state.addPropBuildingName || null),
       latitude: state.regLat, longitude: state.regLng,
-      sizeSqm: isCommonArea ? null : (state.regSizeSqm || null),
-      bedroomCount: isCommonArea ? null : (state.regBedroomCount || null),
-      bathroomCount: isCommonArea ? null : (state.regBathroomCount || null),
-      icalUrl: isCommonArea ? null : (state.addPropIcalUrl || null),
+      sizeSqm: (isCommonArea || isBoat) ? null : (state.regSizeSqm || null),
+      bedroomCount: (isCommonArea || isBoat) ? null : (state.regBedroomCount || null),
+      bathroomCount: (isCommonArea || isBoat) ? null : (state.regBathroomCount || null),
+      icalUrl: (isCommonArea || isBoat) ? null : (state.addPropIcalUrl || null),
       floorCount: isCommonArea ? (state.addPropFloorCount || null) : null,
       sqmPerFloor: isCommonArea ? (state.addPropSqmPerFloor || null) : null,
       elevatorCapacity: isCommonArea ? (state.addPropElevatorCapacity || null) : null,
+      // Tekneye ozgu alanlar - digerlerinde null gonderiliyor
+      boatClass: isBoat ? 'sailboat' : null,
+      boatType: isBoat ? state.addPropBoatType : null,
+      cabinCount: isBoat ? (state.addPropCabinCount || null) : null,
+      lengthFt: isBoat ? (state.addPropLengthFt || null) : null,
+      hasCanvas: isBoat ? !!state.addPropHasCanvas : null,
+      berthNumber: isBoat ? (fd.berthNumber || null) : null,
     })});
     state.modal = null;
     resetAddPropertyState();
