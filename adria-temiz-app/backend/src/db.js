@@ -353,3 +353,63 @@ const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, val
 for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
   seedPricing.run(key, value);
 }
+
+// --- Tekne (yelkenli) mulk kategorisi icin sema guncellemesi -------------
+// ONEMLI: 'category' sutununda bir CHECK constraint var, bu da SQLite'da
+// basit bir ALTER TABLE ADD COLUMN ile degistirilemez (SQLite CHECK
+// constraint'leri dogrudan degistirmeyi desteklemiyor). Bu yuzden tabloyu
+// guvenle yeniden olusturup mevcut veriyi tasiyoruz. IDEMPOTENT'tir -
+// constraint zaten 'boat' iceriyorsa (yeni kurulan bir veritabaninda oldugu
+// gibi) hicbir sey yapmadan gecer. Gercek veri + iliskili kayitlarla
+// (property_delegates FK) test edildi, hicbir veri kaybi olmuyor.
+function migratePropertiesForBoatCategory() {
+  const tableInfo = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='properties'`).get();
+  if (!tableInfo || (tableInfo.sql && tableInfo.sql.includes("'boat'"))) {
+    return; // tablo yok (ilk kurulum, CREATE TABLE zaten guncel) ya da constraint zaten guncel
+  }
+  db.pragma('foreign_keys = OFF');
+  const migrate = db.transaction(() => {
+    db.exec(`ALTER TABLE properties RENAME TO properties_old;`);
+    db.exec(`
+      CREATE TABLE properties (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL REFERENCES users(id),
+        name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'apartment' CHECK (category IN ('apartment','house','office','common_area','boat')),
+        building_name TEXT,
+        address TEXT,
+        city TEXT,
+        latitude REAL,
+        longitude REAL,
+        size_sqm REAL,
+        floor_count INTEGER,
+        sqm_per_floor REAL,
+        elevator_capacity INTEGER,
+        ical_url TEXT,
+        bedroom_count INTEGER,
+        bathroom_count INTEGER,
+        boat_class TEXT,
+        boat_type TEXT,
+        cabin_count INTEGER,
+        length_ft REAL,
+        has_canvas INTEGER,
+        berth_number TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+    `);
+    db.exec(`
+      INSERT INTO properties
+        (id, owner_id, name, category, building_name, address, city, latitude, longitude,
+         size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
+         bedroom_count, bathroom_count, created_at)
+      SELECT id, owner_id, name, category, building_name, address, city, latitude, longitude,
+             size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
+             bedroom_count, bathroom_count, created_at
+      FROM properties_old;
+    `);
+    db.exec(`DROP TABLE properties_old;`);
+  });
+  migrate();
+  db.pragma('foreign_keys = ON');
+}
+migratePropertiesForBoatCategory();
