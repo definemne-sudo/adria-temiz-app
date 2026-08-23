@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, getCommissionRate } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees, getCommissionRate, BOAT_QUOTE_REQUIRED_LENGTH_FT } = require('../services/catalog');
 
 const router = express.Router();
 
@@ -16,6 +16,8 @@ router.get('/', (req, res) => {
   res.json({
     services: getAllServices(lang),
     commonAreaSubOptions: getAllCommonAreaSubOptions(lang),
+    boatSubOptions: getAllBoatSubOptions(lang),
+    boatQuoteRequiredLengthFt: BOAT_QUOTE_REQUIRED_LENGTH_FT,
     addons: getAllAddons(lang),
     suppliesFees: getSuppliesFees(),
     commissionRate: getCommissionRate(),
