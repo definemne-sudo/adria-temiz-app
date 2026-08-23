@@ -717,6 +717,13 @@ const TRANSLATIONS = {
     pleaseSelectSubOption: "Lütfen en az bir hizmet seç.",
     noBuildingGroupsHint: "Ortak Alan Temizliği talep edebilmen için önce \"Ortak Alan\" kategorisiyle bir mülk eklemelisin.",
     noOfficePropertyHint: "Bu hizmeti talep edebilmen için önce \"Ofis / İşyeri\" kategorisiyle bir mülk eklemelisin.",
+    noBoatPropertyHint: "Tekne Temizliği talep edebilmen için önce \"Tekne (Yelkenli)\" kategorisiyle bir mülk eklemelisin.",
+    boatSubServicesHeader: "Tekne Temizliği",
+    boatQuoteNeededTitle: "Bu Tekne İçin Fiyat Teklifi Gerekiyor",
+    boatQuoteNeededHint: "50 ft ve üzeri tekneler için fiyatlandırma tekneye özel belirlenir. Aşağıdaki butona tıklayarak bize ulaş, en kısa sürede sana özel bir teklif sunalım.",
+    boatQuoteRequestBtn: "Fiyat Teklifi Al",
+    boatQuoteChatPrefill: "Merhaba, \"{{name}}\" adlı teknem ({{length}} ft) için fiyat teklifi almak istiyorum.",
+    toastQuoteRequestSent: "Talebin destek ekranına iletildi, oradan devam edebilirsin.",
     corridorSqmLabel: "Koridor alanı (m²)",
     elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
     invoiceLabel: "🧾 Fatura",
@@ -1010,6 +1017,13 @@ const TRANSLATIONS = {
     pleaseSelectSubOption: "Пожалуйста, выберите хотя бы одну услугу.",
     noBuildingGroupsHint: "Чтобы заказать уборку общих зон, сначала добавьте объект категории «Общая зона».",
     noOfficePropertyHint: "Чтобы заказать эту услугу, сначала добавьте объект категории «Офис / Рабочее место».",
+    noBoatPropertyHint: "Чтобы заказать уборку лодки, сначала добавьте объект категории «Лодка (Парусная)».",
+    boatSubServicesHeader: "Уборка лодки",
+    boatQuoteNeededTitle: "Для этой лодки нужна индивидуальная цена",
+    boatQuoteNeededHint: "Для лодок от 50 футов цена определяется индивидуально. Нажмите кнопку ниже, чтобы связаться с нами — мы подготовим предложение как можно скорее.",
+    boatQuoteRequestBtn: "Получить предложение",
+    boatQuoteChatPrefill: "Здравствуйте, хочу получить предложение по цене для моей лодки «{{name}}» ({{length}} фт).",
+    toastQuoteRequestSent: "Ваш запрос передан в чат поддержки, продолжите там.",
     corridorSqmLabel: "Площадь коридора (м²)",
     elevatorCapacityLabel: "Вместимость лифта (чел.)",
     invoiceLabel: "🧾 Счёт",
@@ -1303,6 +1317,13 @@ const TRANSLATIONS = {
     pleaseSelectSubOption: "Please select at least one service.",
     noBuildingGroupsHint: "To request Common Area Cleaning, first add a property with the \"Common Area\" category.",
     noOfficePropertyHint: "To request this service, first add a property with the \"Office/Shop\" category.",
+    noBoatPropertyHint: "To request Boat Cleaning, first add a property with the \"Boat (Sailboat)\" category.",
+    boatSubServicesHeader: "Boat Cleaning",
+    boatQuoteNeededTitle: "This Boat Needs a Custom Quote",
+    boatQuoteNeededHint: "Pricing for boats 50 ft and over is set individually. Tap the button below to reach us and we'll get you a quote as soon as possible.",
+    boatQuoteRequestBtn: "Get a Quote",
+    boatQuoteChatPrefill: "Hi, I'd like a price quote for my boat \"{{name}}\" ({{length}} ft).",
+    toastQuoteRequestSent: "Your request was sent to support chat, continue there.",
     corridorSqmLabel: "Corridor area (m²)",
     elevatorCapacityLabel: "Elevator capacity (people)",
     invoiceLabel: "🧾 Invoice",
@@ -1596,6 +1617,13 @@ const TRANSLATIONS = {
     pleaseSelectSubOption: "Molimo izaberi bar jednu uslugu.",
     noBuildingGroupsHint: "Da bi naručio/la Čišćenje zajedničkih prostorija, prvo dodaj nekretninu sa kategorijom \"Zajednički prostor\".",
     noOfficePropertyHint: "Da bi naručio/la ovu uslugu, prvo dodaj nekretninu sa kategorijom \"Poslovni prostor\".",
+    noBoatPropertyHint: "Da bi naručio/la čišćenje broda, prvo dodaj nekretninu sa kategorijom \"Brod (Jedrilica)\".",
+    boatSubServicesHeader: "Čišćenje broda",
+    boatQuoteNeededTitle: "Za ovaj brod je potrebna individualna ponuda",
+    boatQuoteNeededHint: "Za brodove od 50 ft i više, cijena se određuje individualno. Klikni dugme ispod da nas kontaktiraš, javićemo ti se sa ponudom u najkraćem roku.",
+    boatQuoteRequestBtn: "Zatraži ponudu",
+    boatQuoteChatPrefill: "Zdravo, želim ponudu za cijenu za moj brod \"{{name}}\" ({{length}} ft).",
+    toastQuoteRequestSent: "Tvoj zahtjev je poslat u chat podrške, nastavi tamo.",
     corridorSqmLabel: "Površina hodnika (m²)",
     elevatorCapacityLabel: "Kapacitet lifta (osobe)",
     invoiceLabel: "🧾 Faktura",
@@ -1827,6 +1855,36 @@ const SERVICE_I18N = {
     me: { name: "Čišćenje zajedničkih prostorija", description: "Izaberi između čišćenja stepeništa, hodnika i lifta." },
     ru: { name: "Уборка общих зон", description: "Выберите уборку лестницы, коридора и/или лифта." },
   },
+  boat: {
+    iconImg: 'icon-service-boat.png',
+    tr: { name: "Tekne Temizliği", description: "Dış, iç ve kanvas/tente bakımından istediklerini seç." },
+    en: { name: "Boat Cleaning", description: "Choose from exterior, interior and canvas/bimini care." },
+    me: { name: "Čišćenje broda", description: "Izaberi između spoljašnjeg, unutrašnjeg čišćenja i njege kanvasa." },
+    ru: { name: "Уборка лодки", description: "Выберите уборку снаружи, внутри и уход за тентом." },
+  },
+};
+const BOAT_SUB_I18N = {
+  boat_exterior: {
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 4.5 0 3-1 4.5 0"/><path d="M4 15l1-8 6-4 6 4 1 8"/><path d="M2 15h18"/></svg>',
+    tr: { name: "Dış Temizlik" },
+    en: { name: "Exterior Cleaning" },
+    me: { name: "Spoljašnje čišćenje" },
+    ru: { name: "Уборка снаружи" },
+  },
+  boat_interior: {
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="9" width="16" height="10" rx="1"/><path d="M8 9V6a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v3"/></svg>',
+    tr: { name: "İç Temizlik" },
+    en: { name: "Interior Cleaning" },
+    me: { name: "Unutrašnje čišćenje" },
+    ru: { name: "Уборка внутри" },
+  },
+  boat_canvas: {
+    icon: '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10a8 8 0 0 1 16 0v10"/><path d="M4 20h16"/></svg>',
+    tr: { name: "Kanvas / Tente Bakımı" },
+    en: { name: "Canvas / Bimini Care" },
+    me: { name: "Njega kanvasa/tende" },
+    ru: { name: "Уход за тентом" },
+  },
 };
 const COMMON_AREA_SUB_I18N = {
   staircase: {
@@ -1904,6 +1962,13 @@ function translateError(msg){
 function commonAreaSubLabel(key){
   const s = COMMON_AREA_SUB_I18N[key];
   return s ? (s[state.lang]?.name || s.tr.name) : key;
+}
+function boatSubLabel(key){
+  const s = BOAT_SUB_I18N[key];
+  return s ? (s[state.lang]?.name || s.tr.name) : key;
+}
+function boatSubIcon(key){
+  return (BOAT_SUB_I18N[key] && BOAT_SUB_I18N[key].icon) || FALLBACK_PLUS_ICON;
 }
 const FALLBACK_PLUS_ICON = '<svg viewBox="0 0 24 24" width="15" height="15" style="vertical-align:-3px;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 
@@ -2040,6 +2105,8 @@ let state = {
   jobs: [],
   services: [],
   commonAreaSubOptions: [],
+  boatSubOptions: [],
+  boatQuoteRequiredLengthFt: 50,
   addons: [],
   regLat: null,
   regLng: null,
@@ -2051,6 +2118,7 @@ let state = {
   bookingHasEquipment: true,
   bookingHasChemicals: true,
   bookingCommonAreaSelections: {}, // { staircase: {checked}, corridor: {checked}, elevator: {checked} }
+  bookingBoatSelections: {}, // { boat_exterior: {checked}, boat_interior: {checked}, boat_canvas: {checked} }
   bookingAddons: {},
   bookingPaymentMethod: 'cash',
   savedCard: null,
@@ -2789,7 +2857,7 @@ function renderConfigStep(service, props, selectedProperty){
   const addonChecked = (key) => state.bookingAddons[key]?.checked;
   const addonQty = (key) => state.bookingAddons[key]?.quantity || 1;
 
-  if(isGroup){
+  if(isGroup && service.key === 'common_area'){
     const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
     if(commonAreaProps.length === 0){
       return `
@@ -2862,6 +2930,93 @@ function renderConfigStep(service, props, selectedProperty){
       <div class="price" style="margin:14px 0 10px;">${total} € <span style="font-size:12px;color:var(--muted);font-family:Inter">${t('totalLabel')}</span></div>
 
       <button class="btn ochre btn-sm" style="width:100%; margin-top:6px;" data-goto-checklist="${service.key}">${t('continueBtn')}</button>
+    </div>
+    `;
+  }
+
+  // Tekne Temizliği: sadece "Tekne (Yelkenli)" kategorili mülkler secilebilir.
+  // ONEMLI IKI OZEL DURUM:
+  // 1) Fiyatlandirma formulu HENUZ BELIRLENMEDI (kullaniciyla ayri bir turda
+  //    netlesecek) - bu yuzden common_area'nin aksine burada fiyat onizlemesi
+  //    ya da toplam GOSTERILMIYOR, sadece alt hizmet secimi yapiliyor.
+  // 2) 50ft ve uzeri tekneler icin otomatik fiyatlandirma/rezervasyon akisi
+  //    TAMAMEN ATLANIYOR - musteri "Fiyat Teklifi Al" ile destek chat'ine
+  //    yonlendiriliyor (bkz. asagidaki needsQuote dali).
+  if(isGroup && service.key === 'boat'){
+    const boatProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'boat');
+    if(boatProps.length === 0){
+      return `
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); text-align:center;">
+        <div class="property-avatar" style="margin:0 auto 12px;"><img src="${categoryIconSrc('boat')}" alt="" /></div>
+        <div class="hint" style="margin:0;">${t('noBoatPropertyHint')}</div>
+        <button type="button" class="btn ochre btn-sm" id="goto-add-property-boat" style="width:auto; margin-top:14px;">${t('addPropertyCta')}</button>
+      </div>
+      `;
+    }
+    const selectedBoat = boatProps.find(p => p.id === state.bookingPropertyId) || boatProps[0];
+    const needsQuote = Number(selectedBoat.length_ft || 0) >= state.boatQuoteRequiredLengthFt;
+    const boatSelector = boatProps.length > 1 ? `
+      <div class="field">
+        <label>${t('bookingBuildingLabel')}</label>
+        <select id="booking-boat-property-select">
+          ${boatProps.map(p => `<option value="${p.id}" ${p.id===selectedBoat.id?'selected':''}>${propertyDisplayName(p)}</option>`).join('')}
+        </select>
+      </div>
+    ` : '';
+
+    if(needsQuote){
+      return `
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+        ${boatSelector}
+        <div style="text-align:center; padding:16px 6px 6px;">
+          <div style="font-size:34px; margin-bottom:10px;">⛵</div>
+          <div style="font-weight:700; color:var(--navy); font-size:15px; margin-bottom:8px;">${t('boatQuoteNeededTitle')}</div>
+          <div class="hint" style="margin:0 0 16px;">${t('boatQuoteNeededHint')}</div>
+          <button type="button" class="btn ochre btn-sm" style="width:100%;" id="boat-quote-request-btn" data-boat-id="${selectedBoat.id}">${t('boatQuoteRequestBtn')}</button>
+        </div>
+      </div>
+      `;
+    }
+
+    const subChecked = (key) => state.bookingBoatSelections[key]?.checked;
+    return `
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+      ${boatSelector}
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('boatSubServicesHeader')}</div>
+      ${state.boatSubOptions.filter(sub => sub.key !== 'boat_canvas' || selectedBoat.has_canvas).map(sub => `
+        <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px;">
+          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" data-boat-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} />
+            <span style="color:var(--navy);">${boatSubIcon(sub.key)}</span>
+            <span style="flex:1;">${boatSubLabel(sub.key)}</span>
+          </label>
+        </div>
+      `).join('')}
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('whenLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">${t('urgent')}</div>
+        <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">${t('scheduleOpt')}</div>
+      </div>
+      ${state.bookingUrgency==='scheduled' ? `
+        <div class="field"><label>${t('datetimeLabel')}</label><input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" /></div>
+      ` : ''}
+
+      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
+      <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
+        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${state.suppliesFees.noEquipment}€)</div>
+      </div>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
+      <div class="option-row">
+        <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
+        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${state.suppliesFees.noChemicals}€)</div>
+      </div>
+
+      <button class="btn ochre btn-sm" style="width:100%; margin-top:14px;" data-goto-checklist="${service.key}">${t('continueBtn')}</button>
     </div>
     `;
   }
@@ -3820,6 +3975,8 @@ async function loadAll(){
   if(results[3]){
     state.services = results[3].services;
     state.commonAreaSubOptions = results[3].commonAreaSubOptions || [];
+    state.boatSubOptions = results[3].boatSubOptions || [];
+    state.boatQuoteRequiredLengthFt = results[3].boatQuoteRequiredLengthFt || 50;
     state.addons = results[3].addons;
     if(results[3].suppliesFees) state.suppliesFees = results[3].suppliesFees;
   }
@@ -4426,6 +4583,13 @@ function attachHandlers(){
     state.modal = 'add-property'; render();
   };
 
+  const gotoAddPropertyBoat = document.getElementById('goto-add-property-boat');
+  if(gotoAddPropertyBoat) gotoAddPropertyBoat.onclick = () => {
+    resetAddPropertyState();
+    state.propertyCategory = 'boat';
+    state.modal = 'add-property'; render();
+  };
+
   function resetBookingDraftState(){
     state.bookingStep = 'config';
     state.bookingUrgency = 'scheduled';
@@ -4433,6 +4597,7 @@ function attachHandlers(){
     state.bookingHasEquipment = true;
     state.bookingHasChemicals = true;
     state.bookingCommonAreaSelections = {};
+    state.bookingBoatSelections = {};
     state.bookingAddons = {};
     state.bookingPaymentMethod = 'cash';
     state.pendingBooking = null;
@@ -4448,6 +4613,9 @@ function attachHandlers(){
     if(key === 'common_area'){
       const commonAreaProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'common_area');
       state.bookingPropertyId = commonAreaProps[0]?.id || null;
+    } else if(key === 'boat'){
+      const boatProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'boat');
+      state.bookingPropertyId = boatProps[0]?.id || null;
     } else {
       const props = [...state.properties.owned, ...state.properties.delegated];
       const eligibleProps = key === 'office' ? props.filter(p => p.category === 'office') : props;
@@ -4474,6 +4642,13 @@ function attachHandlers(){
     render();
   };
 
+  const bookingBoatPropertySelect = document.getElementById('booking-boat-property-select');
+  if(bookingBoatPropertySelect) bookingBoatPropertySelect.onchange = () => {
+    state.bookingPropertyId = bookingBoatPropertySelect.value;
+    state.bookingBoatSelections = {};
+    render();
+  };
+
   document.querySelectorAll('[data-urgency]').forEach(el => el.onclick = () => {
     state.bookingUrgency = el.dataset.urgency; render();
   });
@@ -4484,6 +4659,32 @@ function attachHandlers(){
     state.bookingCommonAreaSelections = { ...state.bookingCommonAreaSelections, [key]: { ...current, checked: el.checked } };
     render();
   });
+
+  document.querySelectorAll('[data-boat-toggle]').forEach(el => el.onchange = () => {
+    const key = el.dataset.boatToggle;
+    const current = state.bookingBoatSelections[key] || {};
+    state.bookingBoatSelections = { ...state.bookingBoatSelections, [key]: { ...current, checked: el.checked } };
+    render();
+  });
+
+  // "Fiyat Teklifi Al" - 50ft ve uzeri teknelerde normal rezervasyon akisi
+  // yerine gosterilen buton. Rezervasyon panelini kapatip destek chat'ini
+  // tekne adi+uzunlugu ile onceden doldurulmus bir mesajla acar - musteri
+  // sadece gonder'e basmasi yeterli, admin gerekli baglami zaten gorur.
+  const boatQuoteBtn = document.getElementById('boat-quote-request-btn');
+  if(boatQuoteBtn) boatQuoteBtn.onclick = () => {
+    const boatId = boatQuoteBtn.dataset.boatId;
+    const boat = [...state.properties.owned, ...state.properties.delegated].find(p => p.id === boatId);
+    state.bookingService = null;
+    resetBookingDraftState();
+    state.chatInput = t('boatQuoteChatPrefill', {
+      name: boat ? propertyDisplayName(boat) : '',
+      length: boat?.length_ft || '',
+    });
+    state.chatOpen = true;
+    showToast(t('toastQuoteRequestSent'));
+    render();
+  };
 
   document.querySelectorAll('[data-equipment]').forEach(el => el.onclick = () => {
     state.bookingHasEquipment = el.dataset.equipment === 'true'; render();
