@@ -232,8 +232,9 @@ router.get('/bookings', (req, res) => {
   const rows = db
     .prepare(
       `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
-              p.name AS property_name, p.city AS property_city,
-              u.name AS customer_name, u.account_type AS customer_type,
+              j.created_at, j.service_params, j.urgency, j.notes, j.has_equipment, j.has_chemicals,
+              p.name AS property_name, p.city AS property_city, p.address AS property_address, p.category AS property_category,
+              u.name AS customer_name, u.account_type AS customer_type, u.phone AS customer_phone,
               s.name AS staff_name
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
@@ -305,6 +306,19 @@ router.get('/customers', (req, res) => {
     .all();
 
   res.json({ customers: rows });
+});
+
+// Bir müşterinin tüm mülkleri - Müşteriler sayfasında satıra tıklayınca
+// açılan detay modalı için. Tekneye özgü alanlar (berth_number, length_ft
+// vb.) dahil TÜM sütunlar dönüyor - kategoriye göre hangisinin gösterileceğine
+// admin panelinin kendisi (categoryLabel/propertyMetaLine benzeri mantıkla)
+// karar veriyor, tıpkı müşteri uygulamasındaki gibi.
+router.get('/customers/:id/properties', (req, res) => {
+  const { id } = req.params;
+  const rows = db
+    .prepare('SELECT * FROM properties WHERE owner_id = ? ORDER BY created_at DESC')
+    .all(id);
+  res.json({ properties: rows });
 });
 
 // --- Ciro grafiği -----------------------------------------------------------
