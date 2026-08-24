@@ -122,8 +122,15 @@ function getPricingValue(key, fallback = 0) {
 // verilmezse Turkce'ye duser - boylece eski cagrilar (lang'siz) da
 // kirilmadan calismaya devam eder.
 function getChecklist(serviceKey, lang) {
-  const validLang = ['tr', 'en', 'me'].includes(lang) ? lang : 'tr';
-  const column = `item_text_${validLang}`;
+  // NOT: 'ru' icin COALESCE kullaniyoruz - checklist maddeleri henuz
+  // Rusca'ya cevrilmemis olabilir (item_text_ru bos), bu durumda bos/null
+  // gostermek yerine Ingilizce'ye, o da yoksa Turkce'ye düşüyoruz. Diger
+  // diller (tr/en/me) icin bu tur bir fallback'e gerek yok, cunku onlarin
+  // ceviri metinleri baştan beri dolu.
+  const validLang = ['tr', 'en', 'me', 'ru'].includes(lang) ? lang : 'tr';
+  const column = validLang === 'ru'
+    ? `COALESCE(item_text_ru, item_text_en, item_text_tr)`
+    : `item_text_${validLang}`;
   return db
     .prepare(`SELECT id, ${column} AS item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC`)
     .all(serviceKey);
