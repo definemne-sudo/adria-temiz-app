@@ -2104,6 +2104,7 @@ let state = {
   properties: { owned: [], delegated: [] },
   jobs: [],
   services: [],
+  lastServicesLang: null,
   commonAreaSubOptions: [],
   boatSubOptions: [],
   boatQuoteRequiredLengthFt: 50,
@@ -3967,18 +3968,28 @@ function renderModal(){
 
 async function loadAll(){
   const calls = [ api('/properties'), api('/jobs'), api('/payment-methods') ];
-  if(state.services.length === 0) calls.push(api('/services'));
+  // ONEMLI: /services yaniti (ozellikle checklist metinleri) sunucu
+  // tarafinda cevriliyor - dil parametresi gonderilmezse backend Turkce'ye
+  // dusuyor. Eskiden bu istek SADECE state.services bosken (yani sadece
+  // ilk yuklemede) atiliyordu - kullanici dili degistirdiginde bir daha
+  // HIC yenilenmiyordu, checklist hep ilk cekildigi dilde donuk kaliyordu.
+  // Artik hem dil parametresini gonderiyoruz hem de dil degisince yeniden
+  // cekiyoruz (state.services boyle bir sey henuz cekilmemisse VEYA en son
+  // hangi dille cekildiyse o, o anki dilden farkliysa).
+  const needsServicesFetch = state.services.length === 0 || state.lastServicesLang !== state.lang;
+  if(needsServicesFetch) calls.push(api('/services?lang=' + state.lang));
   const results = await Promise.all(calls);
   state.properties = results[0];
   state.jobs = results[1];
   state.savedCard = results[2];
-  if(results[3]){
+  if(needsServicesFetch && results[3]){
     state.services = results[3].services;
     state.commonAreaSubOptions = results[3].commonAreaSubOptions || [];
     state.boatSubOptions = results[3].boatSubOptions || [];
     state.boatQuoteRequiredLengthFt = results[3].boatQuoteRequiredLengthFt || 50;
     state.addons = results[3].addons;
     if(results[3].suppliesFees) state.suppliesFees = results[3].suppliesFees;
+    state.lastServicesLang = state.lang;
   }
   state.ratingJob = findNextRatingJob();
   render();
@@ -4121,6 +4132,11 @@ function attachHandlers(){
     state.lang = el.dataset.lang;
     localStorage.setItem('lang', state.lang);
     render();
+    // Giris yapilmis bir kullanicida, dil degisince checklist gibi sunucu
+    // tarafinda cevrilen icerigin de yeni dile gore yeniden cekilmesi icin
+    // loadAll() cagiriyoruz (bkz. loadAll() icindeki needsServicesFetch).
+    // Giris ekranindaysa (henuz token yok) bu adima gerek yok.
+    if(state.token && state.user) loadAll().catch(() => {});
   });
 
   document.querySelectorAll('[data-choice]').forEach(el => el.onclick = () => {
