@@ -473,6 +473,34 @@ tr: {
   colProperties: "Mülk",
   colJobsCol: "Sipariş",
   colTotalSpent: "Toplam Harcama",
+  categoryApartment: "Apartman Dairesi",
+  categoryHouse: "Müstakil Ev / Villa",
+  categoryOffice: "Ofis / İşyeri",
+  categoryCommonArea: "Ortak Alan",
+  categoryBoat: "Tekne (Yelkenli)",
+  marinaNameLabel: "Marina",
+  berthNumberLabel: "Palamar No",
+  boatLengthLabel: "Uzunluk",
+  cabinCountShort: "kamara",
+  boatTypeMonohull: "Monohull",
+  boatTypeCatamaran: "Katamaran",
+  hasCanvasYes: "Kanvas/Tente var",
+  bookingDetailTitle: "Sipariş Detayı",
+  orderedOnLabel: "Sipariş Tarihi",
+  scheduledForLabel: "Planlanan Tarih",
+  urgencyLabel: "Aciliyet",
+  urgentLabel: "Acil",
+  nowLabel: "Şimdi",
+  scheduledLabel: "Planlı",
+  checklistLabel: "Seçilen Hizmetler",
+  noChecklistData: "Bu iş için alt hizmet seçimi yok.",
+  suppliesInfoLabel: "Malzeme Durumu",
+  equipmentYes: "Ekipman: Var", equipmentNo: "Ekipman: Yok (+ücret)",
+  chemicalsYes: "Kimyasal: Var", chemicalsNo: "Kimyasal: Yok (+ücret)",
+  notesLabel: "Not",
+  customerDetailTitle: "Müşteri Mülkleri",
+  noPropertiesYet: "Bu müşterinin henüz kayıtlı mülkü yok.",
+  loadingLabel: "Yükleniyor…",
   typeIndividual: "Bireysel",
   typeCompany: "Şirket",
   emptyBookings: "Sipariş bulunamadı.",
@@ -834,6 +862,34 @@ en: {
   colProperties: "Properties",
   colJobsCol: "Orders",
   colTotalSpent: "Total Spent",
+  categoryApartment: "Apartment",
+  categoryHouse: "House / Villa",
+  categoryOffice: "Office / Workspace",
+  categoryCommonArea: "Common Area",
+  categoryBoat: "Boat (Sailboat)",
+  marinaNameLabel: "Marina",
+  berthNumberLabel: "Berth No.",
+  boatLengthLabel: "Length",
+  cabinCountShort: "cabins",
+  boatTypeMonohull: "Monohull",
+  boatTypeCatamaran: "Catamaran",
+  hasCanvasYes: "Has canvas/bimini",
+  bookingDetailTitle: "Order Detail",
+  orderedOnLabel: "Ordered On",
+  scheduledForLabel: "Scheduled For",
+  urgencyLabel: "Urgency",
+  urgentLabel: "Urgent",
+  nowLabel: "Now",
+  scheduledLabel: "Scheduled",
+  checklistLabel: "Selected Services",
+  noChecklistData: "No sub-service selections for this job.",
+  suppliesInfoLabel: "Supplies Status",
+  equipmentYes: "Equipment: Provided", equipmentNo: "Equipment: Not provided (+fee)",
+  chemicalsYes: "Chemicals: Provided", chemicalsNo: "Chemicals: Not provided (+fee)",
+  notesLabel: "Note",
+  customerDetailTitle: "Customer Properties",
+  noPropertiesYet: "This customer has no properties yet.",
+  loadingLabel: "Loading…",
   typeIndividual: "Individual",
   typeCompany: "Company",
   emptyBookings: "No bookings found.",
@@ -1194,6 +1250,34 @@ me: {
   colProperties: "Nekretnine",
   colJobsCol: "Narudžbe",
   colTotalSpent: "Ukupno potrošeno",
+  categoryApartment: "Stan",
+  categoryHouse: "Kuća / Vila",
+  categoryOffice: "Poslovni prostor",
+  categoryCommonArea: "Zajednički prostor",
+  categoryBoat: "Brod (Jedrilica)",
+  marinaNameLabel: "Marina",
+  berthNumberLabel: "Broj veza",
+  boatLengthLabel: "Dužina",
+  cabinCountShort: "kabina",
+  boatTypeMonohull: "Monohull",
+  boatTypeCatamaran: "Katamaran",
+  hasCanvasYes: "Ima kanvas/tendu",
+  bookingDetailTitle: "Detalji narudžbe",
+  orderedOnLabel: "Datum narudžbe",
+  scheduledForLabel: "Zakazano za",
+  urgencyLabel: "Hitnost",
+  urgentLabel: "Hitno",
+  nowLabel: "Sada",
+  scheduledLabel: "Zakazano",
+  checklistLabel: "Izabrane usluge",
+  noChecklistData: "Za ovaj posao nema izabranih podusluga.",
+  suppliesInfoLabel: "Status sredstava",
+  equipmentYes: "Oprema: Ima", equipmentNo: "Oprema: Nema (+naknada)",
+  chemicalsYes: "Hemija: Ima", chemicalsNo: "Hemija: Nema (+naknada)",
+  notesLabel: "Napomena",
+  customerDetailTitle: "Nekretnine klijenta",
+  noPropertiesYet: "Ovaj klijent još nema registrovanih nekretnina.",
+  loadingLabel: "Učitavanje…",
   typeIndividual: "Individualni",
   typeCompany: "Kompanija",
   emptyBookings: "Narudžbe nisu pronađene.",
@@ -1311,6 +1395,9 @@ let state = {
   bookingsFilter: 'all',
   applicationsFilter: 'pending',
   appDetailId: null,
+  bookingDetailId: null,
+  customerDetailId: null,
+  customerProperties: null,
   workers: null,
   customers: null,
   revenue: null,
@@ -1735,7 +1822,7 @@ function renderBookings(){
       </tr></thead>
       <tbody>
         ${b.bookings.map(j => `
-          <tr>
+          <tr data-open-booking-detail="${j.id}" style="cursor:pointer;">
             <td><strong>${serviceLabel(j.service_key)}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${j.property_name} · ${j.property_city||''}</span></td>
             <td>${j.customer_name}</td>
             <td>${j.staff_name || T.noStaffAssigned}</td>
@@ -1756,8 +1843,49 @@ function renderBookings(){
 }
 
 function serviceLabel(key){
-  const map = { checkin_checkout:'Airbnb/Booking Temizliği', deep_clean:'Detaylı Temizlik', office:'Ofis/İşyeri Temizliği', common_area:'Ortak Alan Temizliği' };
+  const map = { checkin_checkout:'Airbnb/Booking Temizliği', deep_clean:'Detaylı Temizlik', office:'Ofis/İşyeri Temizliği', common_area:'Ortak Alan Temizliği', boat:'Tekne Temizliği' };
   return map[key] || key;
+}
+
+// ONEMLI: Mulk kategorisi (Apartman/Villa/Ofis/Ortak Alan/Tekne) ARTIK
+// state.lang'e gore DINAMIK cevriliyor - eskiden backend'den gelen (ya da
+// hic cevrilmemis) ham metin dogrudan gosteriliyordu, bu da dil ne olursa
+// olsun hep Turkce gorunmesine sebep oluyordu. Musteri uygulamasindaki
+// categoryLabel() ile ayni mantik.
+function categoryLabel(cat){
+  const map = { apartment:'categoryApartment', house:'categoryHouse', office:'categoryOffice', common_area:'categoryCommonArea', boat:'categoryBoat' };
+  return T[map[cat]] || T.categoryApartment;
+}
+
+// Mulk kartinda ikinci satir: tekne icin Marina+Palamar+ft+kamara, digerleri
+// icin sehir(+m² varsa). Musteri uygulamasindaki propertyMetaLine() ile
+// birebir ayni mantik.
+function propertyMetaLine(p){
+  if(p.category === 'boat'){
+    const parts = [categoryLabel(p.category)];
+    if(p.address) parts.push(p.address);
+    if(p.berth_number) parts.push(p.berth_number);
+    if(p.length_ft) parts.push(p.length_ft + ' ft');
+    if(p.cabin_count) parts.push(p.cabin_count + ' ' + T.cabinCountShort);
+    return parts.join(' · ');
+  }
+  return `${categoryLabel(p.category)}${p.city ? ' · ' + p.city : ''}${p.size_sqm ? ' · ' + p.size_sqm + ' m²' : ''}`;
+}
+
+// Sipariş detayındaki checklist alt hizmet anahtarlarını (boat_exterior,
+// staircase vb.) okunabilir metne çevirir. Yeni bir alt hizmet eklenirse
+// bu haritaya da eklenmesi gerekir.
+function checklistSubLabel(key){
+  const map = {
+    staircase: { tr:'Merdiven', en:'Staircase', me:'Stepenište' },
+    corridor: { tr:'Kat Koridoru', en:'Floor Corridor', me:'Hodnik' },
+    elevator: { tr:'Asansör', en:'Elevator', me:'Lift' },
+    boat_exterior: { tr:'Dış Temizlik', en:'Exterior Cleaning', me:'Spoljašnje čišćenje' },
+    boat_interior: { tr:'İç Temizlik', en:'Interior Cleaning', me:'Unutrašnje čišćenje' },
+    boat_canvas: { tr:'Kanvas / Tente Bakımı', en:'Canvas / Bimini Care', me:'Njega kanvasa/tende' },
+  };
+  const entry = map[key];
+  return entry ? (entry[state.lang] || entry.tr) : key;
 }
 
 function renderWorkers(){
@@ -1803,7 +1931,7 @@ function renderCustomers(){
       </tr></thead>
       <tbody>
         ${c.customers.map(x => `
-          <tr>
+          <tr data-open-customer-detail="${x.id}" style="cursor:pointer;">
             <td><strong>${x.company_name || x.name}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${x.phone}</span></td>
             <td>${x.account_type==='company' ? T.typeCompany : T.typeIndividual}</td>
             <td>${x.property_count}</td>
@@ -2727,6 +2855,69 @@ function renderModal(){
       </div>
     </div>`;
   }
+  if(state.modal === 'booking-detail' && state.bookingDetailId){
+    const j = (state.bookings?.bookings || []).find(x => x.id === state.bookingDetailId);
+    if(!j) return '';
+    const orderedOnLabel = j.created_at ? new Date(j.created_at.replace(' ','T')).toLocaleString('sr-Latn-ME',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const scheduledLabel = j.checkout_at ? new Date(j.checkout_at.replace(' ','T')).toLocaleString('sr-Latn-ME',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    const urgencyText = j.urgency === 'urgent' ? T.urgentLabel : j.urgency === 'now' ? T.nowLabel : T.scheduledLabel;
+    let selections = [];
+    try{
+      const parsed = j.service_params ? JSON.parse(j.service_params) : null;
+      if(parsed && Array.isArray(parsed.selections)) selections = parsed.selections;
+    }catch(e){ /* service_params bozuk/beklenmeyen formatta - checklist bos gosterilir */ }
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal modal-wide">
+        <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+          <div>
+            <h3 style="margin-bottom:0;">${T.bookingDetailTitle}</h3>
+            <div style="font-size:12.5px; color:var(--muted);">${serviceLabel(j.service_key)}</div>
+          </div>
+        </div>
+        <div class="detail-row"><span>${T.orderedOnLabel}</span><strong>${orderedOnLabel}</strong></div>
+        <div class="detail-row"><span>${T.scheduledForLabel}</span><strong>${scheduledLabel}</strong></div>
+        <div class="detail-row"><span>${T.urgencyLabel}</span><strong>${urgencyText}</strong></div>
+        <div class="detail-row"><span>${T.colCustomerCol}</span><strong>${j.customer_name}${j.customer_phone ? ' · ' + j.customer_phone : ''}</strong></div>
+        <div class="detail-row"><span>${T.colStaffCol}</span><strong>${j.staff_name || T.noStaffAssigned}</strong></div>
+        <div class="detail-row"><span>${T.colProperties ? T.colProperties : 'Mülk'}</span><strong>${j.property_name || ''}${j.property_category ? ' (' + categoryLabel(j.property_category) + ')' : ''}${j.property_address ? ' · ' + j.property_address : ''}</strong></div>
+        <div class="detail-row"><span>${T.suppliesInfoLabel}</span><strong>${j.has_equipment ? T.equipmentYes : T.equipmentNo}<br/>${j.has_chemicals ? T.chemicalsYes : T.chemicalsNo}</strong></div>
+        <div class="detail-row"><span>${T.colPrice}</span><strong>${j.price} €</strong></div>
+        <div class="detail-row"><span>${T.colPayment}</span><strong>${jobPaymentBadge(j.payment_method)} ${j.payment_status}</strong></div>
+        <div class="detail-row" style="align-items:flex-start;">
+          <span>${T.checklistLabel}</span>
+          <strong style="max-width:280px; white-space:normal; text-align:right;">
+            ${selections.length === 0 ? T.noChecklistData : selections.map(s => checklistSubLabel(s.key)).join('<br/>')}
+          </strong>
+        </div>
+        ${j.notes ? `<div class="detail-row" style="border-bottom:none; align-items:flex-start;"><span>${T.notesLabel}</span><strong style="max-width:280px; white-space:normal;">${j.notes}</strong></div>` : ''}
+        <button class="btn ghost btn-sm" style="margin-top:14px; width:100%;" id="modal-close">${T.closeBtn}</button>
+      </div>
+    </div>`;
+  }
+  if(state.modal === 'customer-detail'){
+    const cust = (state.customers?.customers || []).find(x => x.id === state.customerDetailId);
+    return `
+    <div class="modal-backdrop" id="modal-backdrop">
+      <div class="modal modal-wide">
+        <div style="margin-bottom:18px;">
+          <h3 style="margin-bottom:0;">${T.customerDetailTitle}</h3>
+          <div style="font-size:12.5px; color:var(--muted);">${cust ? (cust.company_name || cust.name) : ''}</div>
+        </div>
+        ${!state.customerProperties ? `<div class="empty-state">${T.loadingLabel}</div>` :
+          state.customerProperties.length === 0 ? `<div class="empty-state">${T.noPropertiesYet}</div>` :
+          state.customerProperties.map(p => `
+            <div style="border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px;">
+              <div style="font-weight:600; margin-bottom:3px;">${p.name && p.name.trim() ? p.name : categoryLabel(p.category)}</div>
+              <div style="font-size:12.5px; color:var(--muted);">${propertyMetaLine(p)}</div>
+              ${p.category === 'boat' && p.has_canvas ? `<div style="font-size:11.5px; color:var(--ochre); margin-top:4px;">✓ ${T.hasCanvasYes}</div>` : ''}
+            </div>
+          `).join('')
+        }
+        <button class="btn ghost btn-sm" style="margin-top:6px; width:100%;" id="modal-close">${T.closeBtn}</button>
+      </div>
+    </div>`;
+  }
   if(state.modal === 'credentials' && state.newCredentials){
     return `
     <div class="modal-backdrop" id="modal-backdrop">
@@ -3450,6 +3641,27 @@ function attachHandlers(){
     render();
   });
 
+  document.querySelectorAll('[data-open-booking-detail]').forEach(el => el.onclick = () => {
+    state.bookingDetailId = el.dataset.openBookingDetail;
+    state.modal = 'booking-detail';
+    render();
+  });
+
+  document.querySelectorAll('[data-open-customer-detail]').forEach(el => el.onclick = async () => {
+    state.customerDetailId = el.dataset.openCustomerDetail;
+    state.customerProperties = null;
+    state.modal = 'customer-detail';
+    render();
+    try{
+      const result = await api(`/admin/customers/${state.customerDetailId}/properties`);
+      state.customerProperties = result.properties || [];
+    }catch(err){
+      state.customerProperties = [];
+      showToast(err.message);
+    }
+    render();
+  });
+
   document.querySelectorAll('[data-resend-code]').forEach(el => el.onclick = async () => {
     try{
       const result = await api(`/admin/staff-applications/${el.dataset.resendCode}/resend-code`, { method:'POST' });
@@ -3479,7 +3691,11 @@ function attachHandlers(){
   const modalCancel = document.getElementById('modal-cancel');
   if(modalCancel) modalCancel.onclick = () => { state.modal = null; state.rejectTargetId = null; render(); };
   const modalClose = document.getElementById('modal-close');
-  if(modalClose) modalClose.onclick = () => { state.modal = null; state.newCredentials = null; state.appDetailId = null; render(); };
+  if(modalClose) modalClose.onclick = () => {
+    state.modal = null; state.newCredentials = null; state.appDetailId = null;
+    state.bookingDetailId = null; state.customerDetailId = null; state.customerProperties = null;
+    render();
+  };
 
   const confirmReject = document.getElementById('modal-confirm-reject');
   if(confirmReject) confirmReject.onclick = async () => {
