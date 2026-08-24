@@ -322,6 +322,7 @@ function ensureChecklistLangColumns() {
   ensureColumn('service_checklists', 'item_text_tr', 'TEXT');
   ensureColumn('service_checklists', 'item_text_en', 'TEXT');
   ensureColumn('service_checklists', 'item_text_me', 'TEXT');
+  ensureColumn('service_checklists', 'item_text_ru', 'TEXT');
   // Eski "item_text" sutunundaki mevcut veriyi Turkce sutununa tasi
   // (sadece henuz tasinmamis satirlar icin).
   db.exec(`
