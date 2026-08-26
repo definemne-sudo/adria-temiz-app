@@ -358,6 +358,7 @@ tr: {
   toastPasswordChanged: "Şifre değiştirildi.",
   toastAdminCreated: "Admin hesabı oluşturuldu.",
   toastAdminDeleted: "Admin hesabı silindi.",
+  toastPasswordReset: "Şifre sıfırlandı.",
   confirmDeleteAdminTitle: "Admin hesabını sil",
   confirmDeleteAdminHint: "Bu işlem geri alınamaz. Emin misin?",
   financeTitle: "Finans",
@@ -501,6 +502,16 @@ tr: {
   customerDetailTitle: "Müşteri Mülkleri",
   noPropertiesYet: "Bu müşterinin henüz kayıtlı mülkü yok.",
   loadingLabel: "Yükleniyor…",
+  superAdminBadge: "Süper Admin",
+  resetPasswordBtn: "Şifreyi Sıfırla",
+  resetPasswordTitle: "Yeni Şifre Belirle",
+  notSuperAdminHint: "Admin silme ve şifre sıfırlama işlemleri yalnızca süper admin tarafından yapılabilir.",
+  deleteCustomerBtn: "Müşteriyi Sil",
+  deleteBookingBtn: "Siparişi Sil",
+  confirmDeleteCustomerTitle: "Müşteriyi sil",
+  confirmDeleteCustomerHint: "Bu işlem geri alınamaz. Emin misin?",
+  confirmDeleteBookingTitle: "Siparişi sil",
+  confirmDeleteBookingHint: "Bu işlem geri alınamaz. Emin misin?",
   typeIndividual: "Bireysel",
   typeCompany: "Şirket",
   emptyBookings: "Sipariş bulunamadı.",
@@ -515,6 +526,8 @@ tr: {
   revenueOverviewTitle: "Ciro Görünümü (Son 7 Gün)",
   revenueVsPrevious: "önceki döneme göre",
   navSupport: "Destek",
+  navBoatQuotes: "Tekne Fiyat Talepleri",
+  boatQuotesSubtitle: "50 ft ve üzeri tekneler için gelen özel fiyat teklifi talepleri.",
   newOrderNotifTitle: "Yeni Sipariş",
   newOrderNotifBody: "Yeni bir sipariş geldi, kontrol et.",
   newChatNotifTitle: "Yeni Mesaj",
@@ -750,6 +763,7 @@ en: {
   toastPasswordChanged: "Password changed.",
   toastAdminCreated: "Admin account created.",
   toastAdminDeleted: "Admin account deleted.",
+  toastPasswordReset: "Password reset.",
   confirmDeleteAdminTitle: "Delete admin account",
   confirmDeleteAdminHint: "This can't be undone. Are you sure?",
   financeTitle: "Finance",
@@ -890,6 +904,16 @@ en: {
   customerDetailTitle: "Customer Properties",
   noPropertiesYet: "This customer has no properties yet.",
   loadingLabel: "Loading…",
+  superAdminBadge: "Super Admin",
+  resetPasswordBtn: "Reset Password",
+  resetPasswordTitle: "Set New Password",
+  notSuperAdminHint: "Deleting admins and resetting passwords can only be done by the super admin.",
+  deleteCustomerBtn: "Delete Customer",
+  deleteBookingBtn: "Delete Booking",
+  confirmDeleteCustomerTitle: "Delete customer",
+  confirmDeleteCustomerHint: "This action cannot be undone. Are you sure?",
+  confirmDeleteBookingTitle: "Delete booking",
+  confirmDeleteBookingHint: "This action cannot be undone. Are you sure?",
   typeIndividual: "Individual",
   typeCompany: "Company",
   emptyBookings: "No bookings found.",
@@ -904,6 +928,8 @@ en: {
   revenueOverviewTitle: "Revenue Overview (Last 7 Days)",
   revenueVsPrevious: "vs previous period",
   navSupport: "Support",
+  navBoatQuotes: "Boat Price Requests",
+  boatQuotesSubtitle: "Custom price quote requests for boats 50 ft and over.",
   newOrderNotifTitle: "New Booking",
   newOrderNotifBody: "A new booking just came in, take a look.",
   newChatNotifTitle: "New Message",
@@ -1138,6 +1164,7 @@ me: {
   toastPasswordChanged: "Lozinka promijenjena.",
   toastAdminCreated: "Admin nalog kreiran.",
   toastAdminDeleted: "Admin nalog obrisan.",
+  toastPasswordReset: "Šifra resetovana.",
   confirmDeleteAdminTitle: "Obriši admin nalog",
   confirmDeleteAdminHint: "Ovo se ne može poništiti. Jesi li siguran?",
   financeTitle: "Finansije",
@@ -1278,6 +1305,16 @@ me: {
   customerDetailTitle: "Nekretnine klijenta",
   noPropertiesYet: "Ovaj klijent još nema registrovanih nekretnina.",
   loadingLabel: "Učitavanje…",
+  superAdminBadge: "Super Admin",
+  resetPasswordBtn: "Resetuj Šifru",
+  resetPasswordTitle: "Postavi Novu Šifru",
+  notSuperAdminHint: "Brisanje admina i resetovanje šifre može da izvrši samo super admin.",
+  deleteCustomerBtn: "Obriši Klijenta",
+  deleteBookingBtn: "Obriši Narudžbu",
+  confirmDeleteCustomerTitle: "Obriši klijenta",
+  confirmDeleteCustomerHint: "Ova radnja se ne može poništiti. Jesi li siguran/na?",
+  confirmDeleteBookingTitle: "Obriši narudžbu",
+  confirmDeleteBookingHint: "Ova radnja se ne može poništiti. Jesi li siguran/na?",
   typeIndividual: "Individualni",
   typeCompany: "Kompanija",
   emptyBookings: "Narudžbe nisu pronađene.",
@@ -1292,6 +1329,8 @@ me: {
   revenueOverviewTitle: "Pregled prihoda (posljednjih 7 dana)",
   revenueVsPrevious: "u odnosu na prethodni period",
   navSupport: "Podrška",
+  navBoatQuotes: "Zahtjevi za Cijenu Broda",
+  boatQuotesSubtitle: "Zahtjevi za individualnu ponudu za brodove od 50 ft i više.",
   newOrderNotifTitle: "Nova narudžba",
   newOrderNotifBody: "Stigla je nova narudžba, provjeri.",
   newChatNotifTitle: "Nova poruka",
@@ -1420,6 +1459,10 @@ let state = {
   adminsList: null,
   settingsError: '',
   deleteAdminTargetId: null,
+  deleteCustomerTargetId: null,
+  deleteBookingTargetId: null,
+  resetPasswordTargetId: null,
+  resetPasswordError: null,
   marketingSubPage: 'ads',
   adCampaigns: null,
   promoCodes: null,
@@ -1436,6 +1479,7 @@ let state = {
   staffPerformance: null,
   customerPerformance: null,
   activeChatUserId: null,
+  activeChatChannel: 'support',
   chatMessages: null,
   authError: '',
   modal: null,
@@ -1529,6 +1573,7 @@ function renderPanel(){
     ${navItem('performance', 'performance', T.navPerformance)}
     ${navItem('settings', 'settings', T.navSettings)}
     ${navItem('support', 'support', T.navSupport, state.dashboard && state.dashboard.stats.unreadChats)}
+    ${navItem('boat-quotes', 'support', T.navBoatQuotes, state.dashboard && state.dashboard.stats.unreadBoatQuotes)}
     ${navItem('applications', 'applications', T.navApplications, state.dashboard && state.dashboard.stats.pendingApplications)}
     <div class="lang-switch">
       <button type="button" class="${state.lang==='tr'?'active':''}" data-admin-lang="tr">TR</button>
@@ -1553,6 +1598,7 @@ function renderPanel(){
       : state.page==='performance' ? renderPerformance()
       : state.page==='settings' ? renderSettings()
       : state.page==='support' ? renderSupport()
+      : state.page==='boat-quotes' ? renderSupport()
       : renderApplications()}
   </div>
   ${state.modal ? renderModal() : ''}
@@ -2669,15 +2715,22 @@ function renderSettings(){
         <tbody>
           ${admins.admins.map(a => `
             <tr>
-              <td><strong>${a.name}</strong>${a.id===state.user.id ? ' <span style="color:var(--muted); font-size:11px;">(sen)</span>' : ''}</td>
+              <td>
+                <strong>${a.name}</strong>${a.id===state.user.id ? ' <span style="color:var(--muted); font-size:11px;">(sen)</span>' : ''}
+                ${a.is_super_admin ? `<span class="status-pill status-done" style="margin-left:6px; font-size:10px;">${T.superAdminBadge}</span>` : ''}
+              </td>
               <td>${a.username}</td>
               <td>${new Date(a.created_at.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short',year:'numeric'})}</td>
-              <td>${a.id!==state.user.id ? `<button type="button" class="btn danger btn-sm" data-delete-admin="${a.id}">${T.deleteBtn}</button>` : ''}</td>
+              <td style="display:flex; gap:6px; justify-content:flex-end;">
+                ${state.user.isSuperAdmin && a.id!==state.user.id ? `<button type="button" class="btn ghost btn-sm" data-reset-admin-password="${a.id}">${T.resetPasswordBtn}</button>` : ''}
+                ${state.user.isSuperAdmin && a.id!==state.user.id ? `<button type="button" class="btn danger btn-sm" data-delete-admin="${a.id}">${T.deleteBtn}</button>` : ''}
+              </td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     `}
+    ${!state.user.isSuperAdmin ? `<div class="hint" style="margin-bottom:16px;">${T.notSuperAdminHint}</div>` : ''}
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${T.addAdminTitle}</div>
     <form id="add-admin-form" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
       <div class="field" style="margin-bottom:0; flex:1; min-width:140px;"><label>${T.fieldAdminName}</label><input name="name" required /></div>
@@ -2687,7 +2740,30 @@ function renderSettings(){
     </form>
   </div>
   ${state.deleteAdminTargetId ? renderDeleteAdminModal() : ''}
+  ${state.resetPasswordTargetId ? renderResetAdminPasswordModal() : ''}
   `;
+}
+
+function renderResetAdminPasswordModal(){
+  const a = state.adminsList?.admins.find(x => x.id === state.resetPasswordTargetId);
+  return `
+  <div class="modal-backdrop" id="reset-password-backdrop">
+    <div class="modal">
+      <h3 style="margin-bottom:6px;">${T.resetPasswordTitle}</h3>
+      <div style="font-size:12.5px; color:var(--muted); margin-bottom:16px;">${a ? a.name : ''}</div>
+      <form id="reset-admin-password-form" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldNewPassword}</label>
+          <input name="newPassword" type="password" required minlength="6" autofocus />
+        </div>
+        ${state.resetPasswordError ? `<div class="error-msg" style="margin:0;">${state.resetPasswordError}</div>` : ''}
+        <div style="display:flex; gap:10px; margin-top:6px;">
+          <button type="button" class="btn ghost btn-sm" id="reset-password-cancel" style="flex:1;">${T.cancelBtn}</button>
+          <button type="submit" class="btn ochre btn-sm" style="flex:1;">${T.resetPasswordBtn}</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
 }
 
 function renderDeleteAdminModal(){
@@ -2699,6 +2775,34 @@ function renderDeleteAdminModal(){
       <div class="row-actions">
         <button class="btn ghost" id="cancel-delete-admin" style="flex:1;">${T.cancelBtn}</button>
         <button class="btn danger" id="confirm-delete-admin" style="flex:1;">${T.deleteBtn}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderDeleteCustomerModal(){
+  return `
+  <div class="modal-backdrop" id="delete-customer-backdrop">
+    <div class="modal">
+      <h3>${T.confirmDeleteCustomerTitle}</h3>
+      <div class="hint" style="margin:-6px 0 18px;">${T.confirmDeleteCustomerHint}</div>
+      <div class="row-actions">
+        <button class="btn ghost" id="cancel-delete-customer" style="flex:1;">${T.cancelBtn}</button>
+        <button class="btn danger" id="confirm-delete-customer" style="flex:1;">${T.deleteBtn}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderDeleteBookingModal(){
+  return `
+  <div class="modal-backdrop" id="delete-booking-backdrop">
+    <div class="modal">
+      <h3>${T.confirmDeleteBookingTitle}</h3>
+      <div class="hint" style="margin:-6px 0 18px;">${T.confirmDeleteBookingHint}</div>
+      <div class="row-actions">
+        <button class="btn ghost" id="cancel-delete-booking" style="flex:1;">${T.cancelBtn}</button>
+        <button class="btn danger" id="confirm-delete-booking" style="flex:1;">${T.deleteBtn}</button>
       </div>
     </div>
   </div>`;
@@ -2739,9 +2843,10 @@ function renderSupport(){
   const chats = state.chats;
   const activeId = state.activeChatUserId;
   const activeChat = chats && chats.find(c => c.user_id === activeId);
+  const isBoatQuote = state.activeChatChannel === 'boat_quote';
   return `
   <div class="page-head">
-    <div><h2>${T.supportTitle}</h2><p>${T.supportSubtitle}</p></div>
+    <div><h2>${isBoatQuote ? T.navBoatQuotes : T.supportTitle}</h2><p>${isBoatQuote ? T.boatQuotesSubtitle : T.supportSubtitle}</p></div>
   </div>
   <div style="display:grid; grid-template-columns:300px 1fr; gap:16px; align-items:start;">
     <div class="panel-card" style="padding:0; overflow:hidden;">
@@ -2817,6 +2922,13 @@ function renderApplications(){
 }
 
 function renderModal(){
+  // Silme onay modallari, altta hangi modal acik olursa olsun ONCELIKLE
+  // gosterilir (modal-uzerinde-modal). Iptal edilince ilgili target-id
+  // sifirlanir, altta zaten acik olan detay modali (state.modal degismedi)
+  // otomatik geri gorunur.
+  if(state.deleteCustomerTargetId) return renderDeleteCustomerModal();
+  if(state.deleteBookingTargetId) return renderDeleteBookingModal();
+
   if(state.modal === 'app-detail' && state.appDetailId){
     const a = state.applications.find(x => x.id === state.appDetailId);
     if(!a) return '';
@@ -2891,7 +3003,8 @@ function renderModal(){
           </strong>
         </div>
         ${j.notes ? `<div class="detail-row" style="border-bottom:none; align-items:flex-start;"><span>${T.notesLabel}</span><strong style="max-width:280px; white-space:normal;">${j.notes}</strong></div>` : ''}
-        <button class="btn ghost btn-sm" style="margin-top:14px; width:100%;" id="modal-close">${T.closeBtn}</button>
+        ${state.user.isSuperAdmin ? `<button class="btn danger btn-sm" style="margin-top:14px; width:100%;" data-delete-booking="${j.id}">${T.deleteBookingBtn}</button>` : ''}
+        <button class="btn ghost btn-sm" style="margin-top:10px; width:100%;" id="modal-close">${T.closeBtn}</button>
       </div>
     </div>`;
   }
@@ -2914,6 +3027,7 @@ function renderModal(){
             </div>
           `).join('')
         }
+        ${state.user.isSuperAdmin && state.customerProperties && state.customerProperties.length === 0 ? `<button class="btn danger btn-sm" style="margin-top:6px; width:100%;" data-delete-customer="${state.customerDetailId}">${T.deleteCustomerBtn}</button>` : ''}
         <button class="btn ghost btn-sm" style="margin-top:6px; width:100%;" id="modal-close">${T.closeBtn}</button>
       </div>
     </div>`;
@@ -3095,10 +3209,10 @@ let chatPollInterval = null;
 function startChatPolling(){
   stopChatPolling();
   chatPollInterval = setInterval(async () => {
-    if(state.page !== 'support' || !state.token) return;
+    if((state.page !== 'support' && state.page !== 'boat-quotes') || !state.token) return;
     try{
       if(state.activeChatUserId){
-        const fresh = await api(`/admin/chats/${state.activeChatUserId}/messages`);
+        const fresh = await api(`/admin/chats/${state.activeChatUserId}/messages?channel=${state.activeChatChannel}`);
         if(!state.chatMessages || fresh.length !== state.chatMessages.length){
           state.chatMessages = fresh;
           const thread = document.getElementById('chat-thread');
@@ -3113,7 +3227,7 @@ function startChatPolling(){
           }
         }
       }
-      state.chats = await api('/admin/chats');
+      state.chats = await api('/admin/chats?channel=' + state.activeChatChannel);
     }catch(e){ /* sessizce geç, bir sonraki denemede tekrar dener */ }
   }, 3500);
 }
@@ -3122,12 +3236,12 @@ function stopChatPolling(){
 }
 
 async function loadChats(){
-  state.chats = await api('/admin/chats');
+  state.chats = await api('/admin/chats?channel=' + state.activeChatChannel);
   render();
 }
 async function loadChatMessages(userId){
   state.activeChatUserId = userId;
-  state.chatMessages = await api(`/admin/chats/${userId}/messages`);
+  state.chatMessages = await api(`/admin/chats/${userId}/messages?channel=${state.activeChatChannel}`);
   render();
   const thread = document.getElementById('chat-thread');
   if(thread) thread.scrollTop = thread.scrollHeight;
@@ -3280,8 +3394,13 @@ function attachHandlers(){
     if(state.page === 'bookings') await loadBookings(1);
     if(state.page === 'workers') await loadWorkers();
     if(state.page === 'customers') await loadCustomers();
-    if(state.page === 'support'){ await loadChats(); startChatPolling(); }
-    else stopChatPolling();
+    if(state.page === 'support'){
+      state.activeChatChannel = 'support'; state.activeChatUserId = null; state.chatMessages = null;
+      await loadChats(); startChatPolling();
+    } else if(state.page === 'boat-quotes'){
+      state.activeChatChannel = 'boat_quote'; state.activeChatUserId = null; state.chatMessages = null;
+      await loadChats(); startChatPolling();
+    } else stopChatPolling();
     if(state.page === 'services') await loadServicesData();
     if(state.page === 'finance') await loadFinanceSubPage();
     if(state.page === 'settings'){ await loadSettings(); await loadAdmins(); }
@@ -3429,6 +3548,63 @@ function attachHandlers(){
   const deleteAdminBackdrop = document.getElementById('delete-admin-backdrop');
   if(deleteAdminBackdrop) deleteAdminBackdrop.onclick = (e) => { if(e.target===deleteAdminBackdrop){ state.deleteAdminTargetId = null; render(); } };
 
+  document.querySelectorAll('[data-reset-admin-password]').forEach(el => el.onclick = () => {
+    state.resetPasswordTargetId = el.dataset.resetAdminPassword;
+    state.resetPasswordError = null;
+    render();
+  });
+  const resetPasswordCancel = document.getElementById('reset-password-cancel');
+  if(resetPasswordCancel) resetPasswordCancel.onclick = () => { state.resetPasswordTargetId = null; state.resetPasswordError = null; render(); };
+  const resetPasswordBackdrop = document.getElementById('reset-password-backdrop');
+  if(resetPasswordBackdrop) resetPasswordBackdrop.onclick = (e) => { if(e.target===resetPasswordBackdrop){ state.resetPasswordTargetId = null; render(); } };
+  const resetAdminPasswordForm = document.getElementById('reset-admin-password-form');
+  if(resetAdminPasswordForm) resetAdminPasswordForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(resetAdminPasswordForm));
+    try{
+      await api(`/admin/admins/${state.resetPasswordTargetId}/reset-password`, { method:'PUT', body: JSON.stringify({ newPassword: fd.newPassword }) });
+      showToast(T.toastPasswordReset || 'OK');
+      state.resetPasswordTargetId = null; state.resetPasswordError = null;
+      render();
+    }catch(err){ state.resetPasswordError = err.message; render(); }
+  };
+
+  document.querySelectorAll('[data-delete-customer]').forEach(el => el.onclick = () => {
+    state.deleteCustomerTargetId = el.dataset.deleteCustomer;
+    render();
+  });
+  const cancelDeleteCustomer = document.getElementById('cancel-delete-customer');
+  if(cancelDeleteCustomer) cancelDeleteCustomer.onclick = () => { state.deleteCustomerTargetId = null; render(); };
+  const confirmDeleteCustomer = document.getElementById('confirm-delete-customer');
+  if(confirmDeleteCustomer) confirmDeleteCustomer.onclick = async () => {
+    try{
+      await api(`/admin/customers/${state.deleteCustomerTargetId}`, { method:'DELETE' });
+      showToast(T.deleteCustomerBtn);
+      state.deleteCustomerTargetId = null; state.modal = null; state.customerDetailId = null; state.customerProperties = null;
+      await loadCustomers();
+    }catch(err){ showToast(err.message); state.deleteCustomerTargetId = null; render(); }
+  };
+  const deleteCustomerBackdrop = document.getElementById('delete-customer-backdrop');
+  if(deleteCustomerBackdrop) deleteCustomerBackdrop.onclick = (e) => { if(e.target===deleteCustomerBackdrop){ state.deleteCustomerTargetId = null; render(); } };
+
+  document.querySelectorAll('[data-delete-booking]').forEach(el => el.onclick = () => {
+    state.deleteBookingTargetId = el.dataset.deleteBooking;
+    render();
+  });
+  const cancelDeleteBooking = document.getElementById('cancel-delete-booking');
+  if(cancelDeleteBooking) cancelDeleteBooking.onclick = () => { state.deleteBookingTargetId = null; render(); };
+  const confirmDeleteBooking = document.getElementById('confirm-delete-booking');
+  if(confirmDeleteBooking) confirmDeleteBooking.onclick = async () => {
+    try{
+      await api(`/admin/bookings/${state.deleteBookingTargetId}`, { method:'DELETE' });
+      showToast(T.deleteBookingBtn);
+      state.deleteBookingTargetId = null; state.modal = null; state.bookingDetailId = null;
+      await loadBookings();
+    }catch(err){ showToast(err.message); state.deleteBookingTargetId = null; render(); }
+  };
+  const deleteBookingBackdrop = document.getElementById('delete-booking-backdrop');
+  if(deleteBookingBackdrop) deleteBookingBackdrop.onclick = (e) => { if(e.target===deleteBookingBackdrop){ state.deleteBookingTargetId = null; render(); } };
+
   document.querySelectorAll('[data-marketing-subpage]').forEach(el => el.onclick = async () => {
     state.marketingSubPage = el.dataset.marketingSubpage;
     await loadMarketingSubPage();
@@ -3543,7 +3719,7 @@ function attachHandlers(){
     const fd = Object.fromEntries(new FormData(chatReplyForm));
     if(!fd.message.trim()) return;
     try{
-      await api(`/admin/chats/${state.activeChatUserId}/messages`, { method:'POST', body: JSON.stringify({ message: fd.message }) });
+      await api(`/admin/chats/${state.activeChatUserId}/messages`, { method:'POST', body: JSON.stringify({ message: fd.message, channel: state.activeChatChannel }) });
       await loadChatMessages(state.activeChatUserId);
       await loadChats();
     }catch(err){ showToast(err.message); }
