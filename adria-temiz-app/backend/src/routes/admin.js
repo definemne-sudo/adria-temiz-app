@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
+const { sendPushToUser } = require('../services/push');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -439,6 +440,16 @@ router.post('/chats/:userId/messages', (req, res) => {
     `INSERT INTO chat_messages (id, user_id, sender, message, channel) VALUES (?, ?, 'admin', ?, ?)`
   ).run(id, req.params.userId, message.trim(), channel);
   res.status(201).json(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id));
+
+  // Musteriye, admin'in yanitini push ile haber veriyoruz - kanala gore
+  // baslik farkli (destek vs tekne fiyat teklifi), boylece musteri hangi
+  // konuda yanit geldigini bildirimden bile anlar.
+  sendPushToUser(req.params.userId, {
+    title: channel === 'boat_quote' ? 'Tekne fiyat teklifine yanıt geldi' : 'MICISTO Destek\'ten yeni mesaj',
+    body: message.trim().slice(0, 120),
+    type: 'chat_message',
+    channel,
+  }).catch((err) => console.error('Chat push bildirimi hata:', err));
 });
 
 // --- Hizmetler & Fiyatlandırma ----------------------------------------------
@@ -673,6 +684,18 @@ router.post('/finance/staff/:id/periods/mark-paid', (req, res) => {
      ON CONFLICT(staff_id, period_start) DO UPDATE SET amount = excluded.amount, paid_at = datetime('now')`
   ).run(uuid(), req.params.id, periodStart, periodEnd, Number(amount) || 0);
   res.json({ message: 'Ödendi olarak işaretlendi.' });
+
+  // Personel kendi mutabakatini "Odememi Aldim" ile ZATEN kendisi
+  // isaretliyorsa (jobs.js /finance/mark-received) bu push'a gerek yok -
+  // kendine bildirim gondermek anlamsiz. Sadece ADMIN tarafindan
+  // isaretlendiginde (yani personel henuz haberi yokken) push gonderiyoruz.
+  if (req.user.accountType === 'admin') {
+    sendPushToUser(req.params.id, {
+      title: 'Ödemen gönderildi 💸',
+      body: `${amount ? Number(amount).toFixed(2) + ' € ' : ''}tutarındaki ödemen işleme alındı.`,
+      type: 'payment_sent',
+    }).catch((err) => console.error('Ödeme bildirimi hata:', err));
+  }
 });
 
 router.post('/finance/staff/:id/periods/unmark-paid', (req, res) => {
