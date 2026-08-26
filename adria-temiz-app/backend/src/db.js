@@ -414,3 +414,78 @@ function migratePropertiesForBoatCategory() {
   db.pragma('foreign_keys = ON');
 }
 migratePropertiesForBoatCategory();
+
+// --- Super Admin sistemi -----------------------------------------------
+// Sadece TEK bir admin, "her seye gucu yeten" (musteri/siparis silme, diger
+// adminleri silme/sifresini sifirlama) yetkisine sahip olmali. Bu, Railway'de
+// SUPER_ADMIN_USERNAME environment variable'i ile belirleniyor - kod
+// icinde SABIT/hardcoded degil, boylece kim oldugu istenirse Railway
+// panelinden degistirilebilir, kod degisikligi gerekmez.
+// ONEMLI: Bu fonksiyon her sunucu baslangicinda calisir (idempotent) -
+// belirtilen kullanici adina sahip admin varsa ONA is_super_admin=1 verir,
+// DIGER TUM adminlerin is_super_admin'ini 0'a ceker (aynı anda birden
+// fazla super admin olmasi engellenir). SUPER_ADMIN_USERNAME hic
+// tanimlanmamissa ya da eslesen bir admin yoksa, HICBIR admin super admin
+// olmaz (sessizce atlanir) - bu, yanlislikla herkesin yetkisiz kalmasindan
+// iyidir, hatali/bos bir env var yuzunden yanlis kisiye yetki verilmesindense.
+function ensureSuperAdmin() {
+  ensureColumn('users', 'is_super_admin', 'INTEGER NOT NULL DEFAULT 0');
+  const targetUsername = (process.env.SUPER_ADMIN_USERNAME || '').trim();
+  db.exec(`UPDATE users SET is_super_admin = 0 WHERE account_type = 'admin'`);
+  if (targetUsername) {
+    const result = db
+      .prepare(`UPDATE users SET is_super_admin = 1 WHERE account_type = 'admin' AND username = ?`)
+      .run(targetUsername);
+    if (result.changes === 0) {
+      console.warn(`[UYARI] SUPER_ADMIN_USERNAME="${targetUsername}" ile eslesen bir admin hesabi bulunamadi - hicbir admin super admin degil.`);
+    }
+  } else {
+    console.warn('[UYARI] SUPER_ADMIN_USERNAME environment variable tanimlanmamis - hicbir admin super admin degil.');
+  }
+}
+ensureSuperAdmin();
+
+// --- Tekne fiyat teklifi icin ayri chat kanali ---------------------------
+// chat_messages tablosu simdiye kadar tek bir "genel destek" akisi
+// tutuyordu. Tekne temizligi >=50ft icin "Fiyat Teklifi Al" butonunun genel
+// destek kutusuna DEGIL, ayri bir gelen kutusuna dusmesi icin bir "channel"
+// sutunu ekliyoruz. Mevcut TUM eski mesajlar (kolon eklenmeden once
+// yazilmis) varsayilan olarak 'support' kanalina ait sayilir - bu, geriye
+// donuk uyumlulugu bozmaz, eski destek gecmisi oldugu gibi "Destek"
+// sekmesinde gorunmeye devam eder.
+ensureColumn('chat_messages', 'channel', "TEXT NOT NULL DEFAULT 'support'");
+
+// --- Eski kayitlarda "gizlice cevrilmis" mulk isimlerini temizleme -------
+// GECMISTE (bu dosyadaki mevcut duzeltmelerden ONCE), musteri kayit
+// sirasinda mulk ismi bos birakirsa, o anki dilde CEVRILMIS kategori adi
+// (orn. "Apartman Dairesi") dogrudan 'name' sutununa YAZILIYORDU. Bu,
+// musteri sonradan dili degistirdiginde mulk basligi hep ilk kayit dilinde
+// KALICI kalmasina yol aciyordu (kategori metni dogru cevriliyor olsa bile,
+// baslik cevrilmiyordu). Frontend'de bu artik duzeltildi (yeni kayitlarda
+// isim bos birakilirsa 'name' bos string olarak kaydediliyor, ekranda ANLIK
+// olarak dile gore cevrilen kategori adi gosteriliyor) - ama ESKI kayitlarda
+// hala bu "donmus" ceviri metni duruyor olabilir. Bu migration, name alani
+// TAM OLARAK bilinen 4 dildeki (TR/EN/ME/RU) kategori etiketlerinden birine
+// esit olan satirlari bulup bos stringe cevirir - boylece onlar da artik
+// ANLIK/dinamik cevrilen kategori adini gosterir. IDEMPOTENT'tir (bir kez
+// temizlenen bir satir ikinci calistirmada zaten eslesmez).
+function clearBakedInTranslatedPropertyNames() {
+  const knownCategoryLabels = [
+    // Turkce
+    'Apartman Dairesi', 'Müstakil Ev / Villa', 'Ofis / İşyeri', 'Ortak Alan (Bina geneli)', 'Tekne (Yelkenli)',
+    // Ingilizce
+    'Apartment', 'House/Villa', 'Office/Shop', 'Common Area (Whole Building)', 'Boat (Sailboat)',
+    // Karadagca
+    'Stan', 'Kuća/Villa', 'Poslovni prostor', 'Zajednički prostor (cijela zgrada)', 'Brod (Jedrilica)',
+    // Rusca
+    'Квартира', 'Дом / Вилла', 'Офис / Рабочее место', 'Общая зона (всё здание)', 'Лодка (Парусная)',
+  ];
+  const placeholders = knownCategoryLabels.map(() => '?').join(',');
+  const result = db
+    .prepare(`UPDATE properties SET name = '' WHERE name IN (${placeholders})`)
+    .run(...knownCategoryLabels);
+  if (result.changes > 0) {
+    console.log(`[BILGI] ${result.changes} eski mulk kaydinda donmus/baked-in kategori adi temizlendi (artik dinamik cevrilecek).`);
+  }
+}
+clearBakedInTranslatedPropertyNames();
