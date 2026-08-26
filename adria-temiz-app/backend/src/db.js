@@ -361,8 +361,29 @@ for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
 // constraint'leri dogrudan degistirmeyi desteklemiyor). Bu yuzden tabloyu
 // guvenle yeniden olusturup mevcut veriyi tasiyoruz. IDEMPOTENT'tir -
 // constraint zaten 'boat' iceriyorsa (yeni kurulan bir veritabaninda oldugu
-// gibi) hicbir sey yapmadan gecer. Gercek veri + iliskili kayitlarla
-// (property_delegates FK) test edildi, hicbir veri kaybi olmuyor.
+// gibi) hicbir sey yapmadan gecer.
+//
+// KRITIK DUZELTME: Ilk yazilan surumde, orijinal 'properties' tablosu
+// dogrudan RENAME ediliyordu (properties -> properties_old). SQLite'in
+// DOKUMANTE EDILMIS ama az bilinen bir davranisi var: bir tablo RENAME
+// edildiginde, SQLite o tabloya FOREIGN KEY ile referans veren TUM DIGER
+// tablolarin (bizim durumumuzda cleaning_jobs, property_delegates)
+// semasindaki REFERENCES ifadesini de OTOMATIK OLARAK yeni isme guncelliyor.
+// Yani cleaning_jobs.property_id'nin "REFERENCES properties(id)" ifadesi
+// sessizce "REFERENCES properties_old(id)" oluveriyor - biz properties_old'u
+// silince bu referans askida kaliyor ve cleaning_jobs'a INSERT yapilamaz hale
+// geliyordu ("no such table: main.properties_old" hatasi). Gercek bir
+// veritabaniyla (property_delegates FK'li) test ederken bu hatayi yakaladik.
+//
+// DUZELTME: Orijinal 'properties' tablosunu HIC RENAME ETMIYORUZ. Onun
+// yerine yeni semali tabloyu FARKLI bir gecici isimle (properties_new)
+// olusturup veriyi orijinal isimden (hala 'properties') kopyaliyoruz,
+// orijinali DROP ediyoruz (DROP, RENAME'in aksine baska tablolarin FK
+// referanslarini degistirmiyor), sonra yeni tabloyu doğru isme tasiyoruz.
+// Bu son adimdaki RENAME hicbir tabloyu etkilemiyor cunku hicbir tablo
+// 'properties_new' adina referans vermiyor - cleaning_jobs'un referansi
+// (hic degismeden hep "properties" yazan) bu son adimdan sonra otomatik
+// olarak gecerli hale geliyor. Gercek veri + FK'li tablolarla test edildi.
 function migratePropertiesForBoatCategory() {
   const tableInfo = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='properties'`).get();
   if (!tableInfo || (tableInfo.sql && tableInfo.sql.includes("'boat'"))) {
@@ -370,9 +391,8 @@ function migratePropertiesForBoatCategory() {
   }
   db.pragma('foreign_keys = OFF');
   const migrate = db.transaction(() => {
-    db.exec(`ALTER TABLE properties RENAME TO properties_old;`);
     db.exec(`
-      CREATE TABLE properties (
+      CREATE TABLE properties_new (
         id TEXT PRIMARY KEY,
         owner_id TEXT NOT NULL REFERENCES users(id),
         name TEXT NOT NULL,
@@ -399,16 +419,17 @@ function migratePropertiesForBoatCategory() {
       );
     `);
     db.exec(`
-      INSERT INTO properties
+      INSERT INTO properties_new
         (id, owner_id, name, category, building_name, address, city, latitude, longitude,
          size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
          bedroom_count, bathroom_count, created_at)
       SELECT id, owner_id, name, category, building_name, address, city, latitude, longitude,
              size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
              bedroom_count, bathroom_count, created_at
-      FROM properties_old;
+      FROM properties;
     `);
-    db.exec(`DROP TABLE properties_old;`);
+    db.exec(`DROP TABLE properties;`);
+    db.exec(`ALTER TABLE properties_new RENAME TO properties;`);
   });
   migrate();
   db.pragma('foreign_keys = ON');
