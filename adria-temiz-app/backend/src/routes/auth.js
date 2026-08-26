@@ -351,7 +351,7 @@ router.post('/admin-login', (req, res) => {
   );
   res.json({
     token,
-    user: { id: user.id, name: user.name, accountType: user.account_type, username: user.username },
+    user: { id: user.id, name: user.name, accountType: user.account_type, username: user.username, isSuperAdmin: !!user.is_super_admin },
   });
 });
 
