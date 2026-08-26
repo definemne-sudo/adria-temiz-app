@@ -611,6 +611,21 @@ router.patch('/:id/status', (req, res) => {
     db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
   }
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
+
+  // Is tamamlandiginda musteriye "degerlendir" daveti - eskiden bu haber
+  // yalnizca uygulama acilinca gorunen bir ekrandi (bkz. asagidaki /:id/rate
+  // yorumu), simdi push ile de anlik haber veriliyor.
+  if (status === 'done') {
+    const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(job.property_id);
+    if (property) {
+      sendPushToUser(property.owner_id, {
+        title: 'Hizmetin tamamlandı! ✅',
+        body: `${property.name} için hizmet tamamlandı - deneyimini değerlendirmek ister misin?`,
+        jobId: id,
+        type: 'job_done',
+      }).catch((err) => console.error('Tamamlanma bildirimi hata:', err));
+    }
+  }
 });
 
 // Müşteri, personel tarafından tamamlanmış (status='done') bir siparişi
