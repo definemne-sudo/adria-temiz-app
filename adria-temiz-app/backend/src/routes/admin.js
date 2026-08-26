@@ -18,6 +18,19 @@ router.use((req, res, next) => {
   next();
 });
 
+// Sadece "her şeye gücü yeten" TEK admin için ek yetki kontrolü - müşteri/
+// sipariş silme, diğer adminleri silme/şifresini sıfırlama gibi geri
+// alınamaz/hassas işlemler için kullanılır. JWT payload'ına GÜVENMİYORUZ
+// (token 30 gün geçerli - bu sürede süper admin ataması değişebilir),
+// bunun yerine her istekte veritabanından TAZE kontrol ediyoruz.
+function requireSuperAdmin(req, res, next) {
+  const me = db.prepare(`SELECT is_super_admin FROM users WHERE id = ? AND account_type = 'admin'`).get(req.user.id);
+  if (!me || !me.is_super_admin) {
+    return res.status(403).json({ error: 'Bu işlem yalnızca süper admin tarafından yapılabilir.' });
+  }
+  next();
+}
+
 // --- Personel başvuruları -------------------------------------------------
 
 router.get('/staff-applications', (req, res) => {
@@ -114,15 +127,21 @@ router.get('/stats', (req, res) => {
 
   const unreadChats = count(
     `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
+     WHERE sender = 'user' AND channel = 'support' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'support' AND r.sender='admin' AND r.created_at >= cm.created_at
+     )`
+  );
+  const unreadBoatQuotes = count(
+    `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
+     WHERE sender = 'user' AND channel = 'boat_quote' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'boat_quote' AND r.sender='admin' AND r.created_at >= cm.created_at
      )`
   );
 
   res.json({
     totalCustomers, totalStaff, onlineStaff, pendingApplications,
     totalProperties, totalJobs, completedJobs, pendingJobs,
-    revenue, unreadChats,
+    revenue, unreadChats, unreadBoatQuotes,
   });
 });
 
@@ -190,8 +209,14 @@ router.get('/dashboard', (req, res) => {
 
   const unreadChats = count(
     `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
+     WHERE sender = 'user' AND channel = 'support' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'support' AND r.sender='admin' AND r.created_at >= cm.created_at
+     )`
+  );
+  const unreadBoatQuotes = count(
+    `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
+     WHERE sender = 'user' AND channel = 'boat_quote' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'boat_quote' AND r.sender='admin' AND r.created_at >= cm.created_at
      )`
   );
 
@@ -206,6 +231,7 @@ router.get('/dashboard', (req, res) => {
       todayRevenue,
       avgScore,
       unreadChats,
+      unreadBoatQuotes,
     },
     workerSummary: { total: totalStaff, online: availableStaff, busy: busyStaff, offline: offlineStaff },
     jobStatusBreakdown: { completed: completedJobs, inProgress: inProgressJobs, assigned: assignedJobs, pending: pendingJobs, total: totalJobs },
@@ -365,32 +391,43 @@ router.get('/revenue', (req, res) => {
 
 // Tüm konuşmaları (kullanıcı bazında), son mesaj önizlemesi ve okunmamış
 // bilgisiyle listeler.
+// Gecerli kanallar: 'support' (genel destek) ve 'boat_quote' (>=50ft tekne
+// fiyat teklifi talepleri). Admin panelinde bu ikisi TAMAMEN AYRI gelen
+// kutulari olarak gosterilir - "Tekne Fiyat Talepleri" sekmesi "Destek"
+// sekmesinden bagimsiz calisir.
+function normalizeChannel(raw) {
+  return raw === 'boat_quote' ? 'boat_quote' : 'support';
+}
+
 router.get('/chats', (req, res) => {
+  const channel = normalizeChannel(req.query.channel);
   const rows = db
     .prepare(
       `SELECT u.id AS user_id, u.name AS customer_name, u.account_type,
-              (SELECT message FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message,
-              (SELECT created_at FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message_at,
-              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = u.id AND cm.sender = 'user'
-                 AND NOT EXISTS (SELECT 1 FROM chat_messages r WHERE r.user_id = u.id AND r.sender='admin' AND r.created_at >= cm.created_at)
+              (SELECT message FROM chat_messages WHERE user_id = u.id AND channel = ? ORDER BY created_at DESC LIMIT 1) AS last_message,
+              (SELECT created_at FROM chat_messages WHERE user_id = u.id AND channel = ? ORDER BY created_at DESC LIMIT 1) AS last_message_at,
+              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = u.id AND cm.channel = ? AND cm.sender = 'user'
+                 AND NOT EXISTS (SELECT 1 FROM chat_messages r WHERE r.user_id = u.id AND r.channel = ? AND r.sender='admin' AND r.created_at >= cm.created_at)
               ) AS unread_count
        FROM users u
-       WHERE EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.user_id = u.id)
+       WHERE EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.user_id = u.id AND cm.channel = ?)
        ORDER BY last_message_at DESC`
     )
-    .all();
+    .all(channel, channel, channel, channel, channel);
   res.json(rows);
 });
 
 router.get('/chats/:userId/messages', (req, res) => {
+  const channel = normalizeChannel(req.query.channel);
   const rows = db
-    .prepare('SELECT * FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC')
-    .all(req.params.userId);
+    .prepare('SELECT * FROM chat_messages WHERE user_id = ? AND channel = ? ORDER BY created_at ASC')
+    .all(req.params.userId, channel);
   res.json(rows);
 });
 
 router.post('/chats/:userId/messages', (req, res) => {
   const { message } = req.body;
+  const channel = normalizeChannel(req.body.channel);
   if (!message || !message.trim()) {
     return res.status(400).json({ error: 'Mesaj boş olamaz.' });
   }
@@ -399,8 +436,8 @@ router.post('/chats/:userId/messages', (req, res) => {
 
   const id = uuid();
   db.prepare(
-    `INSERT INTO chat_messages (id, user_id, sender, message) VALUES (?, ?, 'admin', ?)`
-  ).run(id, req.params.userId, message.trim());
+    `INSERT INTO chat_messages (id, user_id, sender, message, channel) VALUES (?, ?, 'admin', ?, ?)`
+  ).run(id, req.params.userId, message.trim(), channel);
   res.status(201).json(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id));
 });
 
@@ -679,7 +716,7 @@ router.put('/settings', (req, res) => {
 // --- Admin hesap yönetimi ----------------------------------------------------
 
 router.get('/admins', (req, res) => {
-  const admins = db.prepare(`SELECT id, name, username, created_at FROM users WHERE account_type = 'admin' ORDER BY created_at ASC`).all();
+  const admins = db.prepare(`SELECT id, name, username, created_at, is_super_admin FROM users WHERE account_type = 'admin' ORDER BY created_at ASC`).all();
   res.json({ admins });
 });
 
@@ -706,7 +743,7 @@ router.post('/admins', (req, res) => {
   res.status(201).json({ message: 'Admin hesabı oluşturuldu.', admin: { id, name: name.trim(), username: username.trim() } });
 });
 
-router.delete('/admins/:id', (req, res) => {
+router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
   if (req.params.id === req.user.id) {
     return res.status(400).json({ error: 'Kendi hesabını silemezsin.' });
   }
@@ -716,6 +753,56 @@ router.delete('/admins/:id', (req, res) => {
   }
   db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
   res.json({ message: 'Admin hesabı silindi.' });
+});
+
+// Süper admin, BAŞKA bir adminin şifresini SIFIRLAR (yeni bir şifre
+// belirler). ÖNEMLİ: mevcut şifreyi GÖRMEK/GERİ ÇÖZMEK mümkün değil ve
+// güvenlik açısından zaten doğru olan budur - şifreler bcrypt ile
+// hash'lenmiş durumda, hash'ten orijinal şifreye geri dönülemez. Bu yüzden
+// "şifreyi göster" değil, "yeni şifre belirle" akışı sunuluyor.
+router.put('/admins/:id/reset-password', requireSuperAdmin, (req, res) => {
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
+  }
+  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'admin'`).get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Admin hesabı bulunamadı.' });
+  const passwordHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(passwordHash, req.params.id);
+  res.json({ message: 'Şifre sıfırlandı.' });
+});
+
+// Bir müşteriyi (birey ya da yönetim şirketi) siler - yalnızca süper admin.
+// Güvenlik: aktif/geçmiş mülkü olan bir müşteri YANLIŞLIKLA silinip veri
+// bütünlüğü bozulmasın diye, önce mülkü olup olmadığı kontrol edilir. Gerçek
+// bir müşteriyi silmek istiyorsa, önce mülklerini silmesi gerekir - bu,
+// "yanlış/test kaydı" silme senaryosu için zaten yeterli bir akış (yeni
+// kayıt olmuş, henüz hiçbir mülk eklememiş birini silmek serbest).
+router.delete('/customers/:id', requireSuperAdmin, (req, res) => {
+  const { id } = req.params;
+  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type IN ('individual','company')`).get(id);
+  if (!target) return res.status(404).json({ error: 'Müşteri bulunamadı.' });
+  const propertyCount = db.prepare(`SELECT COUNT(*) AS c FROM properties WHERE owner_id = ?`).get(id).c;
+  if (propertyCount > 0) {
+    return res.status(409).json({ error: 'Bu müşterinin kayıtlı mülkleri var, önce onları silmelisin.' });
+  }
+  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  res.json({ message: 'Müşteri silindi.' });
+});
+
+// Bir siparişi/işi siler - yalnızca süper admin. Tamamlanmış/ödenmiş bir
+// işin yanlışlıkla silinip mali kayıtların bozulmaması için, ödemesi
+// alınmış (payment_status='released' ya da 'held') işlerin silinmesi
+// engellenir - bunlar yalnızca durum değiştirilerek (iptal vb.) yönetilebilir.
+router.delete('/bookings/:id', requireSuperAdmin, (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare(`SELECT id, payment_status FROM cleaning_jobs WHERE id = ?`).get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (['held', 'released'].includes(job.payment_status)) {
+    return res.status(409).json({ error: 'Ödemesi alınmış/tutulan bir sipariş silinemez.' });
+  }
+  db.prepare(`DELETE FROM cleaning_jobs WHERE id = ?`).run(id);
+  res.json({ message: 'Sipariş silindi.' });
 });
 
 // Giriş yapmış admin kendi şifresini değiştirir.
