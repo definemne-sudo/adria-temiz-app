@@ -723,7 +723,7 @@ const TRANSLATIONS = {
     boatQuoteNeededHint: "50 ft ve üzeri tekneler için fiyatlandırma tekneye özel belirlenir. Aşağıdaki butona tıklayarak bize ulaş, en kısa sürede sana özel bir teklif sunalım.",
     boatQuoteRequestBtn: "Fiyat Teklifi Al",
     boatQuoteChatPrefill: "Merhaba, \"{{name}}\" adlı teknem ({{length}} ft) için fiyat teklifi almak istiyorum.",
-    toastQuoteRequestSent: "Talebin destek ekranına iletildi, oradan devam edebilirsin.",
+    toastQuoteRequestSent: "Talebin iletildi, aşağıdaki sohbetten devam edebilirsin.",
     corridorSqmLabel: "Koridor alanı (m²)",
     elevatorCapacityLabel: "Asansör kapasitesi (kişi)",
     invoiceLabel: "🧾 Fatura",
@@ -916,6 +916,8 @@ const TRANSLATIONS = {
     chatButtonAria: "MICISTO ile iletişime geç",
     chatModalTitle: "MICISTO Destek",
     chatModalSubtitle: "Acil bir durum mu var? Buradan bize yaz.",
+    boatQuoteChatTitle: "Tekne Fiyat Teklifi",
+    boatQuoteChatSubtitle: "Teknenle ilgili fiyat teklifini buradan takip et.",
     chatEmptyState: "Henüz mesaj yok. Aşağıdan yazmaya başlayabilirsin.",
     chatPlaceholder: "Mesajını yaz...",
     chatSendBtn: "Gönder",
@@ -1023,7 +1025,7 @@ const TRANSLATIONS = {
     boatQuoteNeededHint: "Для лодок от 50 футов цена определяется индивидуально. Нажмите кнопку ниже, чтобы связаться с нами — мы подготовим предложение как можно скорее.",
     boatQuoteRequestBtn: "Получить предложение",
     boatQuoteChatPrefill: "Здравствуйте, хочу получить предложение по цене для моей лодки «{{name}}» ({{length}} фт).",
-    toastQuoteRequestSent: "Ваш запрос передан в чат поддержки, продолжите там.",
+    toastQuoteRequestSent: "Ваш запрос отправлен, продолжите в чате ниже.",
     corridorSqmLabel: "Площадь коридора (м²)",
     elevatorCapacityLabel: "Вместимость лифта (чел.)",
     invoiceLabel: "🧾 Счёт",
@@ -1216,6 +1218,8 @@ const TRANSLATIONS = {
     chatButtonAria: "Связаться с MICISTO",
     chatModalTitle: "Поддержка MICISTO",
     chatModalSubtitle: "Срочный вопрос? Напишите нам здесь.",
+    boatQuoteChatTitle: "Предложение по цене лодки",
+    boatQuoteChatSubtitle: "Следите здесь за предложением по цене для вашей лодки.",
     chatEmptyState: "Сообщений пока нет. Начните писать ниже.",
     chatPlaceholder: "Напишите сообщение...",
     chatSendBtn: "Отправить",
@@ -1323,7 +1327,7 @@ const TRANSLATIONS = {
     boatQuoteNeededHint: "Pricing for boats 50 ft and over is set individually. Tap the button below to reach us and we'll get you a quote as soon as possible.",
     boatQuoteRequestBtn: "Get a Quote",
     boatQuoteChatPrefill: "Hi, I'd like a price quote for my boat \"{{name}}\" ({{length}} ft).",
-    toastQuoteRequestSent: "Your request was sent to support chat, continue there.",
+    toastQuoteRequestSent: "Your request was sent, continue in the chat below.",
     corridorSqmLabel: "Corridor area (m²)",
     elevatorCapacityLabel: "Elevator capacity (people)",
     invoiceLabel: "🧾 Invoice",
@@ -1516,6 +1520,8 @@ const TRANSLATIONS = {
     chatButtonAria: "Contact MICISTO",
     chatModalTitle: "MICISTO Support",
     chatModalSubtitle: "Got an urgent issue? Write to us here.",
+    boatQuoteChatTitle: "Boat Price Quote",
+    boatQuoteChatSubtitle: "Follow your boat's price quote here.",
     chatEmptyState: "No messages yet. Start writing below.",
     chatPlaceholder: "Type your message...",
     chatSendBtn: "Send",
@@ -1623,7 +1629,7 @@ const TRANSLATIONS = {
     boatQuoteNeededHint: "Za brodove od 50 ft i više, cijena se određuje individualno. Klikni dugme ispod da nas kontaktiraš, javićemo ti se sa ponudom u najkraćem roku.",
     boatQuoteRequestBtn: "Zatraži ponudu",
     boatQuoteChatPrefill: "Zdravo, želim ponudu za cijenu za moj brod \"{{name}}\" ({{length}} ft).",
-    toastQuoteRequestSent: "Tvoj zahtjev je poslat u chat podrške, nastavi tamo.",
+    toastQuoteRequestSent: "Tvoj zahtjev je poslat, nastavi u chatu ispod.",
     corridorSqmLabel: "Površina hodnika (m²)",
     elevatorCapacityLabel: "Kapacitet lifta (osobe)",
     invoiceLabel: "🧾 Faktura",
@@ -1816,6 +1822,8 @@ const TRANSLATIONS = {
     chatButtonAria: "Kontaktiraj MICISTO",
     chatModalTitle: "MICISTO Podrška",
     chatModalSubtitle: "Imaš hitan problem? Piši nam ovdje.",
+    boatQuoteChatTitle: "Ponuda za cijenu broda",
+    boatQuoteChatSubtitle: "Prati ovdje ponudu za cijenu tvog broda.",
     chatEmptyState: "Još nema poruka. Počni pisati ispod.",
     chatPlaceholder: "Napiši poruku...",
     chatSendBtn: "Pošalji",
@@ -2140,6 +2148,7 @@ let state = {
   chatOpen: false,
   chatMessages: [],
   chatInput: '',
+  activeChatChannel: 'support', // 'support' | 'boat_quote' - hangi kanalin acik oldugunu belirler
   payingJobId: null,
   authStep: 'phone',
   phone: '',
@@ -2582,6 +2591,7 @@ function renderRatingScreen(){
 }
 
 function renderChatWidget(){
+  const isBoatQuote = state.activeChatChannel === 'boat_quote';
   return `
   <button class="chat-fab" id="chat-fab" aria-label="${t('chatButtonAria')}">${state.chatOpen
     ? '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>'
@@ -2593,8 +2603,8 @@ function renderChatWidget(){
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="width:22px; height:22px; flex-shrink:0;">${BRAND_MARK}</span>
           <div>
-            <div style="font-weight:600; font-size:14px;">${t('chatModalTitle')}</div>
-            <div style="font-size:11px; opacity:.85; margin-top:2px;">${t('chatModalSubtitle')}</div>
+            <div style="font-weight:600; font-size:14px;">${isBoatQuote ? t('boatQuoteChatTitle') : t('chatModalTitle')}</div>
+            <div style="font-size:11px; opacity:.85; margin-top:2px;">${isBoatQuote ? t('boatQuoteChatSubtitle') : t('chatModalSubtitle')}</div>
           </div>
         </div>
       </div>
@@ -4031,7 +4041,7 @@ function startChatPolling(){
   chatPollInterval = setInterval(async () => {
     if(!state.chatOpen) return;
     try{
-      const fresh = await api('/chat/messages');
+      const fresh = await api('/chat/messages?channel=' + state.activeChatChannel);
       if(fresh.length !== state.chatMessages.length){
         state.chatMessages = fresh;
         const body = document.getElementById('chat-panel-body');
@@ -4684,22 +4694,27 @@ function attachHandlers(){
   });
 
   // "Fiyat Teklifi Al" - 50ft ve uzeri teknelerde normal rezervasyon akisi
-  // yerine gosterilen buton. Rezervasyon panelini kapatip destek chat'ini
-  // tekne adi+uzunlugu ile onceden doldurulmus bir mesajla acar - musteri
-  // sadece gonder'e basmasi yeterli, admin gerekli baglami zaten gorur.
+  // yerine gosterilen buton. Genel destek kanalindan TAMAMEN AYRI, kendi
+  // "boat_quote" kanalini acar - admin panelinde de bu, "Tekne Fiyat
+  // Talepleri" diye ayri bir gelen kutusunda gorunur, Destek'e karismaz.
   const boatQuoteBtn = document.getElementById('boat-quote-request-btn');
-  if(boatQuoteBtn) boatQuoteBtn.onclick = () => {
+  if(boatQuoteBtn) boatQuoteBtn.onclick = async () => {
     const boatId = boatQuoteBtn.dataset.boatId;
     const boat = [...state.properties.owned, ...state.properties.delegated].find(p => p.id === boatId);
     state.bookingService = null;
     resetBookingDraftState();
+    state.activeChatChannel = 'boat_quote';
     state.chatInput = t('boatQuoteChatPrefill', {
       name: boat ? propertyDisplayName(boat) : '',
       length: boat?.length_ft || '',
     });
+    try{ state.chatMessages = await api('/chat/messages?channel=boat_quote'); }catch(err){ state.chatMessages = []; }
     state.chatOpen = true;
+    startChatPolling();
     showToast(t('toastQuoteRequestSent'));
     render();
+    const body = document.getElementById('chat-panel-body');
+    if(body) body.scrollTop = body.scrollHeight;
   };
 
   document.querySelectorAll('[data-equipment]').forEach(el => el.onclick = () => {
@@ -5150,7 +5165,11 @@ function attachHandlers(){
   if(chatFab) chatFab.onclick = async () => {
     state.chatOpen = !state.chatOpen;
     if(state.chatOpen){
-      try{ state.chatMessages = await api('/chat/messages'); }catch(err){ /* sessizce geç */ }
+      // FAB butonu her zaman GENEL DESTEK kanalini acar - tekne fiyat
+      // teklifi kanali yalnizca "Fiyat Teklifi Al" butonundan acilir
+      // (bkz. boat-quote-request-btn handler'i).
+      state.activeChatChannel = 'support';
+      try{ state.chatMessages = await api('/chat/messages?channel=support'); }catch(err){ /* sessizce geç */ }
       startChatPolling();
     } else {
       stopChatPolling();
@@ -5171,7 +5190,7 @@ function attachHandlers(){
     if(!text) return;
     state.chatInput = '';
     try{
-      const msg = await api('/chat/messages', { method:'POST', body: JSON.stringify({ message: text }) });
+      const msg = await api('/chat/messages', { method:'POST', body: JSON.stringify({ message: text, channel: state.activeChatChannel }) });
       state.chatMessages = [...state.chatMessages, msg];
       render();
       const body = document.getElementById('chat-panel-body');
