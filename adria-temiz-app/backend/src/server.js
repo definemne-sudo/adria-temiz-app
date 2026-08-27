@@ -15,6 +15,7 @@ const analyticsRoutes = require('./routes/analytics');
 const coverageRoutes = require('./routes/coverage');
 const pushRoutes = require('./routes/push');
 const { checkTimeouts } = require('./services/dispatch');
+const { checkDormantCustomers } = require('./services/reengagement');
 
 const app = express();
 app.use(cors());
@@ -55,3 +56,13 @@ app.listen(PORT, () => {
 setInterval(() => {
   checkTimeouts().catch((err) => console.error('checkTimeouts hata:', err));
 }, 60 * 1000);
+
+// Uzun suredir siparis vermemis ("kullanmayan") musterilere hatirlatma
+// push'u - dakikalik hassasiyet gerekmiyor, gunde birkac kez yeterli.
+// Fonksiyonun kendisi (bkz. services/reengagement.js) hem esik gunu
+// (admin ayarlanabilir) hem "ayni kisiye 30 gunde bir defadan fazla
+// gonderme" kuralini zaten icinde kontrol ediyor - burada sadece periyodik
+// tetikliyoruz.
+setInterval(() => {
+  checkDormantCustomers().catch((err) => console.error('checkDormantCustomers hata:', err));
+}, 6 * 60 * 60 * 1000);
