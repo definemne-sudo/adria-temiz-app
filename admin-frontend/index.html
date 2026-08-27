@@ -521,6 +521,22 @@ tr: {
   customerDetailTitle: "Müşteri Mülkleri",
   noPropertiesYet: "Bu müşterinin henüz kayıtlı mülkü yok.",
   loadingLabel: "Yükleniyor…",
+  createOrderBtn: "+ Yeni Sipariş",
+  createOrderTitle: "Yeni Sipariş Oluştur",
+  createOrderSubtitle: "Bir müşteri adına manuel sipariş oluştur - otomatik olarak uygun personele iletilir.",
+  fieldCustomer: "Müşteri",
+  fieldProperty: "Mülk",
+  fieldService: "Hizmet",
+  fieldUrgency: "Aciliyet",
+  fieldScheduledAt: "Tarih / Saat",
+  fieldPaymentMethod: "Ödeme Yöntemi",
+  selectPlaceholder: "Seçiniz…",
+  selectCustomerFirst: "Önce müşteri seç",
+  selectPropertyError: "Bir mülk seçmelisin.",
+  paymentCash: "Nakit",
+  paymentInvoice: "Aylık Fatura",
+  createOrderSubmitBtn: "Siparişi Oluştur",
+  toastOrderCreated: "Sipariş oluşturuldu ve personele iletildi.",
   superAdminBadge: "Süper Admin",
   resetPasswordBtn: "Şifreyi Sıfırla",
   resetPasswordTitle: "Yeni Şifre Belirle",
@@ -942,6 +958,22 @@ en: {
   customerDetailTitle: "Customer Properties",
   noPropertiesYet: "This customer has no properties yet.",
   loadingLabel: "Loading…",
+  createOrderBtn: "+ New Order",
+  createOrderTitle: "Create New Order",
+  createOrderSubtitle: "Create a manual order on behalf of a customer - it's automatically dispatched to available staff.",
+  fieldCustomer: "Customer",
+  fieldProperty: "Property",
+  fieldService: "Service",
+  fieldUrgency: "Urgency",
+  fieldScheduledAt: "Date / Time",
+  fieldPaymentMethod: "Payment Method",
+  selectPlaceholder: "Select…",
+  selectCustomerFirst: "Select a customer first",
+  selectPropertyError: "You must select a property.",
+  paymentCash: "Cash",
+  paymentInvoice: "Monthly Invoice",
+  createOrderSubmitBtn: "Create Order",
+  toastOrderCreated: "Order created and dispatched to staff.",
   superAdminBadge: "Super Admin",
   resetPasswordBtn: "Reset Password",
   resetPasswordTitle: "Set New Password",
@@ -1362,6 +1394,22 @@ me: {
   customerDetailTitle: "Nekretnine klijenta",
   noPropertiesYet: "Ovaj klijent još nema registrovanih nekretnina.",
   loadingLabel: "Učitavanje…",
+  createOrderBtn: "+ Nova Narudžba",
+  createOrderTitle: "Kreiraj Novu Narudžbu",
+  createOrderSubtitle: "Kreiraj ručnu narudžbu u ime klijenta - automatski se prosljeđuje dostupnom osoblju.",
+  fieldCustomer: "Klijent",
+  fieldProperty: "Nekretnina",
+  fieldService: "Usluga",
+  fieldUrgency: "Hitnost",
+  fieldScheduledAt: "Datum / Vrijeme",
+  fieldPaymentMethod: "Način Plaćanja",
+  selectPlaceholder: "Izaberi…",
+  selectCustomerFirst: "Prvo izaberi klijenta",
+  selectPropertyError: "Moraš izabrati nekretninu.",
+  paymentCash: "Keš",
+  paymentInvoice: "Mjesečna Faktura",
+  createOrderSubmitBtn: "Kreiraj Narudžbu",
+  toastOrderCreated: "Narudžba kreirana i proslijeđena osoblju.",
   superAdminBadge: "Super Admin",
   resetPasswordBtn: "Resetuj Šifru",
   resetPasswordTitle: "Postavi Novu Šifru",
@@ -1519,6 +1567,14 @@ let state = {
   deleteCustomerTargetId: null,
   deleteBookingTargetId: null,
   resetPasswordTargetId: null,
+  createOrderCustomers: null,
+  createOrderCustomerId: null,
+  createOrderProperties: null,
+  createOrderPropertyId: null,
+  createOrderServices: null,
+  createOrderServiceKey: null,
+  createOrderUrgency: 'scheduled',
+  createOrderError: null,
   resetPasswordError: null,
   marketingSubPage: 'ads',
   pushCampaigns: null,
@@ -1913,6 +1969,7 @@ function renderBookings(){
   return `
   <div class="page-head">
     <div><h2>${T.bookingsTitle}</h2><p>${T.bookingsSubtitle}</p></div>
+    ${state.user.isSuperAdmin ? `<button class="btn ochre btn-sm" id="open-create-order">${T.createOrderBtn}</button>` : ''}
   </div>
   <div class="option-row-filters" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
     ${['all','pending','assigned','in_progress','done'].map(s => `
@@ -3026,6 +3083,67 @@ function renderApplications(){
   `;
 }
 
+function renderCreateOrderModal(){
+  const customers = state.createOrderCustomers || [];
+  const properties = state.createOrderProperties || [];
+  const services = state.createOrderServices || [];
+  return `
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal modal-wide">
+      <h3 style="margin-bottom:4px;">${T.createOrderTitle}</h3>
+      <div class="hint" style="margin:0 0 18px;">${T.createOrderSubtitle}</div>
+      <form id="create-order-form" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldCustomer}</label>
+          <select id="create-order-customer" required>
+            <option value="">${T.selectPlaceholder}</option>
+            ${customers.map(c => `<option value="${c.id}" ${state.createOrderCustomerId===c.id?'selected':''}>${c.company_name || c.name} · ${c.phone}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldProperty}</label>
+          <select id="create-order-property" required ${!state.createOrderCustomerId?'disabled':''}>
+            <option value="">${!state.createOrderCustomerId ? T.selectCustomerFirst : T.selectPlaceholder}</option>
+            ${properties.map(p => `<option value="${p.id}" ${state.createOrderPropertyId===p.id?'selected':''}>${p.name && p.name.trim() ? p.name : categoryLabel(p.category)} · ${p.city||''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldService}</label>
+          <select id="create-order-service" name="serviceKey" required>
+            <option value="">${T.selectPlaceholder}</option>
+            ${services.map(s => `<option value="${s.key}" ${state.createOrderServiceKey===s.key?'selected':''}>${serviceLabel(s.key)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldUrgency}</label>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn ${state.createOrderUrgency==='urgent'?'ochre':'ghost'} btn-sm" style="flex:1;" data-create-order-urgency="urgent">${T.urgentLabel}</button>
+            <button type="button" class="btn ${state.createOrderUrgency!=='urgent'?'ochre':'ghost'} btn-sm" style="flex:1;" data-create-order-urgency="scheduled">${T.scheduledLabel}</button>
+          </div>
+        </div>
+        ${state.createOrderUrgency !== 'urgent' ? `
+          <div class="field" style="margin-bottom:0;">
+            <label>${T.fieldScheduledAt}</label>
+            <input type="datetime-local" name="scheduledAt" required />
+          </div>
+        ` : ''}
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldPaymentMethod}</label>
+          <select name="paymentMethod">
+            <option value="cash">${T.paymentCash}</option>
+            <option value="invoice">${T.paymentInvoice}</option>
+          </select>
+        </div>
+        ${state.createOrderError ? `<div class="error-msg" style="margin:0;">${state.createOrderError}</div>` : ''}
+        <div style="display:flex; gap:10px; margin-top:6px;">
+          <button type="button" class="btn ghost btn-sm" id="create-order-cancel" style="flex:1;">${T.cancelBtn}</button>
+          <button type="submit" class="btn ochre btn-sm" style="flex:1;">${T.createOrderSubmitBtn}</button>
+        </div>
+      </form>
+    </div>
+  </div>`;
+}
+
 function renderModal(){
   // Silme onay modallari, altta hangi modal acik olursa olsun ONCELIKLE
   // gosterilir (modal-uzerinde-modal). Iptal edilince ilgili target-id
@@ -3033,6 +3151,7 @@ function renderModal(){
   // otomatik geri gorunur.
   if(state.deleteCustomerTargetId) return renderDeleteCustomerModal();
   if(state.deleteBookingTargetId) return renderDeleteBookingModal();
+  if(state.modal === 'create-order') return renderCreateOrderModal();
 
   if(state.modal === 'app-detail' && state.appDetailId){
     const a = state.applications.find(x => x.id === state.appDetailId);
@@ -3669,6 +3788,79 @@ function attachHandlers(){
   if(resetPasswordCancel) resetPasswordCancel.onclick = () => { state.resetPasswordTargetId = null; state.resetPasswordError = null; render(); };
   const resetPasswordBackdrop = document.getElementById('reset-password-backdrop');
   if(resetPasswordBackdrop) resetPasswordBackdrop.onclick = (e) => { if(e.target===resetPasswordBackdrop){ state.resetPasswordTargetId = null; render(); } };
+
+  // "Yeni Sipariş" - super admin, bir müşteri adına manuel sipariş açar.
+  // Müşteri seçilince o müşterinin mülkleri ANLIK olarak çekilip mülk
+  // dropdown'u dolduruluyor (mevcut GET /admin/customers/:id/properties
+  // endpoint'i - müşteri detay modalıyla aynı endpoint - tekrar kullanılıyor).
+  const openCreateOrder = document.getElementById('open-create-order');
+  if(openCreateOrder) openCreateOrder.onclick = async () => {
+    state.modal = 'create-order';
+    state.createOrderCustomerId = null; state.createOrderProperties = null; state.createOrderPropertyId = null;
+    state.createOrderServiceKey = null; state.createOrderError = null;
+    state.createOrderUrgency = 'scheduled';
+    render();
+    try{
+      if(!state.createOrderCustomers){
+        const custResult = await api('/admin/customers');
+        state.createOrderCustomers = custResult.customers;
+      }
+      if(!state.createOrderServices){
+        const svcResult = await api('/admin/services');
+        state.createOrderServices = svcResult.services.filter(s => !s.isGroup); // grup hizmetler (ortak alan/tekne) icin ayri bir akis lazim, simdilik basit hizmetler
+      }
+      render();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const createOrderCancel = document.getElementById('create-order-cancel');
+  if(createOrderCancel) createOrderCancel.onclick = () => { state.modal = null; render(); };
+
+  const createOrderCustomerSelect = document.getElementById('create-order-customer');
+  if(createOrderCustomerSelect) createOrderCustomerSelect.onchange = async () => {
+    state.createOrderCustomerId = createOrderCustomerSelect.value || null;
+    state.createOrderProperties = null; state.createOrderPropertyId = null;
+    render();
+    if(state.createOrderCustomerId){
+      try{
+        const result = await api(`/admin/customers/${state.createOrderCustomerId}/properties`);
+        state.createOrderProperties = result.properties;
+        render();
+      }catch(err){ showToast(err.message); }
+    }
+  };
+
+  document.querySelectorAll('[data-create-order-urgency]').forEach(el => el.onclick = () => {
+    state.createOrderUrgency = el.dataset.createOrderUrgency;
+    render();
+  });
+
+  const createOrderPropertySelect = document.getElementById('create-order-property');
+  if(createOrderPropertySelect) createOrderPropertySelect.onchange = () => {
+    state.createOrderPropertyId = createOrderPropertySelect.value || null;
+  };
+  const createOrderServiceSelect = document.getElementById('create-order-service');
+  if(createOrderServiceSelect) createOrderServiceSelect.onchange = () => {
+    state.createOrderServiceKey = createOrderServiceSelect.value || null;
+  };
+
+  const createOrderForm = document.getElementById('create-order-form');
+  if(createOrderForm) createOrderForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(createOrderForm));
+    if(!state.createOrderPropertyId){ state.createOrderError = T.selectPropertyError; render(); return; }
+    try{
+      await api('/admin/jobs', { method:'POST', body: JSON.stringify({
+        propertyId: state.createOrderPropertyId, serviceKey: state.createOrderServiceKey,
+        urgency: state.createOrderUrgency,
+        scheduledAt: fd.scheduledAt || null,
+        paymentMethod: fd.paymentMethod,
+      })});
+      showToast(T.toastOrderCreated);
+      state.modal = null;
+      await loadBookings();
+    }catch(err){ state.createOrderError = err.message; render(); }
+  };
   const resetAdminPasswordForm = document.getElementById('reset-admin-password-form');
   if(resetAdminPasswordForm) resetAdminPasswordForm.onsubmit = async (e) => {
     e.preventDefault();
