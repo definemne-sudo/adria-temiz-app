@@ -93,6 +93,19 @@ async function createCleaningJob({
   if (!property) { const err = new Error('Mülk bulunamadı.'); err.status = 404; throw err; }
   const isCommonArea = serviceKey === 'common_area';
 
+  // ONEMLI: Tekne Temizligi hizmeti henuz aktif degil (ayri/uzman ekip
+  // kurulana kadar musteri talebine acilmiyor - bkz. frontend'deki "Cok
+  // Yakinda" ekrani). Frontend zaten bu hizmete tiklamayi engelliyor, ama
+  // API DOGRUDAN cagrilirsa (ornegin eski bir istemci surumu, ya da bir
+  // hata/kotu niyetli istek), fiyatlandirma hic tanimlanmadigi icin
+  // asagidaki calcPrice() cagrisi price=NULL doner ve veritabani NOT NULL
+  // kisitina takilip 500 SUNUCU HATASI verirdi (gercek testte yakalandi).
+  // Burada erken ve net bir 400 ile engelleyip cirkin bir cokmeyi onluyoruz.
+  if (serviceKey === 'boat') {
+    const err = new Error('Tekne temizliği hizmeti şu anda aktif değil, çok yakında hizmetinizde olacak.');
+    err.status = 400; throw err;
+  }
+
   if (isCommonArea && property.category !== 'common_area') {
     const err = new Error('Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.');
     err.status = 400; throw err;
