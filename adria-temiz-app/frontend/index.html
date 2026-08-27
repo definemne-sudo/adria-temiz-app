@@ -271,7 +271,7 @@
   .toolbar .btn{width:auto; white-space:nowrap;}
   .toolbar .btn{width:auto; padding:9px 16px;}
   .modal-backdrop{
-    position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex; align-items:center; justify-content:center; z-index:50;
+    position:fixed; inset:0; background:rgba(18,48,63,.45); display:flex; align-items:center; justify-content:center; z-index:60;
     backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
   }
   .modal{background:#fff; border-radius:14px; padding:26px; width:100%; max-width:420px; max-height:88vh; overflow-y:auto;}
@@ -3713,7 +3713,7 @@ function renderModal(){
           <div class="hint" style="margin:-6px 0 14px;">${t('cardCvcHint')}</div>
           ${state.authError ? `<div class="error-msg">${state.authError}</div>` : ''}
           <div class="actions">
-            <button type="button" class="btn ghost" id="modal-cancel">${t('cancelBtn')}</button>
+            <button type="button" class="btn ghost" id="card-form-cancel">${t('cancelBtn')}</button>
             <button type="submit" class="btn ochre">${t('saveContinueBtn')}</button>
           </div>
         </form>
@@ -4882,8 +4882,27 @@ function attachHandlers(){
     state.authError=''; render();
   };
 
+  // ONEMLI: Kart formunun kendi ozel iptal butonu var - genel modalCancel'i
+  // KULLANMIYOR. Cunku genel modalCancel, pendingBooking'i (tum siparis
+  // taslagini - mulk, hizmet, checklist secimleri) SIFIRLIYOR. Musteri
+  // sadece odeme yontemini degistirmek/vazgecmek isterken, siparisin
+  // BASINA donmesi buyuk bir kullanici deneyimi hatasiydi (canli demo
+  // sirasinda tam olarak bu yasandi). Burada SADECE modal kapatiliyor,
+  // pendingBooking dokunulmadan kaliyor - kullanici odeme ekranina
+  // (receipt adimina) sipariş bilgileri hala dolu sekilde donuyor.
+  const cardFormCancel = document.getElementById('card-form-cancel');
+  if(cardFormCancel) cardFormCancel.onclick = () => {
+    state.modal = null;
+    state.authError = '';
+    render();
+  };
+
   const changeCard = document.getElementById('change-card');
-  if(changeCard) changeCard.onclick = () => { state.modal = 'card-form'; state.pendingBooking = null; render(); };
+  // NOT: Burada da pendingBooking'e DOKUNMUYORUZ - musteri aktif bir
+  // siparis sirasinda kayitli kartini degistirmek isteyebilir, bu onun
+  // siparis taslagini iptal ettigi anlamina gelmemeli (yukaridaki
+  // card-form-cancel ile ayni mantik/gerekce).
+  if(changeCard) changeCard.onclick = () => { state.modal = 'card-form'; render(); };
 
   const cardForm = document.getElementById('card-form');
   if(cardForm) cardForm.onsubmit = async (e) => {
