@@ -532,3 +532,8 @@ db.exec(`
 // gonderdigimizi tutar - ayni kisiye her gun/her kontrolde tekrar tekrar
 // gondermemek icin (bkz. services/reengagement.js).
 ensureColumn('users', 'last_reengagement_push_at', 'TEXT');
+
+// Bir siparisin ADMIN tarafindan (musteri adina, orn. telefonla gelen bir
+// talep icin) olusturulup olusturulmadigini izlemek icin. NULL ise siparis
+// musterinin kendisi tarafindan olusturulmustur (normal akis).
+ensureColumn('cleaning_jobs', 'created_by_admin_id', 'TEXT');
