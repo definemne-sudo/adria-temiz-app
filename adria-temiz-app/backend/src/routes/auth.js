@@ -187,9 +187,12 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
     const propertyId = uuid();
     const sizeSqm = property.sizeSqm ? Number(property.sizeSqm) : null;
     const category = ['apartment', 'house', 'office', 'common_area', 'boat'].includes(property.category) ? property.category : 'apartment';
+    const isBoat = category === 'boat';
     db.prepare(
-      `INSERT INTO properties (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url, bedroom_count, bathroom_count)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO properties
+         (id, owner_id, name, category, address, city, latitude, longitude, size_sqm, ical_url, bedroom_count, bathroom_count,
+          boat_class, boat_type, cabin_count, length_ft, has_canvas, berth_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       propertyId,
       req.user.id,
@@ -202,7 +205,13 @@ router.post('/complete-profile', requireAuth, async (req, res) => {
       sizeSqm,
       property.icalUrl || null,
       property.bedroomCount ? Number(property.bedroomCount) : null,
-      property.bathroomCount ? Number(property.bathroomCount) : null
+      property.bathroomCount ? Number(property.bathroomCount) : null,
+      isBoat ? 'sailboat' : null,
+      isBoat ? (property.boatType || null) : null,
+      isBoat && property.cabinCount ? Number(property.cabinCount) : null,
+      isBoat && property.lengthFt ? Number(property.lengthFt) : null,
+      isBoat ? (property.hasCanvas ? 1 : 0) : null,
+      isBoat ? (property.berthNumber || null) : null
     );
     createdProperty = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
 
