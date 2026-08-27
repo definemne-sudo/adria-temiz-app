@@ -53,20 +53,32 @@ router.post('/validate-promo', (req, res) => {
   res.json({ valid: true, discountAmount, discountType: result.promo.discount_type, discountValue: result.promo.discount_value });
 });
 
-router.post('/', async (req, res) => {
-  const {
-    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-    hasEquipment, hasChemicals, serviceParams,
-  } = req.body;
-
+// Sipariş olusturmanin CEKIRDEK mantigi - hem musteri akisindan (asagidaki
+// POST /) hem de ADMIN panelinden ("sistem uzerinden yeni siparis ac")
+// AYNI fonksiyon cagrilir. Boylece admin'in olusturdugu bir siparis de,
+// musterinin olusturdugu gibi, otomatik olarak personele dispatch edilir -
+// iki ayri/farkli davranan kod yolu OLMAZ.
+//
+// skipAccessCheck: admin, KENDI mulku olmayan herhangi bir musterinin
+// mulku icin siparis acabilmeli - bu yuzden admin cagrisinda mulk sahipligi
+// kontrolu atlanir (zaten admin.js tarafinda mulkun VAR OLDUGU ayrica
+// kontrol ediliyor).
+async function createCleaningJob({
+  propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+  hasEquipment, hasChemicals, serviceParams, promoCode,
+  requestingUserId, requestingAccountType, skipAccessCheck = false, createdByAdminId = null,
+}) {
   if (!['cash', 'card', 'invoice'].includes(paymentMethod)) {
-    return res.status(400).json({ error: "paymentMethod 'cash', 'card' veya 'invoice' olmalı." });
+    const err = new Error("paymentMethod 'cash', 'card' veya 'invoice' olmalı.");
+    err.status = 400; throw err;
   }
-  if (paymentMethod === 'invoice' && req.user.accountType !== 'company') {
-    return res.status(403).json({ error: 'Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.' });
+  if (paymentMethod === 'invoice' && !skipAccessCheck && requestingAccountType !== 'company') {
+    const err = new Error('Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.');
+    err.status = 403; throw err;
   }
-  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
-    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
+  if (!skipAccessCheck && !accessiblePropertyIds(requestingUserId).includes(propertyId)) {
+    const err = new Error('Bu mülke erişim yetkiniz yok.');
+    err.status = 403; throw err;
   }
 
   let checkoutAt;
@@ -74,21 +86,22 @@ router.post('/', async (req, res) => {
     getService(serviceKey);
     checkoutAt = resolveScheduledAt(urgency || 'scheduled', scheduledAt);
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    err.status = 400; throw err;
   }
 
   const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
+  if (!property) { const err = new Error('Mülk bulunamadı.'); err.status = 404; throw err; }
   const isCommonArea = serviceKey === 'common_area';
 
   if (isCommonArea && property.category !== 'common_area') {
-    return res.status(400).json({ error: 'Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.' });
+    const err = new Error('Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.');
+    err.status = 400; throw err;
   }
   if (serviceKey === 'office' && property.category !== 'office') {
-    return res.status(400).json({ error: 'Bu hizmet yalnızca "Ofis / İşyeri" kategorili bir mülk için sipariş edilebilir.' });
+    const err = new Error('Bu hizmet yalnızca "Ofis / İşyeri" kategorili bir mülk için sipariş edilebilir.');
+    err.status = 400; throw err;
   }
 
-  // Ortak alan siparişlerinde halı/koltuk gibi ekstra hizmetler yok -
-  // gönderilse bile yok sayılır.
   const addonsList = isCommonArea
     ? []
     : (Array.isArray(addons) ? addons.filter((a) => a && a.key) : []);
@@ -120,7 +133,7 @@ router.post('/', async (req, res) => {
       basePrice = calcPrice(serviceKey, { sizeSqm: property.size_sqm });
     }
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    err.status = 400; throw err;
   }
   const equipmentOk = hasEquipment !== false;
   const chemicalsOk = hasChemicals !== false;
@@ -129,14 +142,14 @@ router.post('/', async (req, res) => {
 
   let appliedPromo = null;
   let discountAmount = 0;
-  if (req.body.promoCode) {
+  if (promoCode) {
     const result = validatePromoCode({
-      code: req.body.promoCode,
-      customerId: req.user.id,
+      code: promoCode,
+      customerId: property.owner_id,
       city: property.city,
       serviceKey,
     });
-    if (result.error) return res.status(400).json({ error: result.error });
+    if (result.error) { const err = new Error(result.error); err.status = 400; throw err; }
     appliedPromo = result.promo;
     discountAmount = calcDiscount(appliedPromo, priceBeforeDiscount);
   }
@@ -148,8 +161,8 @@ router.post('/', async (req, res) => {
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
-        urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?, ?, ?)`
+        urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount, created_by_admin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -161,18 +174,37 @@ router.post('/', async (req, res) => {
     urgency || 'scheduled',
     paymentMethod,
     checkoutAt,
+    'manual',
     price,
     paymentStatus,
     appliedPromo ? appliedPromo.id : null,
-    discountAmount || null
+    discountAmount || null,
+    createdByAdminId
   );
 
-  if (appliedPromo) redeemPromo(appliedPromo, req.user.id, id, discountAmount);
+  if (appliedPromo) redeemPromo(appliedPromo, property.owner_id, id, discountAmount);
 
   const createdJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
-  res.status(201).json(createdJob);
-
   dispatchJob(id).catch((err) => console.error('dispatchJob hata:', err));
+  return createdJob;
+}
+
+router.post('/', async (req, res) => {
+  const {
+    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    hasEquipment, hasChemicals, serviceParams, promoCode,
+  } = req.body;
+
+  try {
+    const createdJob = await createCleaningJob({
+      propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+      hasEquipment, hasChemicals, serviceParams, promoCode,
+      requestingUserId: req.user.id, requestingAccountType: req.user.accountType,
+    });
+    res.status(201).json(createdJob);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Sipariş oluşturulamadı.' });
+  }
 });
 
 // Kullanıcının (bireysel ev sahibi veya yönetim şirketi) erişebildiği
@@ -766,3 +798,5 @@ router.get('/:id/staff-contact', (req, res) => {
 });
 
 module.exports = router;
+module.exports.createCleaningJob = createCleaningJob;
+module.exports.accessiblePropertyIds = accessiblePropertyIds;
