@@ -276,6 +276,25 @@ tr: {
   marketingSubAds: "Reklam Kampanyaları",
   marketingSubPromos: "Promosyon Kodları",
   marketingSubLoyalty: "Sadakat & Referans",
+  marketingSubPush: "Push Kampanya",
+  pushCampaignsSubtitle: "Müşterilere anlık kampanya/promosyon bildirimi gönder.",
+  newCampaignTitle: "Yeni Kampanya",
+  fieldCampaignTitle: "Başlık",
+  fieldCampaignBody: "Mesaj",
+  fieldTargetType: "Hedef Kitle",
+  targetAll: "Tüm Müşteriler",
+  targetIndividual: "Sadece Bireysel",
+  targetCompany: "Sadece Şirket",
+  fieldTargetCity: "Şehir (opsiyonel)",
+  targetCityPlaceholder: "örn. Budva — boş bırakılırsa tüm şehirler",
+  sendCampaignBtn: "Kampanyayı Gönder",
+  campaignHistoryTitle: "Geçmiş Kampanyalar",
+  emptyCampaignHistory: "Henüz kampanya gönderilmedi.",
+  colCampaignTitle: "Kampanya",
+  colTarget: "Hedef",
+  colSentCount: "Gönderilen",
+  fieldDormantThresholdDays: "Kullanmayan Müşteri Eşiği (gün)",
+  dormantThresholdHint: "Son siparişinin üzerinden bu kadar gün geçen müşterilere otomatik hatırlatma push'u gönderilir.",
   adCampaignsSubtitle: "Kendi reklam panelinden (Meta, Google Ads, TikTok vb.) gördüğün rakamları buraya elle gir - gerçek zamanlı otomatik veri çekimi yok.",
   addCampaignTitle: "Yeni Kampanya Ekle",
   fieldPlatform: "Platform",
@@ -681,6 +700,25 @@ en: {
   marketingSubAds: "Ad Campaigns",
   marketingSubPromos: "Promo Codes",
   marketingSubLoyalty: "Loyalty & Referral",
+  marketingSubPush: "Push Campaign",
+  pushCampaignsSubtitle: "Send an instant campaign/promo notification to customers.",
+  newCampaignTitle: "New Campaign",
+  fieldCampaignTitle: "Title",
+  fieldCampaignBody: "Message",
+  fieldTargetType: "Target Audience",
+  targetAll: "All Customers",
+  targetIndividual: "Individual Only",
+  targetCompany: "Company Only",
+  fieldTargetCity: "City (optional)",
+  targetCityPlaceholder: "e.g. Budva — leave empty for all cities",
+  sendCampaignBtn: "Send Campaign",
+  campaignHistoryTitle: "Past Campaigns",
+  emptyCampaignHistory: "No campaigns sent yet.",
+  colCampaignTitle: "Campaign",
+  colTarget: "Target",
+  colSentCount: "Sent",
+  fieldDormantThresholdDays: "Dormant Customer Threshold (days)",
+  dormantThresholdHint: "Customers whose last order is older than this many days get an automatic reminder push.",
   adCampaignsSubtitle: "Manually enter the numbers you see in your own ad dashboard (Meta, Google Ads, TikTok, etc.) - no real-time automatic data pulling.",
   addCampaignTitle: "Add New Campaign",
   fieldPlatform: "Platform",
@@ -1082,6 +1120,25 @@ me: {
   marketingSubAds: "Reklamne kampanje",
   marketingSubPromos: "Promo kodovi",
   marketingSubLoyalty: "Lojalnost i preporuke",
+  marketingSubPush: "Push Kampanja",
+  pushCampaignsSubtitle: "Pošalji trenutno obavještenje o kampanji/promociji klijentima.",
+  newCampaignTitle: "Nova Kampanja",
+  fieldCampaignTitle: "Naslov",
+  fieldCampaignBody: "Poruka",
+  fieldTargetType: "Ciljna Grupa",
+  targetAll: "Svi Klijenti",
+  targetIndividual: "Samo Pojedinci",
+  targetCompany: "Samo Firme",
+  fieldTargetCity: "Grad (opciono)",
+  targetCityPlaceholder: "npr. Budva — ostavi prazno za sve gradove",
+  sendCampaignBtn: "Pošalji Kampanju",
+  campaignHistoryTitle: "Prethodne Kampanje",
+  emptyCampaignHistory: "Još nema poslatih kampanja.",
+  colCampaignTitle: "Kampanja",
+  colTarget: "Cilj",
+  colSentCount: "Poslato",
+  fieldDormantThresholdDays: "Prag Neaktivnog Klijenta (dana)",
+  dormantThresholdHint: "Klijentima čija je posljednja narudžba starija od ovoliko dana šalje se automatski podsjetnik.",
   adCampaignsSubtitle: "Ručno unesi brojke koje vidiš na svom reklamnom panelu (Meta, Google Ads, TikTok itd.) - nema automatskog povlačenja podataka u realnom vremenu.",
   addCampaignTitle: "Dodaj novu kampanju",
   fieldPlatform: "Platforma",
@@ -1464,6 +1521,7 @@ let state = {
   resetPasswordTargetId: null,
   resetPasswordError: null,
   marketingSubPage: 'ads',
+  pushCampaigns: null,
   adCampaigns: null,
   promoCodes: null,
   loyaltyMinOrders: 5,
@@ -2304,10 +2362,52 @@ function renderMarketing(){
     <button class="btn ${state.marketingSubPage==='ads'?'ochre':'ghost'} btn-sm" data-marketing-subpage="ads">${T.marketingSubAds}</button>
     <button class="btn ${state.marketingSubPage==='promos'?'ochre':'ghost'} btn-sm" data-marketing-subpage="promos">${T.marketingSubPromos}</button>
     <button class="btn ${state.marketingSubPage==='loyalty'?'ochre':'ghost'} btn-sm" data-marketing-subpage="loyalty">${T.marketingSubLoyalty}</button>
+    <button class="btn ${state.marketingSubPage==='push'?'ochre':'ghost'} btn-sm" data-marketing-subpage="push">${T.marketingSubPush}</button>
   </div>
   ${state.marketingSubPage==='ads' ? renderAdCampaigns()
     : state.marketingSubPage==='promos' ? renderPromoCodes()
+    : state.marketingSubPage==='push' ? renderPushCampaigns()
     : renderLoyaltyReferral()}
+  `;
+}
+
+function renderPushCampaigns(){
+  const d = state.pushCampaigns;
+  return `
+  <div class="hint" style="margin:-4px 0 16px;">${T.pushCampaignsSubtitle}</div>
+  <div class="panel-card" style="max-width:600px; margin-bottom:20px;">
+    <div class="panel-head"><h3>${T.newCampaignTitle}</h3></div>
+    <form id="push-campaign-form" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldCampaignTitle}</label><input name="title" required maxlength="60" /></div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldCampaignBody}</label><textarea name="body" required rows="3" maxlength="180"></textarea></div>
+      <div class="field" style="margin-bottom:0;">
+        <label>${T.fieldTargetType}</label>
+        <select name="targetType">
+          <option value="all">${T.targetAll}</option>
+          <option value="individual">${T.targetIndividual}</option>
+          <option value="company">${T.targetCompany}</option>
+        </select>
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>${T.fieldTargetCity}</label><input name="targetCity" placeholder="${T.targetCityPlaceholder}" /></div>
+      <button class="btn ochre btn-sm" type="submit">${T.sendCampaignBtn}</button>
+    </form>
+  </div>
+  <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:10px;">${T.campaignHistoryTitle}</div>
+  ${!d ? `<div class="empty-state">…</div>` : d.campaigns.length === 0 ? `<div class="empty-state">${T.emptyCampaignHistory}</div>` : `
+    <table>
+      <thead><tr><th>${T.colCampaignTitle}</th><th>${T.colTarget}</th><th>${T.colSentCount}</th><th>${T.colCreatedAt}</th></tr></thead>
+      <tbody>
+        ${d.campaigns.map(c => `
+          <tr>
+            <td><strong>${c.title}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${c.body}</span></td>
+            <td>${c.target_type === 'all' ? T.targetAll : c.target_type === 'individual' ? T.targetIndividual : T.targetCompany}${c.target_city ? ' · ' + c.target_city : ''}</td>
+            <td>${c.sent_count}</td>
+            <td>${new Date(c.created_at.replace(' ','T')).toLocaleString('sr-Latn-ME',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `}
   `;
 }
 
@@ -2685,6 +2785,11 @@ function renderSettings(){
         <div class="field" style="margin-bottom:0;">
           <label>${T.fieldPayoutCycleDays}</label>
           <input name="payoutCycleDays" type="number" step="1" min="1" value="${s.payoutCycleDays}" />
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldDormantThresholdDays}</label>
+          <input name="dormantThresholdDays" type="number" step="1" min="1" value="${s.dormantThresholdDays}" />
+          <div class="hint" style="margin:4px 0 0;">${T.dormantThresholdHint}</div>
         </div>
         <button class="btn ochre btn-sm" type="submit" style="align-self:flex-start;">${T.saveBtn}</button>
       </form>
@@ -3300,7 +3405,13 @@ async function loadTopReferrers(){
 async function loadMarketingSubPage(){
   if(state.marketingSubPage === 'ads') await loadAdCampaigns();
   else if(state.marketingSubPage === 'promos') await loadPromoCodes();
+  else if(state.marketingSubPage === 'push') await loadPushCampaigns();
   else { await loadLoyaltyCustomers(); await loadTopReferrers(); }
+}
+
+async function loadPushCampaigns(){
+  state.pushCampaigns = await api('/admin/marketing/push-campaigns');
+  render();
 }
 
 async function loadAnalytics(){
@@ -3500,6 +3611,7 @@ function attachHandlers(){
       await api('/admin/settings', { method:'PUT', body: JSON.stringify({
         commissionRate: Number(fd.commissionRatePercent) / 100,
         payoutCycleDays: fd.payoutCycleDays,
+        dormantThresholdDays: fd.dormantThresholdDays,
       })});
       showToast(T.toastSettingsSaved);
       await loadSettings();
@@ -3619,6 +3731,18 @@ function attachHandlers(){
       showToast(T.toastCampaignAdded);
       addCampaignForm.reset();
       await loadAdCampaigns();
+    }catch(err){ showToast(err.message); }
+  };
+
+  const pushCampaignForm = document.getElementById('push-campaign-form');
+  if(pushCampaignForm) pushCampaignForm.onsubmit = async (e) => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(pushCampaignForm));
+    try{
+      const result = await api('/admin/marketing/push-campaigns', { method:'POST', body: JSON.stringify(fd) });
+      showToast(result.message);
+      pushCampaignForm.reset();
+      await loadPushCampaigns();
     }catch(err){ showToast(err.message); }
   };
   document.querySelectorAll('[data-delete-campaign]').forEach(el => el.onclick = async () => {
