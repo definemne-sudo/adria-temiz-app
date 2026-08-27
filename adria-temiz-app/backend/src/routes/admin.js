@@ -888,6 +888,52 @@ router.post('/marketing/push-campaigns', async (req, res) => {
 
 // --- Ayarlar (Settings) ------------------------------------------------------
 
+// --- Demo verisi temizleme --------------------------------------------------
+// TUM musteri ve TUM siparis verisini geri alinamaz sekilde siler - demo/
+// test asamasindan gercek kullanima gecerken kullanilir. Personel, admin ve
+// personel basvurulari (staff_applications) HIC DOKUNULMUYOR - bilerek
+// boyle, cunku bunlar demo verisi degil gercek operasyonel kurulum.
+//
+// Guvenlik: sadece super admin cagirabilir VE istegin govdesinde tam olarak
+// "SIL" onay metni gelmesi gerekiyor - yanlislikla (orn. bir test script'i
+// ya da yanlis tiklama ile) tetiklenmesini zorlastirmak icin. Frontend'de
+// AYRICA kendi onay dialogu var (iki katmanli koruma).
+router.post('/system/wipe-customer-data', requireSuperAdmin, (req, res) => {
+  const { confirm } = req.body || {};
+  if (confirm !== 'SIL') {
+    return res.status(400).json({ error: 'Onay metni yanlış. Bu geri alınamaz bir işlemdir.' });
+  }
+
+  const customerPhones = db
+    .prepare(`SELECT phone FROM users WHERE account_type IN ('individual','company')`)
+    .all()
+    .map((r) => r.phone);
+  const customerCount = customerPhones.length;
+  const propertyCount = db.prepare(`SELECT COUNT(*) AS c FROM properties`).get().c;
+  const jobCount = db.prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs`).get().c;
+
+  const wipe = db.transaction(() => {
+    db.exec(`DELETE FROM chat_messages WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
+    db.exec(`DELETE FROM push_subscriptions WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
+    db.exec(`DELETE FROM saved_cards WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
+    db.exec(`DELETE FROM property_delegates`);
+    db.exec(`DELETE FROM promo_code_redemptions`);
+    db.exec(`DELETE FROM cleaning_jobs`);
+    db.exec(`DELETE FROM properties`);
+    db.exec(`DELETE FROM users WHERE account_type IN ('individual','company')`);
+    const deleteOtp = db.prepare(`DELETE FROM otp_requests WHERE phone = ?`);
+    for (const phone of customerPhones) deleteOtp.run(phone);
+  });
+  wipe();
+
+  res.json({
+    message: 'Tüm müşteri ve sipariş verisi temizlendi.',
+    deletedCustomers: customerCount,
+    deletedProperties: propertyCount,
+    deletedOrders: jobCount,
+  });
+});
+
 router.get('/settings', (req, res) => {
   res.json({
     commissionRate: getCommissionRate(),
