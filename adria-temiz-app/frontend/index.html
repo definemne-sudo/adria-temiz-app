@@ -720,6 +720,8 @@ const TRANSLATIONS = {
     noBoatPropertyHint: "Tekne Temizliği talep edebilmen için önce \"Tekne (Yelkenli)\" kategorisiyle bir mülk eklemelisin.",
     boatSubServicesHeader: "Tekne Temizliği",
     boatQuoteNeededTitle: "Bu Tekne İçin Fiyat Teklifi Gerekiyor",
+    boatComingSoonTitle: "Çok Yakında Hizmetinizde",
+    boatComingSoonHint: "Tekne temizliği için ayrı, uzman bir ekip kuruyoruz. Bu hizmet çok yakında burada olacak!",
     boatQuoteNeededHint: "50 ft ve üzeri tekneler için fiyatlandırma tekneye özel belirlenir. Aşağıdaki butona tıklayarak bize ulaş, en kısa sürede sana özel bir teklif sunalım.",
     boatQuoteRequestBtn: "Fiyat Teklifi Al",
     boatQuoteChatPrefill: "Merhaba, \"{{name}}\" adlı teknem ({{length}} ft) için fiyat teklifi almak istiyorum.",
@@ -1022,6 +1024,8 @@ const TRANSLATIONS = {
     noBoatPropertyHint: "Чтобы заказать уборку лодки, сначала добавьте объект категории «Лодка (Парусная)».",
     boatSubServicesHeader: "Уборка лодки",
     boatQuoteNeededTitle: "Для этой лодки нужна индивидуальная цена",
+    boatComingSoonTitle: "Совсем скоро",
+    boatComingSoonHint: "Мы формируем отдельную, специализированную команду для уборки лодок. Эта услуга появится совсем скоро!",
     boatQuoteNeededHint: "Для лодок от 50 футов цена определяется индивидуально. Нажмите кнопку ниже, чтобы связаться с нами — мы подготовим предложение как можно скорее.",
     boatQuoteRequestBtn: "Получить предложение",
     boatQuoteChatPrefill: "Здравствуйте, хочу получить предложение по цене для моей лодки «{{name}}» ({{length}} фт).",
@@ -1324,6 +1328,8 @@ const TRANSLATIONS = {
     noBoatPropertyHint: "To request Boat Cleaning, first add a property with the \"Boat (Sailboat)\" category.",
     boatSubServicesHeader: "Boat Cleaning",
     boatQuoteNeededTitle: "This Boat Needs a Custom Quote",
+    boatComingSoonTitle: "Coming Very Soon",
+    boatComingSoonHint: "We are building a separate, specialized team for boat cleaning. This service will be here very soon!",
     boatQuoteNeededHint: "Pricing for boats 50 ft and over is set individually. Tap the button below to reach us and we'll get you a quote as soon as possible.",
     boatQuoteRequestBtn: "Get a Quote",
     boatQuoteChatPrefill: "Hi, I'd like a price quote for my boat \"{{name}}\" ({{length}} ft).",
@@ -1626,6 +1632,8 @@ const TRANSLATIONS = {
     noBoatPropertyHint: "Da bi naručio/la čišćenje broda, prvo dodaj nekretninu sa kategorijom \"Brod (Jedrilica)\".",
     boatSubServicesHeader: "Čišćenje broda",
     boatQuoteNeededTitle: "Za ovaj brod je potrebna individualna ponuda",
+    boatComingSoonTitle: "Uskoro Dostupno",
+    boatComingSoonHint: "Formiramo poseban, strucan tim za ciscenje brodova. Ova usluga ce uskoro biti dostupna!",
     boatQuoteNeededHint: "Za brodove od 50 ft i više, cijena se određuje individualno. Klikni dugme ispod da nas kontaktiraš, javićemo ti se sa ponudom u najkraćem roku.",
     boatQuoteRequestBtn: "Zatraži ponudu",
     boatQuoteChatPrefill: "Zdravo, želim ponudu za cijenu za moj brod \"{{name}}\" ({{length}} ft).",
@@ -2462,10 +2470,27 @@ function renderAuth(){
               <div class="choice ${state.propertyCategory==='apartment'?'selected':''}" data-property-category="apartment">${t('categoryApartment')}</div>
               <div class="choice ${state.propertyCategory==='house'?'selected':''}" data-property-category="house">${t('categoryHouse')}</div>
               <div class="choice ${state.propertyCategory==='office'?'selected':''}" data-property-category="office">${t('categoryOffice')}</div>
+              <div class="choice ${state.propertyCategory==='boat'?'selected':''}" data-property-category="boat">${t('categoryBoat')}</div>
             </div>
-            <div class="field"><label>${t('propertySizeLabel')}</label><input id="reg-size-input" name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
-            ${renderRoomStepper('bedroom', t('bedroomCountLabel'), state.regBedroomCount)}
-            ${renderRoomStepper('bathroom', t('bathroomCountLabel'), state.regBathroomCount)}
+            ${state.propertyCategory === 'boat' ? `
+              <div class="field">
+                <label>${t('boatTypeLabel')}</label>
+                <select id="reg-boattype-input" name="boatType">
+                  <option value="monohull" ${state.addPropBoatType!=='catamaran'?'selected':''}>${t('boatTypeMonohull')}</option>
+                  <option value="catamaran" ${state.addPropBoatType==='catamaran'?'selected':''}>${t('boatTypeCatamaran')}</option>
+                </select>
+              </div>
+              <div class="field"><label>${t('cabinCountLabel')}</label><input id="reg-cabincount-input" name="cabinCount" type="number" min="1" placeholder="3" value="${state.addPropCabinCount}" /></div>
+              <div class="field"><label>${t('boatLengthLabel')}</label><input id="reg-lengthft-input" name="lengthFt" type="number" min="1" required placeholder="38" value="${state.addPropLengthFt}" /></div>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; margin:4px 0 14px;">
+                <input type="checkbox" id="reg-hascanvas-input" ${state.addPropHasCanvas?'checked':''} />
+                <span>${t('hasCanvasLabel')}</span>
+              </label>
+            ` : `
+              <div class="field"><label>${t('propertySizeLabel')}</label><input id="reg-size-input" name="sizeSqm" type="number" min="1" required placeholder="75" value="${state.regSizeSqm}" /></div>
+              ${renderRoomStepper('bedroom', t('bedroomCountLabel'), state.regBedroomCount)}
+              ${renderRoomStepper('bathroom', t('bathroomCountLabel'), state.regBathroomCount)}
+            `}
           ` : `
             <div class="field"><label>${t('profileCompanyNameLabel')}</label><input name="companyName" required /></div>
             <div style="border-top:1px solid var(--line); margin:18px 0 14px; padding-top:14px;">
@@ -2495,7 +2520,12 @@ function renderAuth(){
         <button type="button" id="back-to-details" class="hint" style="background:none; border:none; padding:0; margin-bottom:16px; cursor:pointer; color:var(--sage-dark); font-weight:600;">‹ ${t('backBtn')}</button>
         <div class="tagline">${t('authAddressTagline')}</div>
         <form id="profile-address-form">
-          <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" required placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+          ${state.propertyCategory === 'boat' ? `
+            <div class="field"><label>${t('marinaNameLabel')}</label><input id="reg-property-address" name="propertyAddress" required placeholder="${t('marinaNamePlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+            <div class="field"><label>${t('berthNumberLabel')}</label><input name="berthNumber" placeholder="${t('berthNumberPlaceholder')}" value="${state.addPropBerthNumber}" /></div>
+          ` : `
+            <div class="field"><label>${t('propertyAddressLabel')}</label><input id="reg-property-address" name="propertyAddress" required placeholder="${t('propertyAddressPlaceholder')}" value="${state.regPropertyAddress}" autofocus /></div>
+          `}
           <div class="field">
             <label>${t('propertyCityLabel')}</label>
             <select id="reg-property-city" name="propertyCity" required>
@@ -2953,81 +2983,20 @@ function renderConfigStep(service, props, selectedProperty){
   // 2) 50ft ve uzeri tekneler icin otomatik fiyatlandirma/rezervasyon akisi
   //    TAMAMEN ATLANIYOR - musteri "Fiyat Teklifi Al" ile destek chat'ine
   //    yonlendiriliyor (bkz. asagidaki needsQuote dali).
+  // Tekne Temizligi: SU AN icin gercek bir rezervasyon akisi SUNULMUYOR.
+  // Hizmet karti listede gorunmeye devam ediyor (musteriler bu hizmetin
+  // gelecekte olacagini bilsin diye) ama tiklaninca sadece "Cok Yakinda"
+  // mesaji cikiyor - herhangi bir talep OLUSTURULAMIYOR. Sebep: tekne
+  // temizligi icin ayri, uzman bir ekip kurulmasi gerekiyor, bu hazir
+  // olmadan gercek musteri talebi alinamaz. Asagidaki (mulk secimi, alt
+  // hizmet checklist'i, 50ft fiyat teklifi esigi vb.) TUM eski kod BILEREK
+  // kaldirildi - bu ozellik hazir oldugunda git history'den geri getirilebilir.
   if(isGroup && service.key === 'boat'){
-    const boatProps = [...state.properties.owned, ...state.properties.delegated].filter(p => p.category === 'boat');
-    if(boatProps.length === 0){
-      return `
-      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); text-align:center;">
-        <div class="property-avatar" style="margin:0 auto 12px;"><img src="${categoryIconSrc('boat')}" alt="" /></div>
-        <div class="hint" style="margin:0;">${t('noBoatPropertyHint')}</div>
-        <button type="button" class="btn ochre btn-sm" id="goto-add-property-boat" style="width:auto; margin-top:14px;">${t('addPropertyCta')}</button>
-      </div>
-      `;
-    }
-    const selectedBoat = boatProps.find(p => p.id === state.bookingPropertyId) || boatProps[0];
-    const needsQuote = Number(selectedBoat.length_ft || 0) >= state.boatQuoteRequiredLengthFt;
-    const boatSelector = boatProps.length > 1 ? `
-      <div class="field">
-        <label>${t('bookingBuildingLabel')}</label>
-        <select id="booking-boat-property-select">
-          ${boatProps.map(p => `<option value="${p.id}" ${p.id===selectedBoat.id?'selected':''}>${propertyDisplayName(p)}</option>`).join('')}
-        </select>
-      </div>
-    ` : '';
-
-    if(needsQuote){
-      return `
-      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
-        ${boatSelector}
-        <div style="text-align:center; padding:16px 6px 6px;">
-          <div style="font-size:34px; margin-bottom:10px;">⛵</div>
-          <div style="font-weight:700; color:var(--navy); font-size:15px; margin-bottom:8px;">${t('boatQuoteNeededTitle')}</div>
-          <div class="hint" style="margin:0 0 16px;">${t('boatQuoteNeededHint')}</div>
-          <button type="button" class="btn ochre btn-sm" style="width:100%;" id="boat-quote-request-btn" data-boat-id="${selectedBoat.id}">${t('boatQuoteRequestBtn')}</button>
-        </div>
-      </div>
-      `;
-    }
-
-    const subChecked = (key) => state.bookingBoatSelections[key]?.checked;
     return `
-    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
-      ${boatSelector}
-
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('boatSubServicesHeader')}</div>
-      ${state.boatSubOptions.filter(sub => sub.key !== 'boat_canvas' || selectedBoat.has_canvas).map(sub => `
-        <div style="margin-bottom:10px; padding:10px; border:1px solid var(--line); border-radius:8px;">
-          <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
-            <input type="checkbox" data-boat-toggle="${sub.key}" ${subChecked(sub.key) ? 'checked' : ''} />
-            <span style="color:var(--navy);">${boatSubIcon(sub.key)}</span>
-            <span style="flex:1;">${boatSubLabel(sub.key)}</span>
-          </label>
-        </div>
-      `).join('')}
-
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 8px;">${t('whenLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingUrgency==='urgent'?'selected':''}" data-urgency="urgent">${t('urgent')}</div>
-        <div class="choice ${state.bookingUrgency==='scheduled'?'selected':''}" data-urgency="scheduled">${t('scheduleOpt')}</div>
-      </div>
-      ${state.bookingUrgency==='scheduled' ? `
-        <div class="field"><label>${t('datetimeLabel')}</label><input type="datetime-local" id="booking-datetime" value="${state.bookingScheduledAt}" /></div>
-      ` : ''}
-
-      <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin:14px 0 4px;">${t('suppliesLabel')}</div>
-      <div class="hint" style="margin:0 0 10px;">${t('suppliesFeeHint')}</div>
-      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('equipmentLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingHasEquipment?'selected':''}" data-equipment="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasEquipment?'selected':''}" data-equipment="false">${t('notAvailableOpt')} (+${state.suppliesFees.noEquipment}€)</div>
-      </div>
-      <div style="font-size:12.5px; color:var(--muted); margin-bottom:4px;">${t('chemicalsLabel')}</div>
-      <div class="option-row">
-        <div class="choice ${state.bookingHasChemicals?'selected':''}" data-chemicals="true">${t('availableOpt')}</div>
-        <div class="choice ${!state.bookingHasChemicals?'selected':''}" data-chemicals="false">${t('notAvailableOpt')} (+${state.suppliesFees.noChemicals}€)</div>
-      </div>
-
-      <button class="btn ochre btn-sm" style="width:100%; margin-top:14px;" data-goto-checklist="${service.key}">${t('continueBtn')}</button>
+    <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line); text-align:center; padding-bottom:6px;">
+      <div style="font-size:34px; margin-bottom:10px;">⛵</div>
+      <div style="font-weight:700; color:var(--navy); font-size:15px; margin-bottom:8px;">${t('boatComingSoonTitle')}</div>
+      <div class="hint" style="margin:0;">${t('boatComingSoonHint')}</div>
     </div>
     `;
   }
@@ -4348,6 +4317,16 @@ function attachHandlers(){
   if(regNameInput) regNameInput.oninput = () => { state.regName = regNameInput.value; };
   const regSizeInput = document.getElementById('reg-size-input');
   if(regSizeInput) regSizeInput.oninput = () => { state.regSizeSqm = regSizeInput.value; };
+  const regBoatTypeInput = document.getElementById('reg-boattype-input');
+  if(regBoatTypeInput) regBoatTypeInput.onchange = () => { state.addPropBoatType = regBoatTypeInput.value; };
+  const regCabinCountInput = document.getElementById('reg-cabincount-input');
+  if(regCabinCountInput) regCabinCountInput.oninput = () => { state.addPropCabinCount = regCabinCountInput.value; };
+  const regLengthFtInput = document.getElementById('reg-lengthft-input');
+  if(regLengthFtInput) regLengthFtInput.oninput = () => { state.addPropLengthFt = regLengthFtInput.value; };
+  const regHasCanvasInput = document.getElementById('reg-hascanvas-input');
+  if(regHasCanvasInput) regHasCanvasInput.onchange = () => { state.addPropHasCanvas = regHasCanvasInput.checked; };
+  const regBerthInput = document.querySelector('#profile-address-form [name="berthNumber"]');
+  if(regBerthInput) regBerthInput.oninput = () => { state.addPropBerthNumber = regBerthInput.value; };
 
   const profileDetailsForm = document.getElementById('profile-details-form');
   if(profileDetailsForm) profileDetailsForm.onsubmit = async (e) => {
@@ -4357,7 +4336,7 @@ function attachHandlers(){
       // Bireysel: 1. ekran tamamlandı, 2. ekrana (adres+harita) geç -
       // henüz sunucuya bir şey göndermiyoruz.
       state.regName = fd.name;
-      state.regSizeSqm = fd.sizeSqm;
+      if(state.propertyCategory !== 'boat') state.regSizeSqm = fd.sizeSqm;
       state.authError = '';
       state.regStep = 'address';
       render();
@@ -4445,11 +4424,17 @@ function attachHandlers(){
         city: fd.propertyCity || null,
         address: fd.propertyAddress || null,
         category: state.propertyCategory,
-        sizeSqm: state.regSizeSqm || null,
-        bedroomCount: state.regBedroomCount || null,
-        bathroomCount: state.regBathroomCount || null,
+        sizeSqm: state.propertyCategory !== 'boat' ? (state.regSizeSqm || null) : null,
+        bedroomCount: state.propertyCategory !== 'boat' ? (state.regBedroomCount || null) : null,
+        bathroomCount: state.propertyCategory !== 'boat' ? (state.regBathroomCount || null) : null,
         latitude: state.regLat,
         longitude: state.regLng,
+        // Tekneye ozgu alanlar - diger kategorilerde hepsi null gonderilir.
+        boatType: state.propertyCategory === 'boat' ? state.addPropBoatType : null,
+        cabinCount: state.propertyCategory === 'boat' ? (state.addPropCabinCount || null) : null,
+        lengthFt: state.propertyCategory === 'boat' ? (state.addPropLengthFt || null) : null,
+        hasCanvas: state.propertyCategory === 'boat' ? !!state.addPropHasCanvas : null,
+        berthNumber: state.propertyCategory === 'boat' ? (fd.berthNumber || null) : null,
       },
     };
     try{
