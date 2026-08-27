@@ -537,6 +537,16 @@ tr: {
   paymentInvoice: "Aylık Fatura",
   createOrderSubmitBtn: "Siparişi Oluştur",
   toastOrderCreated: "Sipariş oluşturuldu ve personele iletildi.",
+  wipeDataTitle: "Demo Verisini Temizle",
+  wipeDataWarning: "TÜM müşterileri, mülklerini ve siparişlerini geri alınamaz şekilde siler. Personel, admin ve personel başvuruları etkilenmez.",
+  wipeDataConfirmLabel: "Onaylamak için \"SIL\" yaz",
+  wipeDataBtn: "Tüm Müşteri ve Sipariş Verisini Sil",
+  wipeDataModalTitle: "Emin misin?",
+  wipeDataModalHint: "Bu işlem GERİ ALINAMAZ. Tüm müşteriler, mülkleri ve siparişleri kalıcı olarak silinecek.",
+  wipeDataConfirmBtn: "Evet, Hepsini Sil",
+  toastWipeDone: "Temizlik tamamlandı",
+  wipeCustomersLabel: "müşteri",
+  wipeOrdersLabel: "sipariş",
   superAdminBadge: "Süper Admin",
   resetPasswordBtn: "Şifreyi Sıfırla",
   resetPasswordTitle: "Yeni Şifre Belirle",
@@ -974,6 +984,16 @@ en: {
   paymentInvoice: "Monthly Invoice",
   createOrderSubmitBtn: "Create Order",
   toastOrderCreated: "Order created and dispatched to staff.",
+  wipeDataTitle: "Clear Demo Data",
+  wipeDataWarning: "Irreversibly deletes ALL customers, their properties, and orders. Staff, admins, and staff applications are not affected.",
+  wipeDataConfirmLabel: "Type \"SIL\" to confirm",
+  wipeDataBtn: "Delete All Customer & Order Data",
+  wipeDataModalTitle: "Are you sure?",
+  wipeDataModalHint: "This action CANNOT be undone. All customers, their properties, and orders will be permanently deleted.",
+  wipeDataConfirmBtn: "Yes, Delete Everything",
+  toastWipeDone: "Cleanup complete",
+  wipeCustomersLabel: "customers",
+  wipeOrdersLabel: "orders",
   superAdminBadge: "Super Admin",
   resetPasswordBtn: "Reset Password",
   resetPasswordTitle: "Set New Password",
@@ -1410,6 +1430,16 @@ me: {
   paymentInvoice: "Mjesečna Faktura",
   createOrderSubmitBtn: "Kreiraj Narudžbu",
   toastOrderCreated: "Narudžba kreirana i proslijeđena osoblju.",
+  wipeDataTitle: "Obriši Demo Podatke",
+  wipeDataWarning: "Nepovratno briše SVE klijente, njihove nekretnine i narudžbe. Osoblje, admini i prijave za posao nisu pogođeni.",
+  wipeDataConfirmLabel: "Upiši \"SIL\" za potvrdu",
+  wipeDataBtn: "Obriši Sve Podatke o Klijentima i Narudžbama",
+  wipeDataModalTitle: "Jesi li siguran/na?",
+  wipeDataModalHint: "Ova radnja se NE MOŽE poništiti. Svi klijenti, njihove nekretnine i narudžbe biće trajno obrisani.",
+  wipeDataConfirmBtn: "Da, Obriši Sve",
+  toastWipeDone: "Čišćenje završeno",
+  wipeCustomersLabel: "klijenata",
+  wipeOrdersLabel: "narudžbi",
   superAdminBadge: "Super Admin",
   resetPasswordBtn: "Resetuj Šifru",
   resetPasswordTitle: "Postavi Novu Šifru",
@@ -1575,6 +1605,7 @@ let state = {
   createOrderServiceKey: null,
   createOrderUrgency: 'scheduled',
   createOrderError: null,
+  wipeDataConfirmOpen: false,
   resetPasswordError: null,
   marketingSubPage: 'ads',
   pushCampaigns: null,
@@ -2903,7 +2934,33 @@ function renderSettings(){
   </div>
   ${state.deleteAdminTargetId ? renderDeleteAdminModal() : ''}
   ${state.resetPasswordTargetId ? renderResetAdminPasswordModal() : ''}
+  ${state.user.isSuperAdmin ? `
+  <div class="panel-card" style="margin-top:16px; max-width:480px; border:1.5px solid var(--danger);">
+    <div class="panel-head"><h3 style="color:var(--danger);">${T.wipeDataTitle}</h3></div>
+    <div class="hint" style="margin:0 0 14px;">${T.wipeDataWarning}</div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>${T.wipeDataConfirmLabel}</label>
+      <input id="wipe-data-confirm-input" placeholder="SIL" autocomplete="off" />
+    </div>
+    <button type="button" class="btn danger btn-sm" id="wipe-data-btn" style="width:100%;" disabled>${T.wipeDataBtn}</button>
+  </div>
+  ` : ''}
+  ${state.wipeDataConfirmOpen ? renderWipeDataModal() : ''}
   `;
+}
+
+function renderWipeDataModal(){
+  return `
+  <div class="modal-backdrop" id="wipe-data-backdrop">
+    <div class="modal">
+      <h3 style="color:var(--danger);">${T.wipeDataModalTitle}</h3>
+      <div class="hint" style="margin:-6px 0 18px;">${T.wipeDataModalHint}</div>
+      <div class="row-actions">
+        <button class="btn ghost" id="wipe-data-cancel" style="flex:1;">${T.cancelBtn}</button>
+        <button class="btn danger" id="wipe-data-confirm" style="flex:1;">${T.wipeDataConfirmBtn}</button>
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderResetAdminPasswordModal(){
@@ -3861,6 +3918,36 @@ function attachHandlers(){
       await loadBookings();
     }catch(err){ state.createOrderError = err.message; render(); }
   };
+
+  // Demo verisi temizleme - IKI KATMANLI onay: once "SIL" yazmasi gerekiyor
+  // (butonu aktif eder), sonra ayrica bir onay modalinda tekrar onaylamasi
+  // gerekiyor. Backend TARAFI da bagimsiz olarak "SIL" metnini istiyor -
+  // yani bu koruma sadece arayuzde degil, API seviyesinde de var.
+  const wipeDataConfirmInput = document.getElementById('wipe-data-confirm-input');
+  const wipeDataBtn = document.getElementById('wipe-data-btn');
+  if(wipeDataConfirmInput && wipeDataBtn) wipeDataConfirmInput.oninput = () => {
+    wipeDataBtn.disabled = wipeDataConfirmInput.value.trim() !== 'SIL';
+  };
+  if(wipeDataBtn) wipeDataBtn.onclick = () => {
+    state.wipeDataConfirmOpen = true;
+    render();
+  };
+  const wipeDataCancel = document.getElementById('wipe-data-cancel');
+  if(wipeDataCancel) wipeDataCancel.onclick = () => { state.wipeDataConfirmOpen = false; render(); };
+  const wipeDataBackdrop = document.getElementById('wipe-data-backdrop');
+  if(wipeDataBackdrop) wipeDataBackdrop.onclick = (e) => { if(e.target===wipeDataBackdrop){ state.wipeDataConfirmOpen = false; render(); } };
+  const wipeDataConfirm = document.getElementById('wipe-data-confirm');
+  if(wipeDataConfirm) wipeDataConfirm.onclick = async () => {
+    try{
+      const result = await api('/admin/system/wipe-customer-data', { method:'POST', body: JSON.stringify({ confirm:'SIL' }) });
+      showToast(`${T.toastWipeDone} (${result.deletedCustomers} ${T.wipeCustomersLabel}, ${result.deletedOrders} ${T.wipeOrdersLabel})`);
+      state.wipeDataConfirmOpen = false;
+      if(state.page === 'customers') await loadCustomers();
+      if(state.page === 'bookings') await loadBookings();
+      render();
+    }catch(err){ showToast(err.message); state.wipeDataConfirmOpen = false; render(); }
+  };
+
   const resetAdminPasswordForm = document.getElementById('reset-admin-password-form');
   if(resetAdminPasswordForm) resetAdminPasswordForm.onsubmit = async (e) => {
     e.preventDefault();
