@@ -8,6 +8,7 @@ const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFee
 const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
 const { sendPushToUser, sendPushToUsers } = require('../services/push');
 const { getDormantThresholdDays } = require('../services/reengagement');
+const { createCleaningJob } = require('./jobs');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -277,6 +278,73 @@ router.get('/bookings', (req, res) => {
   res.json({ bookings: rows, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
 });
 
+// Admin, sistem uzerinden BIR MUSTERI ADINA yeni bir siparis olusturabilir
+// (orn. telefonla arayan bir musteri icin). musteri.js'teki AYNI cekirdek
+// fonksiyonu (createCleaningJob) cagriliyor - bu, otomatik personel
+// dispatch'inin (dispatchJob) musteri siparislerindeki ile BIREBIR AYNI
+// sekilde calismasini garanti eder; admin'in olusturdugu bir siparis de
+// tipki musterinin kendi olusturdugu gibi uygun personele otomatik iletilir.
+router.post('/jobs', async (req, res) => {
+  const {
+    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    hasEquipment, hasChemicals, serviceParams, promoCode,
+  } = req.body;
+  try {
+    const createdJob = await createCleaningJob({
+      propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+      hasEquipment, hasChemicals, serviceParams, promoCode,
+      skipAccessCheck: true, createdByAdminId: req.user.id,
+    });
+    res.status(201).json(createdJob);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message || 'Sipariş oluşturulamadı.' });
+  }
+});
+
+// Admin, mevcut bir siparisi duzenler - yeniden planlama, personel
+// atama/degistirme, fiyat/not duzeltmesi. Sadece GONDERILEN alanlar
+// guncellenir (COALESCE deseni). Eger assignedStaffId DEGISIYORSA (yeni bir
+// personele atama/aktarma), o personele - tipki otomatik dispatch'teki gibi -
+// bir "yeni is teklifi" push bildirimi gonderilir, boylece admin'in elle
+// atamasi ile sistemin otomatik atamasi PERSONEL ACISINDAN AYNI deneyimi
+// verir (personel haberdar olmadan uzerine is yuklenmis olmaz).
+router.put('/jobs/:id', (req, res) => {
+  const { id } = req.params;
+  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+
+  const { scheduledAt, assignedStaffId, price, notes, urgency } = req.body || {};
+  const newCheckoutAt = scheduledAt ? new Date(scheduledAt).toISOString() : null;
+  const isReassigning = assignedStaffId !== undefined && assignedStaffId !== job.assigned_staff_id;
+
+  db.prepare(
+    `UPDATE cleaning_jobs SET
+       checkout_at = COALESCE(?, checkout_at),
+       assigned_staff_id = COALESCE(?, assigned_staff_id),
+       price = COALESCE(?, price),
+       notes = COALESCE(?, notes),
+       urgency = COALESCE(?, urgency),
+       status = CASE WHEN ? IS NOT NULL THEN 'assigned' ELSE status END
+     WHERE id = ?`
+  ).run(
+    newCheckoutAt, assignedStaffId || null, price !== undefined ? Number(price) : null,
+    notes || null, urgency || null, assignedStaffId || null, id
+  );
+
+  const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  res.json(updatedJob);
+
+  if (isReassigning && assignedStaffId) {
+    const property = db.prepare('SELECT city FROM properties WHERE id = ?').get(updatedJob.property_id);
+    sendPushToUser(assignedStaffId, {
+      title: 'MICISTO — Yeni iş teklifi',
+      body: `${property?.city || ''} · ${updatedJob.price} € (admin tarafından atandı)`,
+      jobId: id,
+      type: 'job_offer',
+    }).catch((err) => console.error('Admin atama push hatası:', err));
+  }
+});
+
 // --- Personel (tam liste) --------------------------------------------------
 
 router.get('/workers', (req, res) => {
@@ -316,6 +384,39 @@ router.get('/workers/live-locations', (req, res) => {
     )
     .all();
   res.json({ workers: rows.map((r) => ({ ...r, isBusy: r.active_jobs > 0 })) });
+});
+
+// Bir personel hesabini siler - SADECE SUPER ADMIN. Aktif/bekleyen bir
+// siparise atanmis bir personel yanlislikla silinip is yariinda kalmasin
+// diye, once bu kontrol yapiliyor (musteri/siparis silmede kullanilan
+// AYNI guvenlik prensibi).
+router.delete('/workers/:id', requireSuperAdmin, (req, res) => {
+  const { id } = req.params;
+  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'staff'`).get(id);
+  if (!target) return res.status(404).json({ error: 'Personel bulunamadı.' });
+  const activeJobs = db
+    .prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE assigned_staff_id = ? AND status IN ('pending','assigned','in_progress')`)
+    .get(id).c;
+  if (activeJobs > 0) {
+    return res.status(409).json({ error: 'Bu personelin aktif/bekleyen siparişleri var, önce onları tamamlat ya da başka bir personele aktar.' });
+  }
+  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  res.json({ message: 'Personel hesabı silindi.' });
+});
+
+// Super admin, bir PERSONELIN sifresini sifirlar (gormek degil - bkz.
+// admins/:id/reset-password'daki ayni gerekce: hash'lenmis sifreler geri
+// cozulemez, bu YUZDEN "goster" degil "yenisini belirle" akisi var).
+router.put('/workers/:id/reset-password', requireSuperAdmin, (req, res) => {
+  const { newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
+  }
+  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
+  if (!target) return res.status(404).json({ error: 'Personel bulunamadı.' });
+  const passwordHash = bcrypt.hashSync(newPassword, 10);
+  db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(passwordHash, req.params.id);
+  res.json({ message: 'Şifre sıfırlandı.' });
 });
 
 // --- Müşteriler (tam liste) -------------------------------------------------
