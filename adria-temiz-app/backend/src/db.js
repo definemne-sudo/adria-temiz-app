@@ -349,6 +349,7 @@ const DEFAULT_PRICING = {
   'carpet.rate': 18, 'upholstery.rate': 22,
   'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
   'system.commissionRate': 0.20, 'system.payoutCycleDays': 15,
+  'marketing.dormantThresholdDays': 45,
 };
 const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
 for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
@@ -510,3 +511,24 @@ function clearBakedInTranslatedPropertyNames() {
   }
 }
 clearBakedInTranslatedPropertyNames();
+
+// --- Push kampanyalari (pazarlama/promosyon anlik gonderimleri) ---------
+// Admin panelinden secilen bir kitleye (tumu/bireysel/sirket/sehir) anlik
+// push bildirimi gonderildiginde, gecmis/kayit amacli buraya yaziliyor.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS push_campaigns (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    target_type TEXT NOT NULL DEFAULT 'all' CHECK (target_type IN ('all','individual','company')),
+    target_city TEXT,
+    sent_count INTEGER NOT NULL DEFAULT 0,
+    created_by_admin_id TEXT REFERENCES users(id),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+`);
+
+// Bir musteriye EN SON ne zaman "kullanmayan musteri" hatirlatma push'u
+// gonderdigimizi tutar - ayni kisiye her gun/her kontrolde tekrar tekrar
+// gondermemek icin (bkz. services/reengagement.js).
+ensureColumn('users', 'last_reengagement_push_at', 'TEXT');
