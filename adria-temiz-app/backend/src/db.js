@@ -625,9 +625,10 @@ function seedRussianChecklistTranslations() {
   if (totalUpdated > 0) {
     console.log(`[BILGI] ${totalUpdated} checklist maddesine Rusca ceviri eklendi.`);
   }
-  const stillMissing = db.prepare(`SELECT COUNT(*) AS c FROM service_checklists WHERE item_text_ru IS NULL`).get().c;
-  if (stillMissing > 0) {
-    console.log(`[BILGI] ${stillMissing} checklist maddesi HALA Rusca cevirisiz (TR metni eslesmedi ya da yeni eklenmis) - Ingilizce'ye dusuyor.`);
+  const stillMissingRows = db.prepare(`SELECT DISTINCT item_text_tr FROM service_checklists WHERE item_text_ru IS NULL`).all();
+  if (stillMissingRows.length > 0) {
+    console.log(`[BILGI] ${stillMissingRows.length} checklist maddesi HALA Rusca cevirisiz (Ingilizce'ye dusuyor). Eslesmeyen TR metinleri:`);
+    stillMissingRows.forEach((r) => console.log(`  - "${r.item_text_tr}"`));
   }
 }
 seedRussianChecklistTranslations();
