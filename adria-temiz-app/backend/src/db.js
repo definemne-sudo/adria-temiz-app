@@ -537,3 +537,50 @@ ensureColumn('users', 'last_reengagement_push_at', 'TEXT');
 // talep icin) olusturulup olusturulmadigini izlemek icin. NULL ise siparis
 // musterinin kendisi tarafindan olusturulmustur (normal akis).
 ensureColumn('cleaning_jobs', 'created_by_admin_id', 'TEXT');
+
+// --- ONARIM: eski (hatali) migration'in birakip gittigi bozuk FK'lar -----
+// GECMISTE (bu dosyanin daha eski bir surumunde), tekne kategorisi icin
+// yazilan migration 'properties' tablosunu DOGRUDAN RENAME ediyordu
+// (properties -> properties_old). SQLite'in az bilinen bir davranisi geregi,
+// bu RENAME islemi, properties'e FOREIGN KEY ile referans veren DIGER
+// tablolarin (cleaning_jobs, property_delegates) sema metnini de OTOMATIK
+// OLARAK "properties_old" olarak GUNCELLIYORDU. O migration duzeltildi
+// (artik boyle bir sorun YARATMIYOR) ama DAHA ONCE bu hatali surumle
+// calismis olan veritabanlarinda, cleaning_jobs/property_delegates HALA
+// var olmayan "properties_old" tablosuna isaret ediyor olabilir - bu da
+// o tablolara INSERT/UPDATE yapan HER ISLEMDE "no such table:
+// main.properties_old" hatasina yol aciyordu (musteri/siparis silme,
+// yeni siparis olusturma vb.).
+//
+// Bu onarim, HANGI tablolarin etkilendigini OTOMATIK bulup (sqlite_master
+// taramasi), o tablolarin MEVCUT tam semasini (tum kolonlar/kisitlar/
+// varsayilanlar OLDUGU GIBI) koruyarak, SADECE bozuk referansi duzeltip
+// yeniden olusturuyor - hicbir veri kaybi olmuyor. IDEMPOTENT'tir (zaten
+// saglikli bir veritabaninda hicbir sey yapmadan gecer). Gercek veri +
+// FK'li kayitlarla test edildi.
+function repairDanglingPropertiesOldReferences() {
+  const affected = db
+    .prepare(`SELECT name, sql FROM sqlite_master WHERE type='table' AND sql LIKE '%properties_old%'`)
+    .all();
+  if (affected.length === 0) return;
+
+  console.log(`[ONARIM] ${affected.length} tabloda bozuk 'properties_old' referansi bulundu, onariliyor:`, affected.map((a) => a.name).join(', '));
+  db.pragma('foreign_keys = OFF');
+  const repair = db.transaction(() => {
+    for (const { name, sql } of affected) {
+      const tempName = `${name}_repaired_tmp`;
+      const fixedSql = sql
+        .replace(new RegExp(`CREATE TABLE\\s+"?${name}"?`, 'i'), `CREATE TABLE "${tempName}"`)
+        .replace(/properties_old/g, 'properties');
+      db.exec(fixedSql);
+      const columns = db.prepare(`PRAGMA table_info("${name}")`).all().map((c) => `"${c.name}"`).join(', ');
+      db.exec(`INSERT INTO "${tempName}" (${columns}) SELECT ${columns} FROM "${name}"`);
+      db.exec(`DROP TABLE "${name}"`);
+      db.exec(`ALTER TABLE "${tempName}" RENAME TO "${name}"`);
+      console.log(`[ONARIM] ${name} tablosu onarildi.`);
+    }
+  });
+  repair();
+  db.pragma('foreign_keys = ON');
+}
+repairDanglingPropertiesOldReferences();
