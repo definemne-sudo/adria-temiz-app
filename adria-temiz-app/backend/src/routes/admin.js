@@ -296,6 +296,20 @@ router.post('/jobs', async (req, res) => {
       skipAccessCheck: true, createdByAdminId: req.user.id,
     });
     res.status(201).json(createdJob);
+
+    // Musteri, admin ADINA/ONUN YERINE olusturulan bu siparisten anlik
+    // olarak haberdar olsun - kendisi olusturmadigi icin (telefonla arayip
+    // admin'e siparis verdirdigi senaryo), uygulamayi actiginda "Siparislerim"
+    // ekraninda gormeden once push ile bilgilendirilmesi onemli.
+    const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(propertyId);
+    if (property) {
+      sendPushToUser(property.owner_id, {
+        title: 'Siparişin Oluşturuldu ✅',
+        body: `${property.name || 'Mülkün'} için bir sipariş oluşturuldu - detayları uygulamadan görebilirsin.`,
+        jobId: createdJob.id,
+        type: 'order_created_by_admin',
+      }).catch((err) => console.error('Admin siparis olusturma push hatasi:', err));
+    }
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message || 'Sipariş oluşturulamadı.' });
   }
