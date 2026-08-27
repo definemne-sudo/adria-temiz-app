@@ -414,7 +414,22 @@ router.delete('/workers/:id', requireSuperAdmin, (req, res) => {
   if (activeJobs > 0) {
     return res.status(409).json({ error: 'Bu personelin aktif/bekleyen siparişleri var, önce onları tamamlat ya da başka bir personele aktar.' });
   }
-  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  // ONEMLI: chat_messages/push_subscriptions gibi ikincil kayitlar musteri
+  // silmedeki AYNI gerekceyle temizleniyor. GECMIS (tamamlanmis/iptal)
+  // siparislerin assigned_staff_id / current_candidate_id alanlarini ise
+  // SILMIYORUZ, SADECE NULL'a cekiyoruz - o siparis kayitlari mali/analitik
+  // gecmis icin onemli, personel hesabi silinse bile o gecmisin kaybolmamasi
+  // gerekiyor (sadece "kim yaptigi" bilgisi bosa dusuyor).
+  const deleteRelated = db.transaction(() => {
+    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM saved_cards WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM property_delegates WHERE delegate_user_id = ?`).run(id);
+    db.prepare(`UPDATE cleaning_jobs SET assigned_staff_id = NULL WHERE assigned_staff_id = ?`).run(id);
+    db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE current_candidate_id = ?`).run(id);
+    db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  });
+  deleteRelated();
   res.json({ message: 'Personel hesabı silindi.' });
 });
 
@@ -949,7 +964,17 @@ router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
   if (totalAdmins <= 1) {
     return res.status(400).json({ error: 'Son admin hesabı silinemez.' });
   }
-  db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
+  // Musteri/personel silmedeki AYNI FOREIGN KEY guvenlik onlemi - admin
+  // hesabinin (dusuk ihtimal de olsa) chat/push kaydi varsa silme islemi
+  // patlamasin diye.
+  const deleteRelated = db.transaction(() => {
+    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(req.params.id);
+    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(req.params.id);
+    db.prepare(`UPDATE push_campaigns SET created_by_admin_id = NULL WHERE created_by_admin_id = ?`).run(req.params.id);
+    db.prepare(`UPDATE cleaning_jobs SET created_by_admin_id = NULL WHERE created_by_admin_id = ?`).run(req.params.id);
+    db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
+  });
+  deleteRelated();
   res.json({ message: 'Admin hesabı silindi.' });
 });
 
@@ -984,7 +1009,21 @@ router.delete('/customers/:id', requireSuperAdmin, (req, res) => {
   if (propertyCount > 0) {
     return res.status(409).json({ error: 'Bu müşterinin kayıtlı mülkleri var, önce onları silmelisin.' });
   }
-  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  // ONEMLI: users tablosuna FOREIGN KEY ile referans veren BASKA tablolar da
+  // var (chat_messages, push_subscriptions, saved_cards, property_delegates) -
+  // bunlar "kritik iş verisi" degil (mulk/siparis gibi), sadece yardimci/
+  // ikincil kayitlar. Musteri silinmeden ONCE bunlarin temizlenmesi gerekiyor,
+  // yoksa SQLite FOREIGN KEY constraint hatasi verip 500 sunucu hatasina
+  // yol aciyordu (gercek bir demo hesabinda chat mesaji oldugu icin tam bu
+  // hata yasandi - test edilip dogrulandi).
+  const deleteRelated = db.transaction(() => {
+    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM saved_cards WHERE user_id = ?`).run(id);
+    db.prepare(`DELETE FROM property_delegates WHERE delegate_user_id = ?`).run(id);
+    db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+  });
+  deleteRelated();
   res.json({ message: 'Müşteri silindi.' });
 });
 
