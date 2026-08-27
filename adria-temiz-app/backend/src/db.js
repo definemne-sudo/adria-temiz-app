@@ -584,3 +584,50 @@ function repairDanglingPropertiesOldReferences() {
   db.pragma('foreign_keys = ON');
 }
 repairDanglingPropertiesOldReferences();
+
+// --- Checklist maddelerine Rusca ceviri ekleme (tek seferlik doldurma) --
+// Admin panelinden girilen mevcut checklist maddelerinin (TR/EN/ME) Rusca
+// karsiliklarini, TR metniyle BIREBIR eslestirerek dolduruyoruz. SADECE
+// item_text_ru BOS olan satirlar guncelleniyor - daha sonra admin
+// panelinden manuel girilmis/duzenlenmis bir Rusca metin varsa ASLA
+// UZERINE YAZILMAZ. IDEMPOTENT'tir - zaten dolu olanlara dokunmaz.
+// Eslesme TAM METIN uzerinden oldugu icin, TR metninde ufak bir farklilik
+// (bosluk, yazim) varsa o satir eslesmeyip atlanabilir - bu durumda o
+// madde Ingilizce'ye duser (bkz. catalog.js getChecklist fallback), hic
+// bos kalmaz.
+function seedRussianChecklistTranslations() {
+  const translations = {
+    'Buzdolabı Kontrolü': 'Проверка холодильника',
+    'Eksik Malzemelerin Yenilenmesi (Tuvalet Kağıdı, Sabun vb.)': 'Пополнение расходных материалов (туалетная бумага, мыло и т.д.)',
+    'Çöplerin Atılması': 'Вынос мусора',
+    'Son Kalite Kontrolü': 'Финальная проверка качества',
+    'Cam Temizliği': 'Мытьё окон',
+    'Perdelerin Yıkanması': 'Стирка штор',
+    'Toz Kontrolü/Toz Alma': 'Проверка пыли / Протирание пыли',
+    'Zeminlerin Temizliği': 'Уборка полов',
+    'Teras/Balkon Temizliği': 'Уборка террасы/балкона',
+    'Yastık/Çarşaf/Havlu Değişimi & Yıkamai': 'Замена и стирка наволочек/простыней/полотенец',
+    'Yastık & Çarşaf Değişimi ve Yıkanması': 'Замена и стирка наволочек/простыней',
+    'Mutfak Temizliği': 'Уборка кухни',
+    'Yatak Odaları Temizliği': 'Уборка спален',
+    'Yaşam Alanları Temizliği': 'Уборка гостиной',
+    'Banyo/Tuvalet Temizliği': 'Уборка ванной/туалета',
+    'Fırın Temizliği': 'Чистка духовки',
+    'Dolap İçi Temizliği': 'Уборка внутри шкафов',
+    'Masa/Sandalye/Raf Düzenlemesi': 'Организация столов/стульев/полок',
+  };
+  const update = db.prepare(`UPDATE service_checklists SET item_text_ru = ? WHERE item_text_tr = ? AND item_text_ru IS NULL`);
+  let totalUpdated = 0;
+  for (const [tr, ru] of Object.entries(translations)) {
+    const result = update.run(ru, tr);
+    totalUpdated += result.changes;
+  }
+  if (totalUpdated > 0) {
+    console.log(`[BILGI] ${totalUpdated} checklist maddesine Rusca ceviri eklendi.`);
+  }
+  const stillMissing = db.prepare(`SELECT COUNT(*) AS c FROM service_checklists WHERE item_text_ru IS NULL`).get().c;
+  if (stillMissing > 0) {
+    console.log(`[BILGI] ${stillMissing} checklist maddesi HALA Rusca cevirisiz (TR metni eslesmedi ya da yeni eklenmis) - Ingilizce'ye dusuyor.`);
+  }
+}
+seedRussianChecklistTranslations();
