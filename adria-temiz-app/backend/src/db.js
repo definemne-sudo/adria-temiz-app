@@ -615,6 +615,11 @@ function seedRussianChecklistTranslations() {
     'Fırın Temizliği': 'Чистка духовки',
     'Dolap İçi Temizliği': 'Уборка внутри шкафов',
     'Masa/Sandalye/Raf Düzenlemesi': 'Организация столов/стульев/полок',
+    // Bu ikisi, veritabaninda Turkce ozel karakterler OLMADAN (ı/ş/ğ yerine
+    // duz i/s/g) kayitli oldugu icin bir onceki eslesmede atlanmisti -
+    // deploy log'unda gorulen BIREBIR metinle tekrar ekleniyor.
+    'Yastik & Carsaf Degisimi ve Yikanmasi': 'Замена и стирка наволочек/простыней',
+    'Cam Temizligi': 'Мытьё окон',
   };
   const update = db.prepare(`UPDATE service_checklists SET item_text_ru = ? WHERE item_text_tr = ? AND item_text_ru IS NULL`);
   let totalUpdated = 0;
