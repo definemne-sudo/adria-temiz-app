@@ -6,7 +6,8 @@ const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
-const { sendPushToUser } = require('../services/push');
+const { sendPushToUser, sendPushToUsers } = require('../services/push');
+const { getDormantThresholdDays } = require('../services/reengagement');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -704,17 +705,69 @@ router.post('/finance/staff/:id/periods/unmark-paid', (req, res) => {
   res.json({ message: 'Ödeme işareti geri alındı.' });
 });
 
+// --- Push Kampanyalari (pazarlama/promosyon anlik gonderimleri) --------------
+// Admin, secilen bir kitleye (tumu / bireysel / sirket, opsiyonel sehir
+// filtresiyle) anlik bir push bildirimi olusturup gonderir. Gonderilen her
+// kampanya push_campaigns tablosuna kayit olarak dusuyor - hem gecmis
+// gorunsun hem "bugun zaten gonderdim mi" diye admin kontrol edebilsin.
+router.get('/marketing/push-campaigns', (req, res) => {
+  const campaigns = db
+    .prepare(`SELECT * FROM push_campaigns ORDER BY created_at DESC LIMIT 50`)
+    .all();
+  res.json({ campaigns });
+});
+
+router.post('/marketing/push-campaigns', async (req, res) => {
+  const { title, body, targetType, targetCity } = req.body || {};
+  if (!title || !title.trim() || !body || !body.trim()) {
+    return res.status(400).json({ error: 'Başlık ve mesaj metni zorunlu.' });
+  }
+  const finalTargetType = ['all', 'individual', 'company'].includes(targetType) ? targetType : 'all';
+  const finalCity = targetCity && targetCity.trim() ? targetCity.trim() : null;
+
+  // Hedef kitleyi olustur: her zaman sadece MUSTERI hesaplari (bireysel/
+  // sirket) - personel/admin'e pazarlama push'u gitmiyor, bu kasitli.
+  let query = `SELECT id FROM users WHERE account_type IN ('individual','company')`;
+  const params = [];
+  if (finalTargetType !== 'all') {
+    query += ` AND account_type = ?`;
+    params.push(finalTargetType);
+  }
+  if (finalCity) {
+    // Musterinin sehri dogrudan users tablosunda degil, mulklerinden
+    // cikariliyor - en az bir mulku o sehirde olan musteriler hedeflenir.
+    query += ` AND id IN (SELECT owner_id FROM properties WHERE city = ?)`;
+    params.push(finalCity);
+  }
+  const targets = db.prepare(query).all(...params);
+
+  await sendPushToUsers(targets.map((t) => t.id), {
+    title: title.trim(),
+    body: body.trim(),
+    type: 'campaign',
+  });
+
+  const id = uuid();
+  db.prepare(
+    `INSERT INTO push_campaigns (id, title, body, target_type, target_city, sent_count, created_by_admin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, title.trim(), body.trim(), finalTargetType, finalCity, targets.length, req.user.id);
+
+  res.status(201).json({ message: `Kampanya ${targets.length} kullanıcıya gönderildi.`, sentCount: targets.length });
+});
+
 // --- Ayarlar (Settings) ------------------------------------------------------
 
 router.get('/settings', (req, res) => {
   res.json({
     commissionRate: getCommissionRate(),
     payoutCycleDays: getPayoutCycleDays(),
+    dormantThresholdDays: getDormantThresholdDays(),
   });
 });
 
 router.put('/settings', (req, res) => {
-  const { commissionRate, payoutCycleDays } = req.body || {};
+  const { commissionRate, payoutCycleDays, dormantThresholdDays } = req.body || {};
   const upsert = db.prepare(
     `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
@@ -732,6 +785,13 @@ router.put('/settings', (req, res) => {
       return res.status(400).json({ error: 'Ödeme döngüsü en az 1 gün olmalı.' });
     }
     upsert.run('system.payoutCycleDays', num);
+  }
+  if (dormantThresholdDays !== undefined && dormantThresholdDays !== '') {
+    const num = Number(dormantThresholdDays);
+    if (Number.isNaN(num) || num < 1) {
+      return res.status(400).json({ error: 'Kullanmayan müşteri eşiği en az 1 gün olmalı.' });
+    }
+    upsert.run('marketing.dormantThresholdDays', num);
   }
   res.json({ message: 'Ayarlar güncellendi.' });
 });
