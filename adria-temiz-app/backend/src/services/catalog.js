@@ -332,7 +332,7 @@ module.exports = {
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
-  getCommissionRate, getPayoutCycleDays,
+  getCommissionRate, getPayoutCycleDays, getPricingValue,
   getService, getAddon, getCommonAreaSubOption, getBoatSubOption, getChecklist, getChecklistAllLangs,
   getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
