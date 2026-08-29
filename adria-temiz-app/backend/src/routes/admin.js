@@ -4,7 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getVatRate, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
 const { sendPushToUser, sendPushToUsers } = require('../services/push');
 const { getDormantThresholdDays } = require('../services/reengagement');
@@ -260,7 +260,7 @@ router.get('/bookings', (req, res) => {
 
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
+      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.net_price, j.vat_amount, j.payment_method, j.payment_status,
               j.created_at, j.service_params, j.urgency, j.notes, j.has_equipment, j.has_chemicals,
               p.name AS property_name, p.city AS property_city, p.address AS property_address, p.category AS property_category,
               u.name AS customer_name, u.account_type AS customer_type, u.phone AS customer_phone,
@@ -331,17 +331,31 @@ router.put('/jobs/:id', (req, res) => {
   const newCheckoutAt = scheduledAt ? new Date(scheduledAt).toISOString() : null;
   const isReassigning = assignedStaffId !== undefined && assignedStaffId !== job.assigned_staff_id;
 
+  // Admin fiyati (KDV DAHIL, musteri fiyati) elle degistirirse, net_price/
+  // vat_amount'i da bu YENI fiyattan GERIYE DOGRU tutarli sekilde yeniden
+  // hesapliyoruz - aksi halde price ile net_price+vat_amount birbirini
+  // tutmaz kalirdi (orn. fiste yanlis KDV gorunurdu).
+  let newNetPrice = null, newVatAmount = null;
+  if (price !== undefined && price !== null && price !== '') {
+    const vatRate = getVatRate();
+    newNetPrice = Math.round((Number(price) / (1 + vatRate)) * 100) / 100;
+    newVatAmount = Math.round((Number(price) - newNetPrice) * 100) / 100;
+  }
+
   db.prepare(
     `UPDATE cleaning_jobs SET
        checkout_at = COALESCE(?, checkout_at),
        assigned_staff_id = COALESCE(?, assigned_staff_id),
        price = COALESCE(?, price),
+       net_price = COALESCE(?, net_price),
+       vat_amount = COALESCE(?, vat_amount),
        notes = COALESCE(?, notes),
        urgency = COALESCE(?, urgency),
        status = CASE WHEN ? IS NOT NULL THEN 'assigned' ELSE status END
      WHERE id = ?`
   ).run(
     newCheckoutAt, assignedStaffId || null, price !== undefined ? Number(price) : null,
+    newNetPrice, newVatAmount,
     notes || null, urgency || null, assignedStaffId || null, id
   );
 
@@ -722,16 +736,25 @@ router.get('/finance', (req, res) => {
 
   const jobs = db
     .prepare(
-      `SELECT j.price, j.payment_method, j.assigned_staff_id, u.name AS staff_name
+      `SELECT j.price, j.net_price, j.vat_amount, j.payment_method, j.assigned_staff_id, u.name AS staff_name
        FROM cleaning_jobs j
        LEFT JOIN users u ON u.id = j.assigned_staff_id
        WHERE j.status = 'done' AND date(j.completed_at) BETWEEN ? AND ?`
     )
     .all(startKey, endKey);
 
+  // ONEMLI: j.price musterinin ODEDIGI (KDV DAHIL) tutar. j.net_price KDV
+  // haric net tutar (eski siparislerde NULL - o zaman price'in kendisi net
+  // kabul edilir, cunku o donemde KDV hic ayrilmiyordu). MICISTO'nun GERCEK
+  // komisyonu (kendi kazanci) SADECE net tutar uzerinden hesaplanir - KDV,
+  // MICISTO'nun kazanci degil, devlete gecici olarak tutulan bir tutardir.
+  const netBase = (j) => (j.net_price != null ? j.net_price : j.price);
+  const vatOf = (j) => (j.vat_amount != null ? j.vat_amount : 0);
+
   const totalRevenue = jobs.reduce((sum, j) => sum + j.price, 0);
-  const totalCommission = Math.round(jobs.reduce((sum, j) => sum + (j.price - calcNetEarning(j.price)), 0) * 100) / 100;
-  const totalPayout = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0) * 100) / 100;
+  const totalVat = Math.round(jobs.reduce((sum, j) => sum + vatOf(j), 0) * 100) / 100;
+  const totalCommission = Math.round(jobs.reduce((sum, j) => sum + (netBase(j) - calcNetEarning(netBase(j))), 0) * 100) / 100;
+  const totalPayout = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(netBase(j)), 0) * 100) / 100;
 
   const paymentBreakdown = { cash: { count: 0, total: 0 }, card: { count: 0, total: 0 }, invoice: { count: 0, total: 0 } };
   jobs.forEach((j) => {
@@ -751,11 +774,16 @@ router.get('/finance', (req, res) => {
       };
     }
     const s = byStaff[j.assigned_staff_id];
-    const net = calcNetEarning(j.price);
+    // ONEMLI: "net" burada personelin net kazancini ifade eder (KDV haric
+    // taban uzerinden). Nakit islerde personel MUSTERIDEN TOPLAMI (KDV
+    // dahil j.price) topluyor, bu yuzden bize geri odemesi gereken tutar
+    // (owedToBusiness) hem komisyonumuzu HEM DE devlete odenecek KDV'yi
+    // icerir: j.price - net = (netBase*komisyon) + KDV.
+    const net = calcNetEarning(netBase(j));
     if (j.payment_method === 'cash') {
       s.cashJobs += 1;
       s.cashTotal += j.price;
-      s.owedToBusiness += (j.price - net); // personel bizim komisyonumuzu bize ödemeli
+      s.owedToBusiness += (j.price - net); // personel bizim komisyonumuzu + KDV'yi bize ödemeli
     } else {
       s.otherJobs += 1;
       s.otherTotal += j.price;
@@ -771,7 +799,7 @@ router.get('/finance', (req, res) => {
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
-    totalRevenue, totalCommission, totalPayout, commissionRate: getCommissionRate(),
+    totalRevenue, totalCommission, totalPayout, totalVat, commissionRate: getCommissionRate(), vatRate: getVatRate(),
     paymentBreakdown, staffSettlements, jobCount: jobs.length,
   });
 });
@@ -939,11 +967,12 @@ router.get('/settings', (req, res) => {
     commissionRate: getCommissionRate(),
     payoutCycleDays: getPayoutCycleDays(),
     dormantThresholdDays: getDormantThresholdDays(),
+    vatRate: getVatRate(),
   });
 });
 
 router.put('/settings', (req, res) => {
-  const { commissionRate, payoutCycleDays, dormantThresholdDays } = req.body || {};
+  const { commissionRate, payoutCycleDays, dormantThresholdDays, vatRate } = req.body || {};
   const upsert = db.prepare(
     `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
@@ -954,6 +983,13 @@ router.put('/settings', (req, res) => {
       return res.status(400).json({ error: 'Komisyon oranı 0 ile 1 arasında bir ondalık sayı olmalı (örn. %20 için 0.2).' });
     }
     upsert.run('system.commissionRate', num);
+  }
+  if (vatRate !== undefined && vatRate !== '') {
+    const num = Number(vatRate);
+    if (Number.isNaN(num) || num < 0 || num > 1) {
+      return res.status(400).json({ error: 'KDV oranı 0 ile 1 arasında bir ondalık sayı olmalı (örn. %21 için 0.21).' });
+    }
+    upsert.run('system.vatRate', num);
   }
   if (payoutCycleDays !== undefined && payoutCycleDays !== '') {
     const num = Number(payoutCycleDays);
