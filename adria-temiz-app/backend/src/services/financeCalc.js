@@ -113,4 +113,41 @@ function getStaffLifetimeTotal(staffId) {
   return round2(allJobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0));
 }
 
-module.exports = { toDateKey, round2, calcStaffRange, getStaffPeriods, getStaffLifetimeTotal };
+// Bir donemin (15 gunluk) KUMULATIF degil, IS IS kirilimini dondurur -
+// admin ve personel tarafinin mutabakat sirasinda "hangi is ne kadar
+// getirdi" diye ayri ayri gorebilmesi icin (bkz. calcStaffRange - o
+// fonksiyon SADECE toplami dondurur, bu fonksiyon HER ISI ayri satir
+// olarak dondurur). Admin ve personel EKRANLARI bu AYNI fonksiyonu
+// kullanir - iki taraf arasinda rakam farkli olmasi mumkun degildir.
+function getStaffPeriodJobs(staffId, startKey, endKey) {
+  const jobs = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.completed_at, j.price, j.net_price, j.vat_amount, j.payment_method,
+              p.name AS property_name, p.city AS property_city
+       FROM cleaning_jobs j
+       JOIN properties p ON p.id = j.property_id
+       WHERE j.assigned_staff_id = ? AND j.status = 'done' AND date(j.completed_at) BETWEEN ? AND ?
+       ORDER BY j.completed_at ASC`
+    )
+    .all(staffId, startKey, endKey);
+  return jobs.map((j) => {
+    // ONEMLI: netBase = KDV HARIC taban (eski islerde net_price NULL ise
+    // price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir).
+    const netBase = j.net_price != null ? j.net_price : j.price;
+    const netEarning = calcNetEarning(netBase);
+    return {
+      id: j.id,
+      serviceKey: j.service_key,
+      completedAt: j.completed_at,
+      propertyName: j.property_name,
+      propertyCity: j.property_city,
+      paymentMethod: j.payment_method,
+      price: j.price,
+      netPrice: round2(netBase),
+      vatAmount: round2(j.vat_amount != null ? j.vat_amount : 0),
+      netEarning: round2(netEarning),
+    };
+  });
+}
+
+module.exports = { toDateKey, round2, calcStaffRange, getStaffPeriods, getStaffLifetimeTotal, getStaffPeriodJobs };
