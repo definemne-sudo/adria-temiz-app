@@ -358,6 +358,11 @@ tr: {
   settingsSubtitle: "İşletme genelindeki parametreler ve hesap yönetimi.",
   generalSettingsTitle: "Genel Ayarlar",
   fieldCommissionRatePercent: "MICISTO Komisyon Oranı (%)",
+  fieldVatRatePercent: "KDV Oranı (%)",
+  vatRateHint: "Karadağ standart KDV oranı %21'dir. Sadece muhasebecinizle teyit ettikten sonra değiştirin.",
+  vatNetLabel: "Net Tutar",
+  vatAmountLabel: "KDV",
+  vatTotalLabel: "Toplam",
   fieldPayoutCycleDays: "Personel Ödeme Döngüsü (gün)",
   myAccountTitle: "Hesabım",
   fieldCurrentPassword: "Mevcut Şifre",
@@ -808,6 +813,11 @@ en: {
   settingsSubtitle: "Business-wide parameters and account management.",
   generalSettingsTitle: "General Settings",
   fieldCommissionRatePercent: "MICISTO Commission Rate (%)",
+  fieldVatRatePercent: "VAT Rate (%)",
+  vatRateHint: "Montenegro's standard VAT rate is 21%. Only change this after confirming with your accountant.",
+  vatNetLabel: "Net Amount",
+  vatAmountLabel: "VAT",
+  vatTotalLabel: "Total",
   fieldPayoutCycleDays: "Staff Payout Cycle (days)",
   myAccountTitle: "My Account",
   fieldCurrentPassword: "Current Password",
@@ -1254,6 +1264,11 @@ me: {
   settingsSubtitle: "Parametri na nivou preduzeća i upravljanje nalozima.",
   generalSettingsTitle: "Opšta podešavanja",
   fieldCommissionRatePercent: "MICISTO stopa provizije (%)",
+  fieldVatRatePercent: "Stopa PDV-a (%)",
+  vatRateHint: "Standardna stopa PDV-a u Crnoj Gori je 21%. Mijenjajte samo nakon potvrde sa računovođom.",
+  vatNetLabel: "Neto Iznos",
+  vatAmountLabel: "PDV",
+  vatTotalLabel: "Ukupno",
   fieldPayoutCycleDays: "Ciklus isplate osoblja (dana)",
   myAccountTitle: "Moj nalog",
   fieldCurrentPassword: "Trenutna lozinka",
@@ -1988,6 +2003,16 @@ function renderBreakdownRow(label, count, total, color){
       <div style="width:${pct}%; height:100%; background:${color};"></div>
     </div>
   </div>`;
+}
+
+// Bir siparisin fiyatini KDV kirilimiyla gosterir. Eski (bu ozellikten
+// once olusturulmus) siparislerde net_price/vat_amount NULL'dur - bu
+// durumda sadece toplam fiyat gosterilir (geriye donuk uyumluluk).
+function vatBreakdownHtml(j){
+  if(j.net_price == null || j.vat_amount == null){
+    return `${j.price} €`;
+  }
+  return `${T.vatNetLabel}: ${j.net_price} € &nbsp;+&nbsp; ${T.vatAmountLabel}: ${j.vat_amount} € <br/><span style="color:var(--navy);">${T.vatTotalLabel}: ${j.price} €</span>`;
 }
 
 function jobPaymentBadge(method){
@@ -2871,6 +2896,11 @@ function renderSettings(){
           <input name="commissionRatePercent" type="number" step="1" min="0" max="100" value="${Math.round(s.commissionRate*100)}" />
         </div>
         <div class="field" style="margin-bottom:0;">
+          <label>${T.fieldVatRatePercent}</label>
+          <input name="vatRatePercent" type="number" step="1" min="0" max="100" value="${Math.round(s.vatRate*100)}" />
+          <div class="hint" style="margin:4px 0 0;">${T.vatRateHint}</div>
+        </div>
+        <div class="field" style="margin-bottom:0;">
           <label>${T.fieldPayoutCycleDays}</label>
           <input name="payoutCycleDays" type="number" step="1" min="1" value="${s.payoutCycleDays}" />
         </div>
@@ -3275,7 +3305,7 @@ function renderModal(){
         <div class="detail-row"><span>${T.colStaffCol}</span><strong>${j.staff_name || T.noStaffAssigned}</strong></div>
         <div class="detail-row"><span>${T.colProperties ? T.colProperties : 'Mülk'}</span><strong>${j.property_name || ''}${j.property_category ? ' (' + categoryLabel(j.property_category) + ')' : ''}${j.property_address ? ' · ' + j.property_address : ''}</strong></div>
         <div class="detail-row"><span>${T.suppliesInfoLabel}</span><strong>${j.has_equipment ? T.equipmentYes : T.equipmentNo}<br/>${j.has_chemicals ? T.chemicalsYes : T.chemicalsNo}</strong></div>
-        <div class="detail-row"><span>${T.colPrice}</span><strong>${j.price} €</strong></div>
+        <div class="detail-row"><span>${T.colPrice}</span><strong>${vatBreakdownHtml(j)}</strong></div>
         <div class="detail-row"><span>${T.colPayment}</span><strong>${jobPaymentBadge(j.payment_method)} ${j.payment_status}</strong></div>
         <div class="detail-row" style="align-items:flex-start;">
           <span>${T.checklistLabel}</span>
@@ -3786,6 +3816,7 @@ function attachHandlers(){
     try{
       await api('/admin/settings', { method:'PUT', body: JSON.stringify({
         commissionRate: Number(fd.commissionRatePercent) / 100,
+        vatRate: Number(fd.vatRatePercent) / 100,
         payoutCycleDays: fd.payoutCycleDays,
         dormantThresholdDays: fd.dormantThresholdDays,
       })});
