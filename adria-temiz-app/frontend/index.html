@@ -842,6 +842,9 @@ const TRANSLATIONS = {
     noEquipmentFeeLabel: "Temizlik araçları (yok)",
     noChemicalsFeeLabel: "Temizlik kimyasalları (yok)",
     receiptTotalLabel: "Toplam",
+    subtotalExVatLabel: "Ara Toplam (KDV Hariç)",
+    vatLineLabel: "KDV",
+    vatIncludedNote: "KDV dahil",
     confirmPaymentBtn: "Ödemeyi Onayla",
     backBtn: "Geri",
     propertiesTitle: "Mülklerim",
@@ -1146,6 +1149,9 @@ const TRANSLATIONS = {
     noEquipmentFeeLabel: "Инвентарь (отсутствует)",
     noChemicalsFeeLabel: "Чистящие средства (отсутствуют)",
     receiptTotalLabel: "Итого",
+    subtotalExVatLabel: "Подытог (без НДС)",
+    vatLineLabel: "НДС",
+    vatIncludedNote: "включая НДС",
     confirmPaymentBtn: "Подтвердить оплату",
     backBtn: "Назад",
     propertiesTitle: "Мои объекты",
@@ -1450,6 +1456,9 @@ const TRANSLATIONS = {
     noEquipmentFeeLabel: "Cleaning equipment (not available)",
     noChemicalsFeeLabel: "Cleaning chemicals (not available)",
     receiptTotalLabel: "Total",
+    subtotalExVatLabel: "Subtotal (excl. VAT)",
+    vatLineLabel: "VAT",
+    vatIncludedNote: "VAT included",
     confirmPaymentBtn: "Confirm Payment",
     backBtn: "Back",
     propertiesTitle: "My Properties",
@@ -1754,6 +1763,9 @@ const TRANSLATIONS = {
     noEquipmentFeeLabel: "Sredstva za čišćenje (nema)",
     noChemicalsFeeLabel: "Hemija za čišćenje (nema)",
     receiptTotalLabel: "Ukupno",
+    subtotalExVatLabel: "Međuzbir (bez PDV-a)",
+    vatLineLabel: "PDV",
+    vatIncludedNote: "sa PDV-om",
     confirmPaymentBtn: "Potvrdi plaćanje",
     backBtn: "Nazad",
     propertiesTitle: "Moje nekretnine",
@@ -2175,6 +2187,7 @@ let state = {
   // makul bir varsayilanla basliyoruz - admin panelindeki gercek deger
   // yuklenir yuklenmez bunun uzerine yazilir.
   suppliesFees: { noEquipment: 15, noChemicals: 10 },
+  vatRate: 0.21,
   regPropertyCity: '',
   // "Mulklerim" sekmesinden mulk eklerken kullanilan, kayit akisiyla ayni
   // 2 adimli (detaylar + adres) yapiyi kullanan alanlar. regSizeSqm,
@@ -3133,7 +3146,13 @@ function renderReceiptPanel(draft){
   const { lines, total } = buildReceiptLines(draft);
   const promo = state.promoValidation;
   const discountAmount = (promo && promo.discountAmount) ? promo.discountAmount : 0;
-  const finalTotal = Math.max(0, Math.round((total - discountAmount) * 100) / 100);
+  // netTotal = KDV HARIC tutar (indirim uygulandiktan sonra). KDV bu tutar
+  // uzerine EKLENIR - boylece personel/MICISTO payi (backend'de oldugu gibi)
+  // hep net tutar uzerinden hesaplanmis olur, musteriye gorunen toplam ise
+  // KDV dahil nihai odeme tutaridir.
+  const netTotal = Math.max(0, Math.round((total - discountAmount) * 100) / 100);
+  const vatAmount = Math.round(netTotal * state.vatRate * 100) / 100;
+  const finalTotal = Math.round((netTotal + vatAmount) * 100) / 100;
   const isCompany = state.user.accountType === 'company';
   const paymentMethod = draft.paymentMethod;
   return `
@@ -3150,6 +3169,12 @@ function renderReceiptPanel(draft){
           <span>${t('promoDiscountLabel')} (${state.promoCodeInput.toUpperCase()})</span><span>-${discountAmount} €</span>
         </div>
       ` : ''}
+      <div style="display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; color:var(--muted); border-top:1px dashed var(--line); margin-top:6px; padding-top:8px;">
+        <span>${t('subtotalExVatLabel')}</span><span>${netTotal} €</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:12.5px; padding:5px 0; color:var(--muted);">
+        <span>${t('vatLineLabel')} (%${Math.round(state.vatRate*100)})</span><span>${vatAmount} €</span>
+      </div>
       <div style="display:flex; justify-content:space-between; font-family:'Fraunces',serif; font-size:17px; color:var(--navy); border-top:1px dashed var(--line); margin-top:8px; padding-top:10px;">
         <span>${t('receiptTotalLabel')}</span><span>${finalTotal} €</span>
       </div>
@@ -3375,6 +3400,7 @@ function renderOrderCard(j){
       <div class="order-card-meta-item">
         <span class="order-card-meta-label">${t('colPrice')}</span>
         <span class="order-card-meta-value order-card-price">${j.price} €</span>
+        ${j.vat_amount != null ? `<span style="display:block; font-size:10.5px; color:var(--muted); font-weight:400;">${t('vatIncludedNote')} (${t('vatLineLabel')} ${j.vat_amount} €)</span>` : ''}
       </div>
     </div>
     <div class="order-card-action">${renderJobAction(j)}</div>
@@ -3968,6 +3994,7 @@ async function loadAll(){
     state.boatQuoteRequiredLengthFt = results[3].boatQuoteRequiredLengthFt || 50;
     state.addons = results[3].addons;
     if(results[3].suppliesFees) state.suppliesFees = results[3].suppliesFees;
+    if(results[3].vatRate != null) state.vatRate = results[3].vatRate;
     state.lastServicesLang = state.lang;
   }
   state.ratingJob = findNextRatingJob();
