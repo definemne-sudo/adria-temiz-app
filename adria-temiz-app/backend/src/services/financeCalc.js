@@ -32,19 +32,29 @@ function round2(n) { return Math.round(n * 100) / 100; }
 //   iki rakamdır.
 function calcStaffRange(staffId, startKey, endKey) {
   const jobs = db
-    .prepare(`SELECT price, payment_method FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done' AND date(completed_at) BETWEEN ? AND ?`)
+    .prepare(`SELECT price, net_price, vat_amount, payment_method FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done' AND date(completed_at) BETWEEN ? AND ?`)
     .all(staffId, startKey, endKey);
   let owedToStaff = 0, owedToBusiness = 0;
-  let grossRevenue = 0, cashHeld = 0, cardHeld = 0, staffEarning = 0, businessEarning = 0;
+  let grossRevenue = 0, cashHeld = 0, cardHeld = 0, staffEarning = 0, businessEarning = 0, businessVat = 0;
   jobs.forEach((j) => {
-    const net = calcNetEarning(j.price);
-    const commission = j.price - net;
+    // ONEMLI: netBase = KDV HARIC tutar (eski siparislerde net_price NULL -
+    // o zaman price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir).
+    // MICISTO'nun GERCEK kazanci (businessEarning/commission) SADECE bu net
+    // taban uzerinden hesaplanir - KDV, MICISTO'nun parasi degil, devlete
+    // gecici olarak tutulan bir tutardir (ayrica businessVat'ta izlenir).
+    const netBase = j.net_price != null ? j.net_price : j.price;
+    const vat = j.vat_amount != null ? j.vat_amount : 0;
+    const net = calcNetEarning(netBase);
+    const commission = netBase - net;
     grossRevenue += j.price;
     staffEarning += net;
     businessEarning += commission;
+    businessVat += vat;
     if (j.payment_method === 'cash') {
       cashHeld += j.price;
-      owedToBusiness += commission;
+      // Nakit iste personel MUSTERIDEN TOPLAMI (KDV dahil j.price) topluyor,
+      // bize hem komisyonumuzu HEM DE devlete odeyecegimiz KDV'yi borclanir.
+      owedToBusiness += (commission + vat);
     } else {
       cardHeld += j.price;
       owedToStaff += net;
@@ -57,6 +67,7 @@ function calcStaffRange(staffId, startKey, endKey) {
     cardHeld: round2(cardHeld),
     staffEarning: round2(staffEarning),
     businessEarning: round2(businessEarning),
+    businessVat: round2(businessVat),
     owedToStaff: round2(owedToStaff),
     owedToBusiness: round2(owedToBusiness),
     netSettlement: round2(owedToStaff - owedToBusiness),
@@ -98,8 +109,8 @@ function getStaffPeriods(staffId) {
 }
 
 function getStaffLifetimeTotal(staffId) {
-  const allJobs = db.prepare(`SELECT price FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done'`).all(staffId);
-  return round2(allJobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0));
+  const allJobs = db.prepare(`SELECT price, net_price FROM cleaning_jobs WHERE assigned_staff_id = ? AND status = 'done'`).all(staffId);
+  return round2(allJobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0));
 }
 
 module.exports = { toDateKey, round2, calcStaffRange, getStaffPeriods, getStaffLifetimeTotal };
