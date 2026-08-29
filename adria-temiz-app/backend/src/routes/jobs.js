@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate, getVatRate } = require('../services/catalog');
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
 const { sendPushToUser } = require('../services/push');
@@ -167,15 +167,24 @@ async function createCleaningJob({
     discountAmount = calcDiscount(appliedPromo, priceBeforeDiscount);
   }
 
-  const price = Math.max(0, priceBeforeDiscount - discountAmount);
+  // ONEMLI: "price" musterinin GERCEKTEN ODEDIGI (KDV DAHIL) tutardir.
+  // Personel/MICISTO %80/%20 payi ise KDV HARIC net tutar uzerinden
+  // hesaplanir - aksi halde MICISTO'nun devlete odeyecegi KDV, komisyonunu
+  // neredeyse sifirlar (is planinda tespit edilip duzeltilen hata, simdi
+  // koda da yansitiliyor). netPrice/vatAmount ayrica saklanir ki musteriye
+  // kesilen fiste KDV ayrica gosterilebilsin.
+  const netPrice = Math.max(0, priceBeforeDiscount - discountAmount);
+  const vatRate = getVatRate();
+  const vatAmount = Math.round(netPrice * vatRate * 100) / 100;
+  const price = Math.round((netPrice + vatAmount) * 100) / 100;
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
-        urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount, created_by_admin_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?)`
+        urgency, payment_method, checkout_at, status, source, price, net_price, vat_amount, payment_status, promo_code_id, discount_amount, created_by_admin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -189,6 +198,8 @@ async function createCleaningJob({
     checkoutAt,
     'manual',
     price,
+    netPrice,
+    vatAmount,
     paymentStatus,
     appliedPromo ? appliedPromo.id : null,
     discountAmount || null,
@@ -392,7 +403,9 @@ router.get('/:id/offer-detail', (req, res) => {
   res.json({
     ...job,
     estimatedMinutes: estimateJobMinutes(job.service_key, JSON.parse(job.service_params || 'null')),
-    netEarning: calcNetEarning(job.price),
+    // KDV HARIC net taban uzerinden - bkz. jobs.js/financeCalc.js'teki
+    // ayni gerekce (KDV, personelin/MICISTO'nun payini etkilememeli).
+    netEarning: calcNetEarning(job.net_price != null ? job.net_price : job.price),
     canRespond: job.status === 'pending',
   });
 });
@@ -448,8 +461,9 @@ router.get('/home-summary', (req, res) => {
     )
     .all(req.user.id);
 
+  // KDV HARIC net taban uzerinden - bkz. /performance endpoint'indeki ayni gerekce.
   const grossTotal = completedToday.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.price), 0);
+  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0);
 
   res.json({
     todaysJobs,
@@ -511,8 +525,13 @@ router.get('/performance', (req, res) => {
     )
     .all(req.user.id, startKey, endKey);
 
+  // ONEMLI: Personelin net kazanci KDV HARIC taban uzerinden hesaplanir -
+  // j.price KDV DAHIL musteri fiyatidir, dogrudan kullanilirsa personelin
+  // "bu donemki kazancim" ekranindaki rakam OLDUGUNDAN FAZLA gorunurdu.
+  // Eski (KDV ozelliginden once olusturulmus) islerde j.net_price NULL'dur,
+  // o durumda j.price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir.
   const grossTotal = jobs.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0) * 100) / 100;
+  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0) * 100) / 100;
   const daysWorked = new Set(jobs.map((j) => (j.completed_at || '').slice(0, 10))).size;
   const completionRate = totalDays ? daysWorked / totalDays : 0;
   const bonus = calcPerformanceBonus(completionRate, { period, daysWorked, totalDays });
