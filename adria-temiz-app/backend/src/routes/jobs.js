@@ -6,7 +6,7 @@ const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, get
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
 const { sendPushToUser } = require('../services/push');
-const { getStaffPeriods, getStaffLifetimeTotal, round2 } = require('../services/financeCalc');
+const { getStaffPeriods, getStaffLifetimeTotal, getStaffPeriodJobs, round2 } = require('../services/financeCalc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -744,6 +744,21 @@ router.get('/finance-summary', (req, res) => {
   // KARISTIRILMAMALI - ikisi kasitli olarak farkli rakamlardir.
   const staffEarningPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.staffEarning, 0));
   res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet, staffEarningPending });
+});
+
+// Bir donemin KUMULATIF degil, IS IS kirilimi - personel kendi mutabakat
+// donemine tikladiginda hangi isten ne kadar kazandigini gorsun (admin
+// tarafindaki AYNI endpoint mantigi, bkz. admin.js /finance/staff/:id/period-jobs -
+// iki taraf da AYNI getStaffPeriodJobs fonksiyonunu kullanir, rakamlar
+// birebir tutarlidir).
+router.get('/finance/period-jobs', (req, res) => {
+  if (req.user.accountType !== 'staff') {
+    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
+  }
+  const { periodStart, periodEnd } = req.query;
+  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'periodStart ve periodEnd zorunlu.' });
+  const jobs = getStaffPeriodJobs(req.user.id, periodStart, periodEnd);
+  res.json({ periodStart, periodEnd, jobs });
 });
 
 // Personel "Ödememi Aldım" dediğinde, admin'in "Ödendi İşaretle" dediğinde
