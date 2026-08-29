@@ -111,6 +111,12 @@ function getPayoutCycleDays() {
   return getPricingValue('system.payoutCycleDays', 15);
 }
 
+// Karadağ standart KDV oranı (varsayılan %21). Admin panelinden
+// değiştirilebilir - bkz. /admin/settings.
+function getVatRate() {
+  return getPricingValue('system.vatRate', 0.21);
+}
+
 function getPricingValue(key, fallback = 0) {
   const row = db.prepare('SELECT value FROM pricing_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
@@ -332,7 +338,7 @@ module.exports = {
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
-  getCommissionRate, getPayoutCycleDays, getPricingValue,
+  getCommissionRate, getPayoutCycleDays, getVatRate, getPricingValue,
   getService, getAddon, getCommonAreaSubOption, getBoatSubOption, getChecklist, getChecklistAllLangs,
   getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
