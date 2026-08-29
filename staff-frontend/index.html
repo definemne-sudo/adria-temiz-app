@@ -1458,7 +1458,13 @@ function perfPeriodLabel(d){
 
 function renderHistoryRow(j){
   const icon = serviceIconSrc(j.service_key);
-  const net = Math.round(j.price * (1 - state.perfData.commissionRate) * 100) / 100;
+  // ONEMLI: Komisyon KDV HARIC net tutar uzerinden hesaplanir (backend'deki
+  // calcNetEarning ile ayni mantik) - j.price KDV DAHIL musteri fiyatidir,
+  // dogrudan kullanilirsa personelin kazanci OLDUGUNDAN FAZLA gorunur. Eski
+  // (KDV ozelliginden once olusturulmus) islerde j.net_price NULL'dur, o
+  // durumda j.price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir.
+  const netBase = j.net_price != null ? j.net_price : j.price;
+  const net = Math.round(netBase * (1 - state.perfData.commissionRate) * 100) / 100;
   const dateLabel = new Date((j.completed_at||'').replace(' ','T')).toLocaleDateString(LOCALES[state.lang], { day:'numeric', month:'short' });
   return `
   <div class="job-card" style="flex-direction:row; align-items:center; gap:12px; padding:12px 14px; margin-bottom:8px;">
