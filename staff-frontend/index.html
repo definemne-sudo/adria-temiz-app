@@ -358,6 +358,9 @@ const TRANSLATIONS = {
     financeYouOwe: "Sistemin alacağı",
     financeNetLabel: "Net",
     markReceivedBtn: "Ödememi Aldım",
+    viewJobByJobBtn: "İş İş Görüntüle",
+    periodJobsTitle: "Dönem Detayı — İş İş Kırılım",
+    periodJobsTotalLabel: "TOPLAM",
     financeCurrentPeriodTitle: "Güncel Dönem",
     financeHistoryTitle: "Geçmiş Dönemler",
     financeNoJobsYet: "Henüz tamamlanmış işin yok.",
@@ -518,6 +521,9 @@ const TRANSLATIONS = {
     financeYouOwe: "Owed to system",
     financeNetLabel: "Net",
     markReceivedBtn: "I Received My Payment",
+    viewJobByJobBtn: "View Job by Job",
+    periodJobsTitle: "Period Detail — Job by Job",
+    periodJobsTotalLabel: "TOTAL",
     financeCurrentPeriodTitle: "Current Period",
     financeHistoryTitle: "Past Periods",
     financeNoJobsYet: "You haven't completed any jobs yet.",
@@ -678,6 +684,9 @@ const TRANSLATIONS = {
     financeYouOwe: "Duguješ sistemu",
     financeNetLabel: "Neto",
     markReceivedBtn: "Primio/la sam isplatu",
+    viewJobByJobBtn: "Prikaži Posao po Posao",
+    periodJobsTitle: "Detalji Perioda — Posao po Posao",
+    periodJobsTotalLabel: "UKUPNO",
     financeCurrentPeriodTitle: "Trenutni period",
     financeHistoryTitle: "Prošli periodi",
     financeNoJobsYet: "Još nisi završio/la nijedan posao.",
@@ -838,6 +847,9 @@ const TRANSLATIONS = {
     financeYouOwe: "Ты должен системе",
     financeNetLabel: "Итого",
     markReceivedBtn: "Я получил оплату",
+    viewJobByJobBtn: "Посмотреть по заказам",
+    periodJobsTitle: "Детали периода — по заказам",
+    periodJobsTotalLabel: "ИТОГО",
     financeCurrentPeriodTitle: "Текущий период",
     financeHistoryTitle: "Прошлые периоды",
     financeNoJobsYet: "Пока нет завершённых заказов.",
@@ -1020,6 +1032,7 @@ let state = {
   supportError: '',
   pendingOnlineToggle: false,
   detailJob: null,
+  periodJobsModal: null,
   calendarWeekStart: formatDateKey(getMonday(new Date())),
   selectedCalendarDate: formatDateKey(new Date()),
   perfPeriod: 'week', // 'week' | 'month'
@@ -1225,6 +1238,7 @@ function renderPanel(){
   ${state.offerJob ? renderOfferModal() : ''}
   ${state.showCityPicker ? renderCityPickerModal() : ''}
   ${state.supportView ? renderSupportModal() : ''}
+  ${state.periodJobsModal ? renderPeriodJobsModal() : ''}
   `;
 }
 
@@ -1414,7 +1428,46 @@ function renderFinancePeriodCard(p, isCurrent){
     <div style="display:flex; justify-content:space-between; font-size:14px; font-weight:700; color:${isPositive?'var(--sage-dark)':'var(--danger)'}; padding-top:8px; margin-top:4px; border-top:1px dashed var(--line);">
       <span>${t('financeNetLabel')}</span><span>${isPositive?'+':''}${p.netSettlement.toFixed(2)} €</span>
     </div>
-    ${!p.isPaid && p.netSettlement > 0 ? `<button type="button" class="btn ochre btn-sm" style="width:100%; margin-top:10px;" data-mark-received="${p.periodStart}" data-mark-received-end="${p.periodEnd}" data-mark-received-amount="${p.netSettlement}">${t('markReceivedBtn')}</button>` : ''}
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button type="button" class="btn ghost btn-sm" style="flex:1;" data-open-period-jobs="${p.periodStart}" data-open-period-jobs-end="${p.periodEnd}">${t('viewJobByJobBtn')}</button>
+      ${!p.isPaid && p.netSettlement > 0 ? `<button type="button" class="btn ochre btn-sm" style="flex:1;" data-mark-received="${p.periodStart}" data-mark-received-end="${p.periodEnd}" data-mark-received-amount="${p.netSettlement}">${t('markReceivedBtn')}</button>` : ''}
+    </div>
+  </div>
+  `;
+}
+
+// Bir donemin IS IS kirilimini gosteren modal - kumulatif rakam yerine her
+// isin ayri satirda gorulmesini saglar. Admin panelindeki AYNI mantik/
+// AYNI backend endpoint'i (bkz. /jobs/finance/period-jobs) kullanilir -
+// personel ve admin arasinda mutabakat sirasinda rakam farki OLMAZ.
+function renderPeriodJobsModal(){
+  const m = state.periodJobsModal;
+  if(!m) return '';
+  const jobs = m.data ? m.data.jobs : null;
+  const totalNet = jobs ? Math.round(jobs.reduce((s,j) => s + j.netEarning, 0) * 100) / 100 : 0;
+  return `
+  <div class="modal-backdrop" id="period-jobs-backdrop">
+    <div class="modal">
+      <h3 style="margin-bottom:4px;">${t('periodJobsTitle')}</h3>
+      <div class="hint" style="margin:0 0 14px;">${new Date(m.periodStart+'T00:00:00').toLocaleDateString(LOCALES[state.lang],{day:'numeric',month:'short'})} – ${new Date(m.periodEnd+'T00:00:00').toLocaleDateString(LOCALES[state.lang],{day:'numeric',month:'short'})}</div>
+      ${!jobs ? `<div class="empty-state">…</div>` : jobs.length === 0 ? `<div class="empty-state">${t('emptyHistory')}</div>` : `
+        <div style="display:flex; flex-direction:column; gap:8px; max-height:50vh; overflow-y:auto;">
+          ${jobs.map(j => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:10px;">
+              <div>
+                <div style="font-size:12.5px; font-weight:700; color:var(--navy);">${jobServiceLabel({service_key:j.serviceKey})}</div>
+                <div style="font-size:11px; color:var(--muted);">${j.propertyName} · ${new Date(j.completedAt.replace(' ','T')).toLocaleDateString(LOCALES[state.lang],{day:'numeric',month:'short'})}</div>
+              </div>
+              <div style="font-family:'Fraunces',serif; font-size:15px; color:var(--ochre); flex-shrink:0;">+${j.netEarning.toFixed(2)} €</div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex; justify-content:space-between; font-family:'Fraunces',serif; font-size:16px; color:var(--navy); border-top:1px dashed var(--line); margin-top:12px; padding-top:10px;">
+          <span>${t('periodJobsTotalLabel')}</span><span>${totalNet.toFixed(2)} €</span>
+        </div>
+      `}
+      <button type="button" class="btn ochre full" id="close-period-jobs-modal" style="margin-top:14px;">${t('closeBtn')}</button>
+    </div>
   </div>
   `;
 }
@@ -2231,6 +2284,25 @@ function attachHandlers(){
       await loadAll();
     }catch(err){ showToast(err.message); }
   });
+
+  // Donemin IS IS kirilimini gosteren modal - admin panelindeki AYNI
+  // mantik/AYNI backend endpoint'i kullanilir, mutabakat sirasinda rakam
+  // farki olmamasi garanti edilir.
+  document.querySelectorAll('[data-open-period-jobs]').forEach(el => el.onclick = async () => {
+    const periodStart = el.dataset.openPeriodJobs;
+    const periodEnd = el.dataset.openPeriodJobsEnd;
+    state.periodJobsModal = { periodStart, periodEnd, data: null };
+    render();
+    try{
+      const data = await api(`/jobs/finance/period-jobs?periodStart=${periodStart}&periodEnd=${periodEnd}`);
+      state.periodJobsModal = { periodStart, periodEnd, data };
+      render();
+    }catch(err){ showToast(err.message); state.periodJobsModal = null; render(); }
+  });
+  const closePeriodJobsModal = document.getElementById('close-period-jobs-modal');
+  if(closePeriodJobsModal) closePeriodJobsModal.onclick = () => { state.periodJobsModal = null; render(); };
+  const periodJobsBackdrop = document.getElementById('period-jobs-backdrop');
+  if(periodJobsBackdrop) periodJobsBackdrop.onclick = (e) => { if(e.target===periodJobsBackdrop){ state.periodJobsModal = null; render(); } };
 
   document.querySelectorAll('[data-head-out]').forEach(el => el.onclick = async () => {
     try{
