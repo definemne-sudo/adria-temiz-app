@@ -5,7 +5,7 @@ const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
 const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getVatRate, getChecklist, getChecklistAllLangs } = require('../services/catalog');
-const { getStaffPeriods, getStaffLifetimeTotal } = require('../services/financeCalc');
+const { getStaffPeriods, getStaffLifetimeTotal, getStaffPeriodJobs } = require('../services/financeCalc');
 const { sendPushToUser, sendPushToUsers } = require('../services/push');
 const { getDormantThresholdDays } = require('../services/reengagement');
 const { createCleaningJob } = require('./jobs');
@@ -721,6 +721,125 @@ function toDateKey(d) {
   return `${y}-${m}-${day}`;
 }
 
+// Bir isin MICISTO'nun GERCEK komisyonunu (KDV HARIC net taban uzerinden)
+// dondurur. Eski (KDV ozelliginden once olusturulmus) islerde net_price
+// NULL'dur - o zaman price zaten KDV eklenmeden hesaplanmisti.
+function jobCommission(j) {
+  const netBase = j.net_price != null ? j.net_price : j.price;
+  return Math.round((netBase - calcNetEarning(netBase)) * 100) / 100;
+}
+
+// Bir nakit isin komisyonu "TAHSIL EDILDI" sayilir mi? - personelin o isin
+// tamamlandigi tarihi kapsayan 15 gunluk donemi ZATEN "odendi" olarak
+// isaretlenmisse (staff_payment_marks), personel komisyonu bize o donemde
+// geri odemis demektir. Kart/fatura islerinde para zaten ELIMIZDE (musteri
+// odemeyi dogrudan bize yapti) - bu yuzden HER ZAMAN "tahsil edildi" sayilir,
+// donem kapanmasini beklemez.
+function isCommissionCollected(j) {
+  if (j.payment_method !== 'cash') return true;
+  if (!j.assigned_staff_id || !j.completed_at) return false;
+  const dateKey = (j.completed_at || '').slice(0, 10);
+  const mark = db
+    .prepare(`SELECT 1 FROM staff_payment_marks WHERE staff_id = ? AND ? BETWEEN period_start AND period_end LIMIT 1`)
+    .get(j.assigned_staff_id, dateKey);
+  return !!mark;
+}
+
+// Finans "Genel Bakış" sekmesi: tahsil edilmis / bekleyen komisyon kartlari
+// + zaman serisi grafigi. ONEMLI: komisyon HER YERDE net (KDV haric) taban
+// uzerinden hesaplaniyor - musterinin odedigi KDV DAHIL tutar (price)
+// DOGRUDAN kullanilirsa komisyon oldugundan fazla gorunur (bu, kullanicinin
+// canli testte yakaladigi hataydi).
+router.get('/finance/overview', (req, res) => {
+  const granularity = ['day', 'week', 'month'].includes(req.query.granularity) ? req.query.granularity : 'day';
+  const bucketCount = granularity === 'day' ? 30 : granularity === 'week' ? 12 : 12;
+
+  const jobs = db
+    .prepare(
+      `SELECT price, net_price, vat_amount, payment_method, assigned_staff_id, completed_at
+       FROM cleaning_jobs WHERE status = 'done' AND completed_at IS NOT NULL`
+    )
+    .all();
+
+  let collectedCommission = 0, pendingCommission = 0, totalVat = 0;
+  jobs.forEach((j) => {
+    const commission = jobCommission(j);
+    if (isCommissionCollected(j)) collectedCommission += commission;
+    else pendingCommission += commission;
+    totalVat += (j.vat_amount != null ? j.vat_amount : 0);
+  });
+
+  // Zaman serisi: gunluk/haftalik/aylik toplam komisyon (tahsilat durumundan
+  // BAGIMSIZ - "bu donemde ne kadar komisyon HAK EDILDI" trendini gosterir).
+  const buckets = new Map();
+  const bucketKey = (dateStr) => {
+    const d = new Date(dateStr.replace(' ', 'T') + (dateStr.includes('T') ? '' : 'Z'));
+    if (granularity === 'day') return toDateKey(d);
+    if (granularity === 'month') return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    // hafta: o haftanin Pazartesi tarihi
+    const day = d.getUTCDay();
+    const diffToMonday = (day === 0 ? -6 : 1 - day);
+    const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diffToMonday));
+    return toDateKey(monday);
+  };
+  jobs.forEach((j) => {
+    const key = bucketKey(j.completed_at);
+    buckets.set(key, (buckets.get(key) || 0) + jobCommission(j));
+  });
+  const sortedKeys = Array.from(buckets.keys()).sort().slice(-bucketCount);
+  const series = sortedKeys.map((label) => ({ label, commission: Math.round(buckets.get(label) * 100) / 100 }));
+
+  res.json({
+    collectedCommission: Math.round(collectedCommission * 100) / 100,
+    pendingCommission: Math.round(pendingCommission * 100) / 100,
+    totalVat: Math.round(totalVat * 100) / 100,
+    series,
+  });
+});
+
+// Bir kart/kategoriye (tahsil edilmis / bekleyen) tiklaninca acilan is
+// listesi - muhasebeyle mutabakat icin kullanilir.
+router.get('/finance/transactions', (req, res) => {
+  const category = req.query.category === 'pending' ? 'pending' : 'collected';
+  const jobs = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.price, j.net_price, j.vat_amount, j.payment_method, j.assigned_staff_id,
+              j.completed_at AS eventDate, u.name AS staff_name, p.name AS property_name, c.name AS customer_name
+       FROM cleaning_jobs j
+       LEFT JOIN users u ON u.id = j.assigned_staff_id
+       JOIN properties p ON p.id = j.property_id
+       JOIN users c ON c.id = p.owner_id
+       WHERE j.status = 'done' AND j.completed_at IS NOT NULL
+       ORDER BY j.completed_at DESC`
+    )
+    .all();
+
+  const filtered = jobs.filter((j) => (isCommissionCollected(j) ? category === 'collected' : category === 'pending'));
+  const transactions = filtered.map((j) => ({ ...j, commission: jobCommission(j) }));
+  res.json({ transactions, totalCommission: Math.round(transactions.reduce((s, t) => s + t.commission, 0) * 100) / 100 });
+});
+
+// --- KDV (PDV) mutabakati -----------------------------------------------
+// Muhasebeyle mutabakat icin: devlete odenmesi gereken TOPLAM KDV tutari +
+// bu tutari olusturan is listesi (Excel'e aktarilabilir).
+router.get('/finance/vat', (req, res) => {
+  const jobs = db
+    .prepare(
+      `SELECT j.id, j.service_key, j.price, j.net_price, j.vat_amount, j.payment_method, j.completed_at AS eventDate,
+              u.name AS staff_name, p.name AS property_name, c.name AS customer_name
+       FROM cleaning_jobs j
+       LEFT JOIN users u ON u.id = j.assigned_staff_id
+       JOIN properties p ON p.id = j.property_id
+       JOIN users c ON c.id = p.owner_id
+       WHERE j.status = 'done' AND j.completed_at IS NOT NULL
+       ORDER BY j.completed_at DESC`
+    )
+    .all();
+  const transactions = jobs.map((j) => ({ ...j, vatAmount: j.vat_amount != null ? j.vat_amount : 0 }));
+  const totalVat = Math.round(transactions.reduce((s, t) => s + t.vatAmount, 0) * 100) / 100;
+  res.json({ totalVat, transactions, vatRate: getVatRate() });
+});
+
 // Seçilen dönemde tamamlanan işlerden: toplam ciro, MICISTO komisyonu,
 // ödeme yöntemi dağılımı, ve personel bazında mutabakat (kim kime ne kadar
 // borçlu). Nakit işlerde para zaten personelde - o yüzden personel bize
@@ -828,6 +947,19 @@ router.get('/finance/staff/:id/periods', (req, res) => {
   if (!staffRow) return res.status(404).json({ error: 'Personel bulunamadı.' });
   const periods = getStaffPeriods(req.params.id);
   res.json({ staff: staffRow, periods });
+});
+
+// Bir donemin KUMULATIF degil, IS IS kirilimi - mutabakat sirasinda "hangi
+// is ne kadar getirdi" sorusuna cevap vermek icin (bkz. financeCalc.js
+// getStaffPeriodJobs - personelin KENDI uygulamasindaki AYNI endpoint
+// mantigi ile birebir tutarli, bkz. jobs.js /finance/period-jobs).
+router.get('/finance/staff/:id/period-jobs', (req, res) => {
+  const { periodStart, periodEnd } = req.query;
+  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'periodStart ve periodEnd zorunlu.' });
+  const staffRow = db.prepare(`SELECT id, name FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
+  if (!staffRow) return res.status(404).json({ error: 'Personel bulunamadı.' });
+  const jobs = getStaffPeriodJobs(req.params.id, periodStart, periodEnd);
+  res.json({ staff: staffRow, periodStart, periodEnd, jobs });
 });
 
 // Personel kendi "Ödememi Aldım" derken de, admin burada "Ödendi
