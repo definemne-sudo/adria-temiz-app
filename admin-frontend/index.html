@@ -419,6 +419,14 @@ tr: {
   granularity_month: "Ay",
   financeCollected: "Tahsil Edilen Komisyon",
   financePending: "Bekleyen Komisyon",
+  financeVatOwed: "Ödenecek KDV",
+  vatModalTitle: "KDV Mutabakatı",
+  vatModalSubtitle: "Devlete ödenecek toplam KDV:",
+  exportVatCsvBtn: "Excel'e Aktar (CSV)",
+  viewJobByJobBtn: "İş İş Görüntüle",
+  periodJobsTitle: "Dönem Detayı — İş İş Kırılım",
+  periodJobsEarningCol: "Net Kazanç",
+  periodJobsTotalLabel: "TOPLAM",
   financeClickToView: "Detay için tıkla →",
   financeCommissionChartTitle: "MICISTO Komisyon Kazancı",
   financeTotalEarned: "Toplam Kazanç",
@@ -874,6 +882,14 @@ en: {
   granularity_month: "Month",
   financeCollected: "Collected Commission",
   financePending: "Pending Commission",
+  financeVatOwed: "VAT Owed",
+  vatModalTitle: "VAT Reconciliation",
+  vatModalSubtitle: "Total VAT owed to the state:",
+  exportVatCsvBtn: "Export to Excel (CSV)",
+  viewJobByJobBtn: "View Job by Job",
+  periodJobsTitle: "Period Detail — Job by Job Breakdown",
+  periodJobsEarningCol: "Net Earning",
+  periodJobsTotalLabel: "TOTAL",
   financeClickToView: "Click for detail →",
   financeCommissionChartTitle: "MICISTO Commission Earnings",
   financeTotalEarned: "Total Earned",
@@ -1325,6 +1341,14 @@ me: {
   granularity_month: "Mjesec",
   financeCollected: "Naplaćena provizija",
   financePending: "Provizija na čekanju",
+  financeVatOwed: "PDV za uplatu",
+  vatModalTitle: "Usklađivanje PDV-a",
+  vatModalSubtitle: "Ukupan PDV za uplatu državi:",
+  exportVatCsvBtn: "Izvezi u Excel (CSV)",
+  viewJobByJobBtn: "Prikaži Posao po Posao",
+  periodJobsTitle: "Detalji Perioda — Raščlana po Poslu",
+  periodJobsEarningCol: "Neto Zarada",
+  periodJobsTotalLabel: "UKUPNO",
   financeClickToView: "Klikni za detalje →",
   financeCommissionChartTitle: "MICISTO zarada od provizije",
   financeTotalEarned: "Ukupno zarađeno",
@@ -1605,6 +1629,8 @@ let state = {
   staffPeriods: null,
   financeCancellations: null,
   financeTxModal: null,
+  financeVatModal: null,
+  periodJobsModal: null,
   settingsData: null,
   adminsList: null,
   settingsError: '',
@@ -2262,6 +2288,8 @@ function renderFinance(){
     : state.financeSubPage==='staff' ? renderFinanceStaff()
     : renderFinanceCancellations()}
   ${state.financeTxModal ? renderFinanceTxModal() : ''}
+  ${state.financeVatModal ? renderFinanceVatModal() : ''}
+  ${state.periodJobsModal ? renderPeriodJobsModal() : ''}
   `;
 }
 
@@ -2279,7 +2307,7 @@ function renderFinanceOverview(){
   <div style="display:flex; gap:8px; margin-bottom:16px;">
     ${['day','week','month'].map(g => `<button class="btn ${state.financeGranularity===g?'ochre':'ghost'} btn-sm" data-finance-granularity="${g}">${T['granularity_'+g]}</button>`).join('')}
   </div>
-  <div class="stat-grid" style="grid-template-columns:repeat(2,1fr); margin-bottom:16px;">
+  <div class="stat-grid" style="grid-template-columns:repeat(3,1fr); margin-bottom:16px;">
     <div class="stat-card" data-open-tx="collected" style="cursor:pointer;">
       <div class="value" style="color:var(--sage-dark);">${o.collectedCommission} €</div>
       <div class="label">${T.financeCollected}</div>
@@ -2288,6 +2316,11 @@ function renderFinanceOverview(){
     <div class="stat-card" data-open-tx="pending" style="cursor:pointer;">
       <div class="value" style="color:#C98A3E;">${o.pendingCommission} €</div>
       <div class="label">${T.financePending}</div>
+      <div class="sub-label">${T.financeClickToView}</div>
+    </div>
+    <div class="stat-card" id="open-vat-card" style="cursor:pointer;">
+      <div class="value" style="color:#B5542A;">${o.totalVat != null ? o.totalVat : '…'} €</div>
+      <div class="label">${T.financeVatOwed}</div>
       <div class="sub-label">${T.financeClickToView}</div>
     </div>
   </div>
@@ -2392,10 +2425,50 @@ function renderAdminPeriodCard(p){
           : `<span style="color:var(--muted);">${T.settlementEven}</span>`}
       </span>
     </div>
-    <div style="margin-top:10px;">
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button type="button" class="btn ghost btn-sm" style="flex:1;" data-open-period-jobs="${p.periodStart}" data-open-period-jobs-end="${p.periodEnd}">${T.viewJobByJobBtn}</button>
       ${p.isPaid
-        ? `<button type="button" class="btn ghost btn-sm" style="width:100%;" data-unmark-paid="${p.periodStart}">${T.undoBtn}</button>`
-        : `<button type="button" class="btn ochre btn-sm" style="width:100%;" data-mark-paid="${p.periodStart}" data-mark-paid-end="${p.periodEnd}" data-mark-paid-amount="${p.netSettlement}">${T.markPaidBtn}</button>`}
+        ? `<button type="button" class="btn ghost btn-sm" style="flex:1;" data-unmark-paid="${p.periodStart}">${T.undoBtn}</button>`
+        : `<button type="button" class="btn ochre btn-sm" style="flex:1;" data-mark-paid="${p.periodStart}" data-mark-paid-end="${p.periodEnd}" data-mark-paid-amount="${p.netSettlement}">${T.markPaidBtn}</button>`}
+    </div>
+  </div>`;
+}
+
+// Bir donemin IS IS kirilimini gosteren modal - kumulatif rakam yerine her
+// isin ayri satirda gorulmesini saglar (mutabakat sirasinda "hangi is ne
+// kadar getirdi" sorusuna netlik icin), en altta TOPLAM satiri ile.
+function renderPeriodJobsModal(){
+  const m = state.periodJobsModal;
+  if(!m) return '';
+  const jobs = m.data ? m.data.jobs : null;
+  const totalNet = jobs ? Math.round(jobs.reduce((s,j) => s + j.netEarning, 0) * 100) / 100 : 0;
+  return `
+  <div class="modal-backdrop" id="period-jobs-backdrop">
+    <div class="modal" style="max-width:650px;">
+      <h3 style="margin-bottom:4px;">${T.periodJobsTitle}</h3>
+      <div class="hint" style="margin:0 0 14px;">${new Date(m.periodStart+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})} – ${new Date(m.periodEnd+'T00:00:00').toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</div>
+      ${!jobs ? `<div class="empty-state" style="margin:0;">…</div>` : jobs.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyTransactions}</div>` : `
+        <div style="max-height:400px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>${T.colDate}</th><th>${T.colService}</th><th>${T.colPrice}</th><th>${T.vatAmountLabel}</th><th>${T.periodJobsEarningCol}</th></tr></thead>
+            <tbody>
+              ${jobs.map(j => `
+                <tr>
+                  <td>${new Date(j.completedAt.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+                  <td>${serviceLabel(j.serviceKey)}<br/><span style="color:var(--muted); font-size:11px;">${j.propertyName}</span></td>
+                  <td>${j.price} €</td>
+                  <td>${j.vatAmount} €</td>
+                  <td><strong>${j.netEarning} €</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-family:'Fraunces',serif; font-size:16px; color:var(--navy); border-top:1px dashed var(--line); margin-top:12px; padding-top:10px;">
+          <span>${T.periodJobsTotalLabel}</span><span>${totalNet} €</span>
+        </div>
+      `}
+      <button class="btn ochre full" id="close-period-jobs-modal" style="margin-top:14px;">${T.closeBtn}</button>
     </div>
   </div>`;
 }
@@ -2439,6 +2512,41 @@ function renderFinanceCancellations(){
 }
 
 /* ---- Drill-down modal (kart tıklama -> işlem listesi) ---- */
+// KDV mutabakat kartına tıklanınca açılan modal - devlete ödenecek toplam
+// KDV'yi oluşturan tüm işleri listeler, muhasebeyle mutabakat için CSV
+// (Excel'de doğrudan açılır) olarak dışa aktarılabilir.
+function renderFinanceVatModal(){
+  const m = state.financeVatModal;
+  return `
+  <div class="modal-backdrop" id="vat-modal-backdrop">
+    <div class="modal" style="max-width:650px;">
+      <h3 style="margin-bottom:4px;">${T.vatModalTitle}</h3>
+      ${m && m.data ? `<div class="hint" style="margin:0 0 14px;">${T.vatModalSubtitle} <strong>${m.data.totalVat} €</strong></div>` : ''}
+      ${!m || !m.data ? `<div class="empty-state" style="margin:0;">…</div>` : m.data.transactions.length === 0 ? `<div class="empty-state" style="margin:0;">${T.emptyTransactions}</div>` : `
+        <div style="max-height:400px; overflow-y:auto;">
+          <table>
+            <thead><tr><th>${T.colDate}</th><th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colStaffCol}</th><th>${T.colPrice}</th><th>${T.vatAmountLabel}</th></tr></thead>
+            <tbody>
+              ${m.data.transactions.map(t => `
+                <tr>
+                  <td>${new Date(t.eventDate.replace(' ','T')).toLocaleDateString('sr-Latn-ME',{day:'numeric',month:'short'})}</td>
+                  <td>${serviceLabel(t.service_key)}</td>
+                  <td>${t.customer_name}</td>
+                  <td>${t.staff_name || T.noStaffAssigned}</td>
+                  <td>${t.price} €</td>
+                  <td>${t.vatAmount} €</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        <button class="btn ghost full" id="export-vat-csv" style="margin-top:14px;">${T.exportVatCsvBtn}</button>
+      `}
+      <button class="btn ochre full" id="close-vat-modal" style="margin-top:10px;">${T.closeBtn}</button>
+    </div>
+  </div>`;
+}
+
 function renderFinanceTxModal(){
   const m = state.financeTxModal;
   return `
@@ -3751,6 +3859,58 @@ function attachHandlers(){
   if(closeTxModal) closeTxModal.onclick = () => { state.financeTxModal = null; render(); };
   const txBackdrop = document.getElementById('tx-modal-backdrop');
   if(txBackdrop) txBackdrop.onclick = (e) => { if(e.target===txBackdrop){ state.financeTxModal = null; render(); } };
+
+  const openVatCard = document.getElementById('open-vat-card');
+  if(openVatCard) openVatCard.onclick = async () => {
+    state.financeVatModal = { data: null };
+    render();
+    try{
+      const data = await api('/admin/finance/vat');
+      state.financeVatModal = { data };
+      render();
+    }catch(err){ showToast(err.message); state.financeVatModal = null; render(); }
+  };
+  const closeVatModal = document.getElementById('close-vat-modal');
+  if(closeVatModal) closeVatModal.onclick = () => { state.financeVatModal = null; render(); };
+  const vatBackdrop = document.getElementById('vat-modal-backdrop');
+  if(vatBackdrop) vatBackdrop.onclick = (e) => { if(e.target===vatBackdrop){ state.financeVatModal = null; render(); } };
+  const exportVatCsv = document.getElementById('export-vat-csv');
+  if(exportVatCsv) exportVatCsv.onclick = () => {
+    const rows = state.financeVatModal.data.transactions;
+    const header = ['Tarih','Hizmet','Musteri','Personel','Tutar (KDV Dahil)','KDV Tutari'];
+    const lines = [header.join(';')];
+    rows.forEach(t => {
+      const dateStr = new Date(t.eventDate.replace(' ','T')).toLocaleDateString('sr-Latn-ME');
+      lines.push([dateStr, serviceLabel(t.service_key), t.customer_name, t.staff_name||'-', t.price, t.vatAmount].join(';'));
+    });
+    lines.push(['','','','','TOPLAM', state.financeVatModal.data.totalVat].join(';'));
+    const csvContent = '\uFEFF' + lines.join('\n'); // BOM - Excel'de Turkce/CG karakterler dogru gorunsun diye
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `MICISTO-KDV-Mutabakat-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Donemin IS IS kirilimini gosteren modal - kumulatif kartin YANINDA,
+  // onu DEGISTIRMEDEN ek bir secenek olarak sunuluyor (mutabakat sirasinda
+  // "hangi is ne kadar getirdi" sorusuna netlik icin).
+  document.querySelectorAll('[data-open-period-jobs]').forEach(el => el.onclick = async () => {
+    const periodStart = el.dataset.openPeriodJobs;
+    const periodEnd = el.dataset.openPeriodJobsEnd;
+    state.periodJobsModal = { periodStart, periodEnd, data: null };
+    render();
+    try{
+      const data = await api(`/admin/finance/staff/${state.selectedFinanceStaffId}/period-jobs?periodStart=${periodStart}&periodEnd=${periodEnd}`);
+      state.periodJobsModal = { periodStart, periodEnd, data };
+      render();
+    }catch(err){ showToast(err.message); state.periodJobsModal = null; render(); }
+  });
+  const closePeriodJobsModal = document.getElementById('close-period-jobs-modal');
+  if(closePeriodJobsModal) closePeriodJobsModal.onclick = () => { state.periodJobsModal = null; render(); };
+  const periodJobsBackdrop = document.getElementById('period-jobs-backdrop');
+  if(periodJobsBackdrop) periodJobsBackdrop.onclick = (e) => { if(e.target===periodJobsBackdrop){ state.periodJobsModal = null; render(); } };
 
   document.querySelectorAll('[data-open-staff-finance]').forEach(el => el.onclick = async () => {
     await loadStaffPeriods(el.dataset.openStaffFinance);
