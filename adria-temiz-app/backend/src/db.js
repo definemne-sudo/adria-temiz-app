@@ -348,7 +348,7 @@ const DEFAULT_PRICING = {
   'elevator.base': 12, 'elevator.ratePerCapacity': 1.4, 'elevator.min': 20, 'elevator.estimatedMinutes': 20,
   'carpet.rate': 18, 'upholstery.rate': 22,
   'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
-  'system.commissionRate': 0.20, 'system.payoutCycleDays': 15,
+  'system.commissionRate': 0.20, 'system.payoutCycleDays': 15, 'system.vatRate': 0.21,
   'marketing.dormantThresholdDays': 45,
 };
 const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
@@ -637,3 +637,19 @@ function seedRussianChecklistTranslations() {
   }
 }
 seedRussianChecklistTranslations();
+
+// --- KDV (PDV) hesaplama destegi -----------------------------------------
+// ONEMLI GECMIS BAGLAM: 'price' kolonu, musterinin ODEDIGI TOPLAM tutari
+// (KDV DAHIL) temsil eder. Ancak personel/MICISTO %80/%20 payi bu tutarin
+// TAMAMI uzerinden degil, KDV dusulmus NET tutar uzerinden hesaplanmalidir
+// (aksi halde MICISTO'nun devlete odeyecegi KDV, komisyonunu neredeyse
+// sifirlar - bu hata is planinda tespit edilip duzeltildi, simdi koda da
+// yansitiliyor). Bu yuzden NET tutari ve KDV tutarini AYRI AYRI saklamamiz
+// gerekiyor - hem dogru komisyon hesabi icin hem de musteriye kesilen fiste
+// KDV'nin ayrica gosterilebilmesi icin.
+// Eski (bu degisiklikten once olusturulmus) siparislerde net_price/vat_amount
+// NULL kalir - bu siparislerde price zaten KDV dusunulmeden hesaplanmisti,
+// geriye donuk uyumluluk icin ilgili kodlar (financeCalc.js, admin.js) bu
+// durumda net_price yerine price'i (KDV yokmus gibi) kullanmaya devam eder.
+ensureColumn('cleaning_jobs', 'net_price', 'REAL');
+ensureColumn('cleaning_jobs', 'vat_amount', 'REAL');
