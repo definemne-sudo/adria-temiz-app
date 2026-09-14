@@ -1,5 +1,5 @@
 const express = require('express');
-const { getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees, getCommissionRate, getVatRate, BOAT_QUOTE_REQUIRED_LENGTH_FT } = require('../services/catalog');
+const { getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees, getCommissionRate, getVatRate, isCardPaymentEnabled, BOAT_QUOTE_REQUIRED_LENGTH_FT } = require('../services/catalog');
 
 const router = express.Router();
 
@@ -22,6 +22,7 @@ router.get('/', (req, res) => {
     suppliesFees: getSuppliesFees(),
     commissionRate: getCommissionRate(),
     vatRate: getVatRate(),
+    cardPaymentEnabled: isCardPaymentEnabled(),
   });
 });
 
