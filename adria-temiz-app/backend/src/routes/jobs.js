@@ -2,7 +2,7 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate, getVatRate } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate, getVatRate, calcCardFee, isCardPaymentEnabled } = require('../services/catalog');
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
 const { sendPushToUser } = require('../services/push');
@@ -70,6 +70,13 @@ async function createCleaningJob({
 }) {
   if (!['cash', 'card', 'invoice'].includes(paymentMethod)) {
     const err = new Error("paymentMethod 'cash', 'card' veya 'invoice' olmalı.");
+    err.status = 400; throw err;
+  }
+  // Kart ile odeme lansmanda KAPALI - sadece nakit (ve yonetim sirketleri
+  // icin aylik fatura) kabul ediliyor. Odeme islemcisi entegrasyonu hazir
+  // olunca system.cardPaymentEnabled=1 yapilarak tekrar acilabilir.
+  if (paymentMethod === 'card' && !isCardPaymentEnabled()) {
+    const err = new Error('Kart ile ödeme şu anda kullanılamıyor. Lütfen nakit ödeme seçin.');
     err.status = 400; throw err;
   }
   if (paymentMethod === 'invoice' && !skipAccessCheck && requestingAccountType !== 'company') {
@@ -179,12 +186,19 @@ async function createCleaningJob({
   const price = Math.round((netPrice + vatAmount) * 100) / 100;
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
+  // Kart islemci ucreti (ornek: %2,9 + 0,30 EUR) SADECE kart odemesinde
+  // dogar - nakitte islemciye hicbir sey odenmez, cardFee her zaman 0'dir.
+  // Musteriye YANSITILMAZ (fiyat/price degismez); personel/MICISTO'nun
+  // net kazanci hesaplanirken %50/%50 paylasilir (bkz. calcNetEarning
+  // cagrilari - financeCalc.js, admin.js, jobs.js).
+  const cardFee = paymentMethod === 'card' ? calcCardFee(price) : 0;
+
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
-        urgency, payment_method, checkout_at, status, source, price, net_price, vat_amount, payment_status, promo_code_id, discount_amount, created_by_admin_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)`
+        urgency, payment_method, checkout_at, status, source, price, net_price, vat_amount, card_fee, payment_status, promo_code_id, discount_amount, created_by_admin_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -200,6 +214,7 @@ async function createCleaningJob({
     price,
     netPrice,
     vatAmount,
+    cardFee,
     paymentStatus,
     appliedPromo ? appliedPromo.id : null,
     discountAmount || null,
@@ -405,7 +420,7 @@ router.get('/:id/offer-detail', (req, res) => {
     estimatedMinutes: estimateJobMinutes(job.service_key, JSON.parse(job.service_params || 'null')),
     // KDV HARIC net taban uzerinden - bkz. jobs.js/financeCalc.js'teki
     // ayni gerekce (KDV, personelin/MICISTO'nun payini etkilememeli).
-    netEarning: calcNetEarning(job.net_price != null ? job.net_price : job.price),
+    netEarning: calcNetEarning(job.net_price != null ? job.net_price : job.price, job.card_fee ? job.card_fee / 2 : 0),
     canRespond: job.status === 'pending',
   });
 });
@@ -463,7 +478,7 @@ router.get('/home-summary', (req, res) => {
 
   // KDV HARIC net taban uzerinden - bkz. /performance endpoint'indeki ayni gerekce.
   const grossTotal = completedToday.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0);
+  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price, j.card_fee ? j.card_fee / 2 : 0), 0);
 
   res.json({
     todaysJobs,
@@ -531,7 +546,7 @@ router.get('/performance', (req, res) => {
   // Eski (KDV ozelliginden once olusturulmus) islerde j.net_price NULL'dur,
   // o durumda j.price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir.
   const grossTotal = jobs.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price), 0) * 100) / 100;
+  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price, j.card_fee ? j.card_fee / 2 : 0), 0) * 100) / 100;
   const daysWorked = new Set(jobs.map((j) => (j.completed_at || '').slice(0, 10))).size;
   const completionRate = totalDays ? daysWorked / totalDays : 0;
   const bonus = calcPerformanceBonus(completionRate, { period, daysWorked, totalDays });
