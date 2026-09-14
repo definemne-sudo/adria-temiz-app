@@ -349,6 +349,14 @@ const DEFAULT_PRICING = {
   'carpet.rate': 18, 'upholstery.rate': 22,
   'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
   'system.commissionRate': 0.20, 'system.payoutCycleDays': 15, 'system.vatRate': 0.21,
+  'system.cardFeePercent': 0.029, 'system.cardFeeFixed': 0.30,
+  // Kart ile odeme SU AN KAPALI - lansmanda sadece nakit alinacak. Bu bir
+  // sistem ayari oldugu icin (kod silinmedi), ileride odeme islemcisi
+  // entegrasyonu hazir oldugunda admin panelinden ya da bu deger
+  // degistirilerek tekrar acilabilir. bkz. jobs.js createCleaningJob
+  // (paymentMethod validasyonu) ve musteri arayuzu (odeme secenegi listesi).
+  // ONEMLI: better-sqlite3 JS boolean kabul etmez, 0/1 kullanilir (1=acik).
+  'system.cardPaymentEnabled': 0,
   'marketing.dormantThresholdDays': 45,
 };
 const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
@@ -653,3 +661,12 @@ seedRussianChecklistTranslations();
 // durumda net_price yerine price'i (KDV yokmus gibi) kullanmaya devam eder.
 ensureColumn('cleaning_jobs', 'net_price', 'REAL');
 ensureColumn('cleaning_jobs', 'vat_amount', 'REAL');
+
+// --- Kart islem komisyonu (card_fee) -------------------------------------
+// SADECE kart ile odenen islerde dolduruluyor (nakitte 0/NULL kalir - kart
+// islemcisine hicbir ucret odenmez). Bu ucret (~%2,9 + 0,30 EUR, ayarlanabilir
+// - bkz. system.cardFeePercent/cardFeeFixed) personel ile MICISTO arasinda
+// %50/%50 paylasilir (financeCalc.js/jobs.js/admin.js'deki hesaplamalara
+// bakiniz) - boylece kart odemesi kullanan musteriden hicbir ek ucret
+// alinmaz, maliyet iki tarafca esit karsilanir.
+ensureColumn('cleaning_jobs', 'card_fee', 'REAL');
