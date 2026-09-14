@@ -2188,6 +2188,7 @@ let state = {
   // yuklenir yuklenmez bunun uzerine yazilir.
   suppliesFees: { noEquipment: 15, noChemicals: 10 },
   vatRate: 0.21,
+  cardPaymentEnabled: false,
   regPropertyCity: '',
   // "Mulklerim" sekmesinden mulk eklerken kullanilan, kayit akisiyla ayni
   // 2 adimli (detaylar + adres) yapiyi kullanan alanlar. regSizeSqm,
@@ -3192,7 +3193,7 @@ function renderReceiptPanel(draft){
     <div style="font-size:12px; font-weight:700; color:var(--navy); text-transform:uppercase; letter-spacing:.03em; margin-bottom:8px;">${t('paymentMethodLabel')}</div>
     <div class="option-row">
       <div class="choice ${paymentMethod==='cash'?'selected':''}" data-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
-      <div class="choice ${paymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+      ${state.cardPaymentEnabled ? `<div class="choice ${paymentMethod==='card'?'selected':''}" data-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>` : ''}
       ${isCompany ? `<div class="choice ${paymentMethod==='invoice'?'selected':''}" data-payment-method="invoice">${t('invoiceLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('invoiceSub')}</span></div>` : ''}
     </div>
     ${paymentMethod==='card' && state.savedCard ? `
@@ -3673,7 +3674,7 @@ function renderModal(){
         <div class="hint" style="margin:-8px 0 16px;">${t('syncPaymentModalHint')}</div>
         <div class="option-row">
           <div class="choice ${state.syncPaymentMethod==='cash'?'selected':''}" data-sync-payment-method="cash">${t('cashLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cashSub')}</span></div>
-          <div class="choice ${state.syncPaymentMethod==='card'?'selected':''}" data-sync-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>
+          ${state.cardPaymentEnabled ? `<div class="choice ${state.syncPaymentMethod==='card'?'selected':''}" data-sync-payment-method="card">${t('cardLabel')}<br/><span style="font-weight:400; font-size:11px;">${t('cardSub')}</span></div>` : ''}
         </div>
         ${state.syncPaymentMethod==='card' && state.savedCard ? `
           <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px;">
@@ -3995,6 +3996,7 @@ async function loadAll(){
     state.addons = results[3].addons;
     if(results[3].suppliesFees) state.suppliesFees = results[3].suppliesFees;
     if(results[3].vatRate != null) state.vatRate = results[3].vatRate;
+    state.cardPaymentEnabled = results[3].cardPaymentEnabled === true;
     state.lastServicesLang = state.lang;
   }
   state.ratingJob = findNextRatingJob();
