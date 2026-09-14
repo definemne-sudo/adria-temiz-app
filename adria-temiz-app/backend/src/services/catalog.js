@@ -111,10 +111,35 @@ function getPayoutCycleDays() {
   return getPricingValue('system.payoutCycleDays', 15);
 }
 
+// Kart ile odeme su an sistemde ACIK mi? Lansmanda KAPALI baslatiliyor
+// (sadece nakit) - odeme islemcisi entegrasyonu hazir olunca bu ayar
+// (system.cardPaymentEnabled) 1'e cevrilerek tekrar acilabilir, kod
+// tarafinda baska hicbir degisiklik gerekmez.
+function isCardPaymentEnabled() {
+  return getPricingValue('system.cardPaymentEnabled', 0) === 1;
+}
+
 // Karadağ standart KDV oranı (varsayılan %21). Admin panelinden
 // değiştirilebilir - bkz. /admin/settings.
 function getVatRate() {
   return getPricingValue('system.vatRate', 0.21);
+}
+
+// Kart odeme islemcisinin (Stripe/Adyen vb.) aldigi ucret - yuzde + sabit
+// kisim. SADECE kart odemelerinde uygulanir, nakitte hic yoktur (islemciye
+// hicbir sey odenmez). Musteriye YANSITILMAZ - personel/MICISTO arasinda
+// %50/%50 paylasilir (bkz. calcCardFee, jobs.js createCleaningJob).
+function getCardFeeRate() {
+  return {
+    percent: getPricingValue('system.cardFeePercent', 0.029),
+    fixed: getPricingValue('system.cardFeeFixed', 0.30),
+  };
+}
+
+// Bir islemin (KDV DAHIL brut) fiyatindan kart islemci ucretini hesaplar.
+function calcCardFee(grossPrice) {
+  const { percent, fixed } = getCardFeeRate();
+  return Math.round((grossPrice * percent + fixed) * 100) / 100;
 }
 
 function getPricingValue(key, fallback = 0) {
@@ -291,9 +316,21 @@ function calcSuppliesFee({ hasEquipment, hasChemicals }) {
 }
 
 // Bir işin fiyatından MICISTO komisyonu düşüldükten sonra personele
-// kalan net kazanç.
-function calcNetEarning(price) {
-  return Math.round(price * (1 - getCommissionRate()) * 100) / 100;
+// kalan net kazanç. cardFeeStaffShare: kart ile odenen islerde, personelin
+// karsilamasi gereken kart islemci ucretinin YARISI (bkz. calcCardFee) -
+// nakit islerde bu her zaman 0'dir, cunku hic kart ucreti dogmaz.
+function calcNetEarning(price, cardFeeStaffShare = 0) {
+  return Math.round((price * (1 - getCommissionRate()) - cardFeeStaffShare) * 100) / 100;
+}
+
+// MICISTO'nun GERCEK marji - calcNetEarning'in "ayna"si. ONEMLI: Komisyonu
+// "netBase - calcNetEarning(netBase)" seklinde CIKARMA YONTEMIYLE bulmaya
+// CALISMAYIN - kart kesintisi personel tarafinda dusulunce bu yontem
+// kesintiyi yanlislikla MICISTO'ya EKLENMIS gibi gosterir. Bunun yerine
+// MICISTO'nun payi HER ZAMAN bu fonksiyonla, kendi kart payi ayrica
+// dusularak ayrı hesaplanmalidir.
+function calcMicistoMargin(price, cardFeeMicistoShare = 0) {
+  return Math.round((price * getCommissionRate() - cardFeeMicistoShare) * 100) / 100;
 }
 
 // Personel performans bonusu - o dönemde (hafta/ay) çalıştığı gün sayısının
@@ -338,10 +375,10 @@ module.exports = {
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
-  getCommissionRate, getPayoutCycleDays, getVatRate, getPricingValue,
+  getCommissionRate, getPayoutCycleDays, getVatRate, getCardFeeRate, calcCardFee, isCardPaymentEnabled, getPricingValue,
   getService, getAddon, getCommonAreaSubOption, getBoatSubOption, getChecklist, getChecklistAllLangs,
   getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
-  calcNetEarning, estimateJobMinutes, calcPerformanceBonus,
+  calcNetEarning, calcMicistoMargin, estimateJobMinutes, calcPerformanceBonus,
   BOAT_QUOTE_REQUIRED_LENGTH_FT,
 };
