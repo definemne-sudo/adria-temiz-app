@@ -336,6 +336,34 @@ ensureColumn('cleaning_jobs', 'headed_out_at', 'TEXT');
 // yazılıyor, dağıtım motoru ve kazanç bölüşümü bu değeri kullanıyor.
 ensureColumn('cleaning_jobs', 'required_staff_count', 'INTEGER NOT NULL DEFAULT 1');
 
+// Müşteriye gösterilen, admin panelinde aranabilen 4 haneli sipariş
+// numarası (1001'den başlar). created_at sırasına göre MAX+1 mantığıyla
+// jobs.js'te atanıyor - burada sadece kolon ve geriye dönük dolum var.
+ensureColumn('cleaning_jobs', 'order_no', 'INTEGER');
+
+// --- Sipariş numarası geriye dönük dolum (migration) -----------------------
+// Daha önce order_no olmadan oluşturulmuş siparişlere, oluşturulma
+// sırasına göre 1001'den başlayarak numara veriliyor. Idempotent: sadece
+// order_no IS NULL olan satırlar işleniyor, tekrar çalıştırmak zararsız.
+function backfillOrderNumbers() {
+  const missing = db
+    .prepare(`SELECT id FROM cleaning_jobs WHERE order_no IS NULL ORDER BY created_at ASC, id ASC`)
+    .all();
+  if (missing.length === 0) return;
+  const maxRow = db.prepare(`SELECT MAX(order_no) AS m FROM cleaning_jobs`).get();
+  let next = Math.max(1000, maxRow.m || 1000) + 1;
+  const update = db.prepare(`UPDATE cleaning_jobs SET order_no = ? WHERE id = ?`);
+  const updateMany = db.transaction((rows) => {
+    for (const row of rows) {
+      update.run(next, row.id);
+      next++;
+    }
+  });
+  updateMany(missing);
+}
+backfillOrderNumbers();
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cleaning_jobs_order_no ON cleaning_jobs(order_no)`);
+
 // --- Çok personelli atama tablosu için geriye dönük veri taşıma ------------
 // job_staff_assignments tablosu yeni eklendi (yukarıda). Daha önce
 // assigned_staff_id ile atanmış (assigned/in_progress/done/confirmed)
