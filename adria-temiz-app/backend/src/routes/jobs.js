@@ -148,13 +148,19 @@ router.post('/', async (req, res) => {
   // personel, Ortak Alan Temizliği hariç) - bkz. catalog.js calcRequiredStaffCount.
   const requiredStaffCount = calcRequiredStaffCount(serviceKey, property.size_sqm);
 
+  // Sipariş numarası: 4 haneli, 1001'den başlar (bkz. db.js migration).
+  // MAX+1 mantığı - INSERT ile aynı senkron blokta (aralarında await yok)
+  // hesaplandığı için better-sqlite3'ün senkron doğası sayesinde yarış
+  // durumu oluşmaz.
   const id = uuid();
+  const maxOrderRow = db.prepare(`SELECT MAX(order_no) AS m FROM cleaning_jobs`).get();
+  const orderNo = Math.max(1000, maxOrderRow.m || 1000) + 1;
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
         urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount,
-        required_staff_count)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?, ?, ?, ?)`
+        required_staff_count, order_no)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?, ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -170,7 +176,8 @@ router.post('/', async (req, res) => {
     paymentStatus,
     appliedPromo ? appliedPromo.id : null,
     discountAmount || null,
-    requiredStaffCount
+    requiredStaffCount,
+    orderNo
   );
 
   if (appliedPromo) redeemPromo(appliedPromo, req.user.id, id, discountAmount);
