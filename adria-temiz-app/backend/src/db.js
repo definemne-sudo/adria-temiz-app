@@ -166,6 +166,24 @@ CREATE TABLE IF NOT EXISTS cleaning_jobs (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(property_id, ical_uid)
 );
+
+-- Çok personelli işler için: yüksek m²'li mülklerde (ortak alan hariç) her
+-- 70 m²'ye 1 personel atanması gerekiyor (bkz. catalog.js
+-- calcRequiredStaffCount). assigned_staff_id sütunu geriye dönük uyumluluk
+-- için "birincil" (ilk kabul eden) personeli tutmaya devam ediyor - eski
+-- kod/sorgular bozulmasın diye. GERÇEK atama listesi burası: bir işe kaç
+-- personelin fiilen katıldığı, kimlerin meşgul sayılacağı ve kazancın kaç
+-- kişiye bölüneceği hep bu tablodan okunuyor.
+CREATE TABLE IF NOT EXISTS job_staff_assignments (
+  id TEXT PRIMARY KEY,
+  job_id TEXT NOT NULL REFERENCES cleaning_jobs(id),
+  staff_id TEXT NOT NULL REFERENCES users(id),
+  is_primary INTEGER NOT NULL DEFAULT 0,
+  joined_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(job_id, staff_id)
+);
+CREATE INDEX IF NOT EXISTS idx_job_staff_assignments_job ON job_staff_assignments(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_staff_assignments_staff ON job_staff_assignments(staff_id);
 `);
 
 db.exec(`
@@ -313,6 +331,37 @@ ensureColumn('cleaning_jobs', 'staff_score', 'INTEGER');
 // harita/ETA/iletişim butonunun görünmesi bu alana bağlı.
 ensureColumn('cleaning_jobs', 'headed_out_at', 'TEXT');
 
+// Yüksek m²'li işlerde kaç personel gerektiği (bkz. catalog.js
+// calcRequiredStaffCount) - sipariş oluşturulurken hesaplanıp buraya
+// yazılıyor, dağıtım motoru ve kazanç bölüşümü bu değeri kullanıyor.
+ensureColumn('cleaning_jobs', 'required_staff_count', 'INTEGER NOT NULL DEFAULT 1');
+
+// --- Çok personelli atama tablosu için geriye dönük veri taşıma ------------
+// job_staff_assignments tablosu yeni eklendi (yukarıda). Daha önce
+// assigned_staff_id ile atanmış (assigned/in_progress/done/confirmed)
+// işlerin, yeni tabloda karşılığı olmadan "kimsesiz" kalmaması için - bu
+// personelin kendi iş listesi/kazanç sorguları artık job_staff_assignments
+// üzerinden okunuyor. Idempotent: INSERT OR IGNORE + UNIQUE(job_id, staff_id)
+// sayesinde tekrar tekrar çalıştırılabilir.
+function backfillJobStaffAssignments() {
+  const rows = db
+    .prepare(
+      `SELECT id, assigned_staff_id FROM cleaning_jobs
+       WHERE assigned_staff_id IS NOT NULL
+         AND status IN ('assigned','in_progress','done','confirmed')`
+    )
+    .all();
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO job_staff_assignments (id, job_id, staff_id, is_primary) VALUES (?, ?, ?, 1)`
+  );
+  const { v4: uuidv4 } = require('uuid');
+  const insertMany = db.transaction((list) => {
+    for (const r of list) insert.run(uuidv4(), r.id, r.assigned_staff_id);
+  });
+  insertMany(rows);
+}
+backfillJobStaffAssignments();
+
 // --- Checklist maddelerine dil bazli sutunlar (migration) ---------------
 // Eskiden "item_text" tek dildeydi (Turkce varsayilan). Artik 3 ayri
 // sutun var. Mevcut veriler otomatik olarak Turkce sutununa tasinir.
@@ -322,7 +371,6 @@ function ensureChecklistLangColumns() {
   ensureColumn('service_checklists', 'item_text_tr', 'TEXT');
   ensureColumn('service_checklists', 'item_text_en', 'TEXT');
   ensureColumn('service_checklists', 'item_text_me', 'TEXT');
-  ensureColumn('service_checklists', 'item_text_ru', 'TEXT');
   // Eski "item_text" sutunundaki mevcut veriyi Turkce sutununa tasi
   // (sadece henuz tasinmamis satirlar icin).
   db.exec(`
@@ -348,325 +396,9 @@ const DEFAULT_PRICING = {
   'elevator.base': 12, 'elevator.ratePerCapacity': 1.4, 'elevator.min': 20, 'elevator.estimatedMinutes': 20,
   'carpet.rate': 18, 'upholstery.rate': 22,
   'supplies.noEquipment': 15, 'supplies.noChemicals': 10,
-  'system.commissionRate': 0.20, 'system.payoutCycleDays': 15, 'system.vatRate': 0.21,
-  'system.cardFeePercent': 0.029, 'system.cardFeeFixed': 0.30,
-  // Kart ile odeme SU AN KAPALI - lansmanda sadece nakit alinacak. Bu bir
-  // sistem ayari oldugu icin (kod silinmedi), ileride odeme islemcisi
-  // entegrasyonu hazir oldugunda admin panelinden ya da bu deger
-  // degistirilerek tekrar acilabilir. bkz. jobs.js createCleaningJob
-  // (paymentMethod validasyonu) ve musteri arayuzu (odeme secenegi listesi).
-  // ONEMLI: better-sqlite3 JS boolean kabul etmez, 0/1 kullanilir (1=acik).
-  'system.cardPaymentEnabled': 0,
-  'marketing.dormantThresholdDays': 45,
+  'system.commissionRate': 0.20, 'system.payoutCycleDays': 15,
 };
 const seedPricing = db.prepare('INSERT OR IGNORE INTO pricing_settings (key, value) VALUES (?, ?)');
 for (const [key, value] of Object.entries(DEFAULT_PRICING)) {
   seedPricing.run(key, value);
 }
-
-// --- Tekne (yelkenli) mulk kategorisi icin sema guncellemesi -------------
-// ONEMLI: 'category' sutununda bir CHECK constraint var, bu da SQLite'da
-// basit bir ALTER TABLE ADD COLUMN ile degistirilemez (SQLite CHECK
-// constraint'leri dogrudan degistirmeyi desteklemiyor). Bu yuzden tabloyu
-// guvenle yeniden olusturup mevcut veriyi tasiyoruz. IDEMPOTENT'tir -
-// constraint zaten 'boat' iceriyorsa (yeni kurulan bir veritabaninda oldugu
-// gibi) hicbir sey yapmadan gecer.
-//
-// KRITIK DUZELTME: Ilk yazilan surumde, orijinal 'properties' tablosu
-// dogrudan RENAME ediliyordu (properties -> properties_old). SQLite'in
-// DOKUMANTE EDILMIS ama az bilinen bir davranisi var: bir tablo RENAME
-// edildiginde, SQLite o tabloya FOREIGN KEY ile referans veren TUM DIGER
-// tablolarin (bizim durumumuzda cleaning_jobs, property_delegates)
-// semasindaki REFERENCES ifadesini de OTOMATIK OLARAK yeni isme guncelliyor.
-// Yani cleaning_jobs.property_id'nin "REFERENCES properties(id)" ifadesi
-// sessizce "REFERENCES properties_old(id)" oluveriyor - biz properties_old'u
-// silince bu referans askida kaliyor ve cleaning_jobs'a INSERT yapilamaz hale
-// geliyordu ("no such table: main.properties_old" hatasi). Gercek bir
-// veritabaniyla (property_delegates FK'li) test ederken bu hatayi yakaladik.
-//
-// DUZELTME: Orijinal 'properties' tablosunu HIC RENAME ETMIYORUZ. Onun
-// yerine yeni semali tabloyu FARKLI bir gecici isimle (properties_new)
-// olusturup veriyi orijinal isimden (hala 'properties') kopyaliyoruz,
-// orijinali DROP ediyoruz (DROP, RENAME'in aksine baska tablolarin FK
-// referanslarini degistirmiyor), sonra yeni tabloyu doğru isme tasiyoruz.
-// Bu son adimdaki RENAME hicbir tabloyu etkilemiyor cunku hicbir tablo
-// 'properties_new' adina referans vermiyor - cleaning_jobs'un referansi
-// (hic degismeden hep "properties" yazan) bu son adimdan sonra otomatik
-// olarak gecerli hale geliyor. Gercek veri + FK'li tablolarla test edildi.
-function migratePropertiesForBoatCategory() {
-  const tableInfo = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='properties'`).get();
-  if (!tableInfo || (tableInfo.sql && tableInfo.sql.includes("'boat'"))) {
-    return; // tablo yok (ilk kurulum, CREATE TABLE zaten guncel) ya da constraint zaten guncel
-  }
-  db.pragma('foreign_keys = OFF');
-  const migrate = db.transaction(() => {
-    db.exec(`
-      CREATE TABLE properties_new (
-        id TEXT PRIMARY KEY,
-        owner_id TEXT NOT NULL REFERENCES users(id),
-        name TEXT NOT NULL,
-        category TEXT NOT NULL DEFAULT 'apartment' CHECK (category IN ('apartment','house','office','common_area','boat')),
-        building_name TEXT,
-        address TEXT,
-        city TEXT,
-        latitude REAL,
-        longitude REAL,
-        size_sqm REAL,
-        floor_count INTEGER,
-        sqm_per_floor REAL,
-        elevator_capacity INTEGER,
-        ical_url TEXT,
-        bedroom_count INTEGER,
-        bathroom_count INTEGER,
-        boat_class TEXT,
-        boat_type TEXT,
-        cabin_count INTEGER,
-        length_ft REAL,
-        has_canvas INTEGER,
-        berth_number TEXT,
-        created_at TEXT NOT NULL DEFAULT (datetime('now'))
-      );
-    `);
-    db.exec(`
-      INSERT INTO properties_new
-        (id, owner_id, name, category, building_name, address, city, latitude, longitude,
-         size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
-         bedroom_count, bathroom_count, created_at)
-      SELECT id, owner_id, name, category, building_name, address, city, latitude, longitude,
-             size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
-             bedroom_count, bathroom_count, created_at
-      FROM properties;
-    `);
-    db.exec(`DROP TABLE properties;`);
-    db.exec(`ALTER TABLE properties_new RENAME TO properties;`);
-  });
-  migrate();
-  db.pragma('foreign_keys = ON');
-}
-migratePropertiesForBoatCategory();
-
-// --- Super Admin sistemi -----------------------------------------------
-// Sadece TEK bir admin, "her seye gucu yeten" (musteri/siparis silme, diger
-// adminleri silme/sifresini sifirlama) yetkisine sahip olmali. Bu, Railway'de
-// SUPER_ADMIN_USERNAME environment variable'i ile belirleniyor - kod
-// icinde SABIT/hardcoded degil, boylece kim oldugu istenirse Railway
-// panelinden degistirilebilir, kod degisikligi gerekmez.
-// ONEMLI: Bu fonksiyon her sunucu baslangicinda calisir (idempotent) -
-// belirtilen kullanici adina sahip admin varsa ONA is_super_admin=1 verir,
-// DIGER TUM adminlerin is_super_admin'ini 0'a ceker (aynı anda birden
-// fazla super admin olmasi engellenir). SUPER_ADMIN_USERNAME hic
-// tanimlanmamissa ya da eslesen bir admin yoksa, HICBIR admin super admin
-// olmaz (sessizce atlanir) - bu, yanlislikla herkesin yetkisiz kalmasindan
-// iyidir, hatali/bos bir env var yuzunden yanlis kisiye yetki verilmesindense.
-function ensureSuperAdmin() {
-  ensureColumn('users', 'is_super_admin', 'INTEGER NOT NULL DEFAULT 0');
-  const targetUsername = (process.env.SUPER_ADMIN_USERNAME || '').trim();
-  db.exec(`UPDATE users SET is_super_admin = 0 WHERE account_type = 'admin'`);
-  if (targetUsername) {
-    const result = db
-      .prepare(`UPDATE users SET is_super_admin = 1 WHERE account_type = 'admin' AND username = ?`)
-      .run(targetUsername);
-    if (result.changes === 0) {
-      console.warn(`[UYARI] SUPER_ADMIN_USERNAME="${targetUsername}" ile eslesen bir admin hesabi bulunamadi - hicbir admin super admin degil.`);
-    }
-  } else {
-    console.warn('[UYARI] SUPER_ADMIN_USERNAME environment variable tanimlanmamis - hicbir admin super admin degil.');
-  }
-}
-ensureSuperAdmin();
-
-// --- Tekne fiyat teklifi icin ayri chat kanali ---------------------------
-// chat_messages tablosu simdiye kadar tek bir "genel destek" akisi
-// tutuyordu. Tekne temizligi >=50ft icin "Fiyat Teklifi Al" butonunun genel
-// destek kutusuna DEGIL, ayri bir gelen kutusuna dusmesi icin bir "channel"
-// sutunu ekliyoruz. Mevcut TUM eski mesajlar (kolon eklenmeden once
-// yazilmis) varsayilan olarak 'support' kanalina ait sayilir - bu, geriye
-// donuk uyumlulugu bozmaz, eski destek gecmisi oldugu gibi "Destek"
-// sekmesinde gorunmeye devam eder.
-ensureColumn('chat_messages', 'channel', "TEXT NOT NULL DEFAULT 'support'");
-
-// --- Eski kayitlarda "gizlice cevrilmis" mulk isimlerini temizleme -------
-// GECMISTE (bu dosyadaki mevcut duzeltmelerden ONCE), musteri kayit
-// sirasinda mulk ismi bos birakirsa, o anki dilde CEVRILMIS kategori adi
-// (orn. "Apartman Dairesi") dogrudan 'name' sutununa YAZILIYORDU. Bu,
-// musteri sonradan dili degistirdiginde mulk basligi hep ilk kayit dilinde
-// KALICI kalmasina yol aciyordu (kategori metni dogru cevriliyor olsa bile,
-// baslik cevrilmiyordu). Frontend'de bu artik duzeltildi (yeni kayitlarda
-// isim bos birakilirsa 'name' bos string olarak kaydediliyor, ekranda ANLIK
-// olarak dile gore cevrilen kategori adi gosteriliyor) - ama ESKI kayitlarda
-// hala bu "donmus" ceviri metni duruyor olabilir. Bu migration, name alani
-// TAM OLARAK bilinen 4 dildeki (TR/EN/ME/RU) kategori etiketlerinden birine
-// esit olan satirlari bulup bos stringe cevirir - boylece onlar da artik
-// ANLIK/dinamik cevrilen kategori adini gosterir. IDEMPOTENT'tir (bir kez
-// temizlenen bir satir ikinci calistirmada zaten eslesmez).
-function clearBakedInTranslatedPropertyNames() {
-  const knownCategoryLabels = [
-    // Turkce
-    'Apartman Dairesi', 'Müstakil Ev / Villa', 'Ofis / İşyeri', 'Ortak Alan (Bina geneli)', 'Tekne (Yelkenli)',
-    // Ingilizce
-    'Apartment', 'House/Villa', 'Office/Shop', 'Common Area (Whole Building)', 'Boat (Sailboat)',
-    // Karadagca
-    'Stan', 'Kuća/Villa', 'Poslovni prostor', 'Zajednički prostor (cijela zgrada)', 'Brod (Jedrilica)',
-    // Rusca
-    'Квартира', 'Дом / Вилла', 'Офис / Рабочее место', 'Общая зона (всё здание)', 'Лодка (Парусная)',
-  ];
-  const placeholders = knownCategoryLabels.map(() => '?').join(',');
-  const result = db
-    .prepare(`UPDATE properties SET name = '' WHERE name IN (${placeholders})`)
-    .run(...knownCategoryLabels);
-  if (result.changes > 0) {
-    console.log(`[BILGI] ${result.changes} eski mulk kaydinda donmus/baked-in kategori adi temizlendi (artik dinamik cevrilecek).`);
-  }
-}
-clearBakedInTranslatedPropertyNames();
-
-// --- Push kampanyalari (pazarlama/promosyon anlik gonderimleri) ---------
-// Admin panelinden secilen bir kitleye (tumu/bireysel/sirket/sehir) anlik
-// push bildirimi gonderildiginde, gecmis/kayit amacli buraya yaziliyor.
-db.exec(`
-  CREATE TABLE IF NOT EXISTS push_campaigns (
-    id TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    target_type TEXT NOT NULL DEFAULT 'all' CHECK (target_type IN ('all','individual','company')),
-    target_city TEXT,
-    sent_count INTEGER NOT NULL DEFAULT 0,
-    created_by_admin_id TEXT REFERENCES users(id),
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-`);
-
-// Bir musteriye EN SON ne zaman "kullanmayan musteri" hatirlatma push'u
-// gonderdigimizi tutar - ayni kisiye her gun/her kontrolde tekrar tekrar
-// gondermemek icin (bkz. services/reengagement.js).
-ensureColumn('users', 'last_reengagement_push_at', 'TEXT');
-
-// Bir siparisin ADMIN tarafindan (musteri adina, orn. telefonla gelen bir
-// talep icin) olusturulup olusturulmadigini izlemek icin. NULL ise siparis
-// musterinin kendisi tarafindan olusturulmustur (normal akis).
-ensureColumn('cleaning_jobs', 'created_by_admin_id', 'TEXT');
-
-// --- ONARIM: eski (hatali) migration'in birakip gittigi bozuk FK'lar -----
-// GECMISTE (bu dosyanin daha eski bir surumunde), tekne kategorisi icin
-// yazilan migration 'properties' tablosunu DOGRUDAN RENAME ediyordu
-// (properties -> properties_old). SQLite'in az bilinen bir davranisi geregi,
-// bu RENAME islemi, properties'e FOREIGN KEY ile referans veren DIGER
-// tablolarin (cleaning_jobs, property_delegates) sema metnini de OTOMATIK
-// OLARAK "properties_old" olarak GUNCELLIYORDU. O migration duzeltildi
-// (artik boyle bir sorun YARATMIYOR) ama DAHA ONCE bu hatali surumle
-// calismis olan veritabanlarinda, cleaning_jobs/property_delegates HALA
-// var olmayan "properties_old" tablosuna isaret ediyor olabilir - bu da
-// o tablolara INSERT/UPDATE yapan HER ISLEMDE "no such table:
-// main.properties_old" hatasina yol aciyordu (musteri/siparis silme,
-// yeni siparis olusturma vb.).
-//
-// Bu onarim, HANGI tablolarin etkilendigini OTOMATIK bulup (sqlite_master
-// taramasi), o tablolarin MEVCUT tam semasini (tum kolonlar/kisitlar/
-// varsayilanlar OLDUGU GIBI) koruyarak, SADECE bozuk referansi duzeltip
-// yeniden olusturuyor - hicbir veri kaybi olmuyor. IDEMPOTENT'tir (zaten
-// saglikli bir veritabaninda hicbir sey yapmadan gecer). Gercek veri +
-// FK'li kayitlarla test edildi.
-function repairDanglingPropertiesOldReferences() {
-  const affected = db
-    .prepare(`SELECT name, sql FROM sqlite_master WHERE type='table' AND sql LIKE '%properties_old%'`)
-    .all();
-  if (affected.length === 0) return;
-
-  console.log(`[ONARIM] ${affected.length} tabloda bozuk 'properties_old' referansi bulundu, onariliyor:`, affected.map((a) => a.name).join(', '));
-  db.pragma('foreign_keys = OFF');
-  const repair = db.transaction(() => {
-    for (const { name, sql } of affected) {
-      const tempName = `${name}_repaired_tmp`;
-      const fixedSql = sql
-        .replace(new RegExp(`CREATE TABLE\\s+"?${name}"?`, 'i'), `CREATE TABLE "${tempName}"`)
-        .replace(/properties_old/g, 'properties');
-      db.exec(fixedSql);
-      const columns = db.prepare(`PRAGMA table_info("${name}")`).all().map((c) => `"${c.name}"`).join(', ');
-      db.exec(`INSERT INTO "${tempName}" (${columns}) SELECT ${columns} FROM "${name}"`);
-      db.exec(`DROP TABLE "${name}"`);
-      db.exec(`ALTER TABLE "${tempName}" RENAME TO "${name}"`);
-      console.log(`[ONARIM] ${name} tablosu onarildi.`);
-    }
-  });
-  repair();
-  db.pragma('foreign_keys = ON');
-}
-repairDanglingPropertiesOldReferences();
-
-// --- Checklist maddelerine Rusca ceviri ekleme (tek seferlik doldurma) --
-// Admin panelinden girilen mevcut checklist maddelerinin (TR/EN/ME) Rusca
-// karsiliklarini, TR metniyle BIREBIR eslestirerek dolduruyoruz. SADECE
-// item_text_ru BOS olan satirlar guncelleniyor - daha sonra admin
-// panelinden manuel girilmis/duzenlenmis bir Rusca metin varsa ASLA
-// UZERINE YAZILMAZ. IDEMPOTENT'tir - zaten dolu olanlara dokunmaz.
-// Eslesme TAM METIN uzerinden oldugu icin, TR metninde ufak bir farklilik
-// (bosluk, yazim) varsa o satir eslesmeyip atlanabilir - bu durumda o
-// madde Ingilizce'ye duser (bkz. catalog.js getChecklist fallback), hic
-// bos kalmaz.
-function seedRussianChecklistTranslations() {
-  const translations = {
-    'Buzdolabı Kontrolü': 'Проверка холодильника',
-    'Eksik Malzemelerin Yenilenmesi (Tuvalet Kağıdı, Sabun vb.)': 'Пополнение расходных материалов (туалетная бумага, мыло и т.д.)',
-    'Çöplerin Atılması': 'Вынос мусора',
-    'Son Kalite Kontrolü': 'Финальная проверка качества',
-    'Cam Temizliği': 'Мытьё окон',
-    'Perdelerin Yıkanması': 'Стирка штор',
-    'Toz Kontrolü/Toz Alma': 'Проверка пыли / Протирание пыли',
-    'Zeminlerin Temizliği': 'Уборка полов',
-    'Teras/Balkon Temizliği': 'Уборка террасы/балкона',
-    'Yastık/Çarşaf/Havlu Değişimi & Yıkamai': 'Замена и стирка наволочек/простыней/полотенец',
-    'Yastık & Çarşaf Değişimi ve Yıkanması': 'Замена и стирка наволочек/простыней',
-    'Mutfak Temizliği': 'Уборка кухни',
-    'Yatak Odaları Temizliği': 'Уборка спален',
-    'Yaşam Alanları Temizliği': 'Уборка гостиной',
-    'Banyo/Tuvalet Temizliği': 'Уборка ванной/туалета',
-    'Fırın Temizliği': 'Чистка духовки',
-    'Dolap İçi Temizliği': 'Уборка внутри шкафов',
-    'Masa/Sandalye/Raf Düzenlemesi': 'Организация столов/стульев/полок',
-    // Bu ikisi, veritabaninda Turkce ozel karakterler OLMADAN (ı/ş/ğ yerine
-    // duz i/s/g) kayitli oldugu icin bir onceki eslesmede atlanmisti -
-    // deploy log'unda gorulen BIREBIR metinle tekrar ekleniyor.
-    'Yastik & Carsaf Degisimi ve Yikanmasi': 'Замена и стирка наволочек/простыней',
-    'Cam Temizligi': 'Мытьё окон',
-  };
-  const update = db.prepare(`UPDATE service_checklists SET item_text_ru = ? WHERE item_text_tr = ? AND item_text_ru IS NULL`);
-  let totalUpdated = 0;
-  for (const [tr, ru] of Object.entries(translations)) {
-    const result = update.run(ru, tr);
-    totalUpdated += result.changes;
-  }
-  if (totalUpdated > 0) {
-    console.log(`[BILGI] ${totalUpdated} checklist maddesine Rusca ceviri eklendi.`);
-  }
-  const stillMissingRows = db.prepare(`SELECT DISTINCT item_text_tr FROM service_checklists WHERE item_text_ru IS NULL`).all();
-  if (stillMissingRows.length > 0) {
-    console.log(`[BILGI] ${stillMissingRows.length} checklist maddesi HALA Rusca cevirisiz (Ingilizce'ye dusuyor). Eslesmeyen TR metinleri:`);
-    stillMissingRows.forEach((r) => console.log(`  - "${r.item_text_tr}"`));
-  }
-}
-seedRussianChecklistTranslations();
-
-// --- KDV (PDV) hesaplama destegi -----------------------------------------
-// ONEMLI GECMIS BAGLAM: 'price' kolonu, musterinin ODEDIGI TOPLAM tutari
-// (KDV DAHIL) temsil eder. Ancak personel/MICISTO %80/%20 payi bu tutarin
-// TAMAMI uzerinden degil, KDV dusulmus NET tutar uzerinden hesaplanmalidir
-// (aksi halde MICISTO'nun devlete odeyecegi KDV, komisyonunu neredeyse
-// sifirlar - bu hata is planinda tespit edilip duzeltildi, simdi koda da
-// yansitiliyor). Bu yuzden NET tutari ve KDV tutarini AYRI AYRI saklamamiz
-// gerekiyor - hem dogru komisyon hesabi icin hem de musteriye kesilen fiste
-// KDV'nin ayrica gosterilebilmesi icin.
-// Eski (bu degisiklikten once olusturulmus) siparislerde net_price/vat_amount
-// NULL kalir - bu siparislerde price zaten KDV dusunulmeden hesaplanmisti,
-// geriye donuk uyumluluk icin ilgili kodlar (financeCalc.js, admin.js) bu
-// durumda net_price yerine price'i (KDV yokmus gibi) kullanmaya devam eder.
-ensureColumn('cleaning_jobs', 'net_price', 'REAL');
-ensureColumn('cleaning_jobs', 'vat_amount', 'REAL');
-
-// --- Kart islem komisyonu (card_fee) -------------------------------------
-// SADECE kart ile odenen islerde dolduruluyor (nakitte 0/NULL kalir - kart
-// islemcisine hicbir ucret odenmez). Bu ucret (~%2,9 + 0,30 EUR, ayarlanabilir
-// - bkz. system.cardFeePercent/cardFeeFixed) personel ile MICISTO arasinda
-// %50/%50 paylasilir (financeCalc.js/jobs.js/admin.js'deki hesaplamalara
-// bakiniz) - boylece kart odemesi kullanan musteriden hicbir ek ucret
-// alinmaz, maliyet iki tarafca esit karsilanir.
-ensureColumn('cleaning_jobs', 'card_fee', 'REAL');
