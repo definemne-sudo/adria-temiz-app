@@ -4,11 +4,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
 const { generateActivationCode } = require('../services/credentials');
-const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, getCommissionRate, getPayoutCycleDays, getVatRate, getChecklist, getChecklistAllLangs } = require('../services/catalog');
-const { getStaffPeriods, getStaffLifetimeTotal, getStaffPeriodJobs } = require('../services/financeCalc');
-const { sendPushToUser, sendPushToUsers } = require('../services/push');
-const { getDormantThresholdDays } = require('../services/reengagement');
-const { createCleaningJob } = require('./jobs');
+const { getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees, calcNetEarning, calcNetEarningPerStaff, getCommissionRate, getPayoutCycleDays, getChecklist, getChecklistAllLangs } = require('../services/catalog');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -20,19 +16,6 @@ router.use((req, res, next) => {
   }
   next();
 });
-
-// Sadece "her şeye gücü yeten" TEK admin için ek yetki kontrolü - müşteri/
-// sipariş silme, diğer adminleri silme/şifresini sıfırlama gibi geri
-// alınamaz/hassas işlemler için kullanılır. JWT payload'ına GÜVENMİYORUZ
-// (token 30 gün geçerli - bu sürede süper admin ataması değişebilir),
-// bunun yerine her istekte veritabanından TAZE kontrol ediyoruz.
-function requireSuperAdmin(req, res, next) {
-  const me = db.prepare(`SELECT is_super_admin FROM users WHERE id = ? AND account_type = 'admin'`).get(req.user.id);
-  if (!me || !me.is_super_admin) {
-    return res.status(403).json({ error: 'Bu işlem yalnızca süper admin tarafından yapılabilir.' });
-  }
-  next();
-}
 
 // --- Personel başvuruları -------------------------------------------------
 
@@ -130,21 +113,15 @@ router.get('/stats', (req, res) => {
 
   const unreadChats = count(
     `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND channel = 'support' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'support' AND r.sender='admin' AND r.created_at >= cm.created_at
-     )`
-  );
-  const unreadBoatQuotes = count(
-    `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND channel = 'boat_quote' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'boat_quote' AND r.sender='admin' AND r.created_at >= cm.created_at
+     WHERE sender = 'user' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
      )`
   );
 
   res.json({
     totalCustomers, totalStaff, onlineStaff, pendingApplications,
     totalProperties, totalJobs, completedJobs, pendingJobs,
-    revenue, unreadChats, unreadBoatQuotes,
+    revenue, unreadChats,
   });
 });
 
@@ -166,7 +143,8 @@ router.get('/dashboard', (req, res) => {
   const onlineStaff = count(`SELECT COUNT(*) AS c FROM users WHERE account_type = 'staff' AND is_online = 1`);
   const pendingApplications = count(`SELECT COUNT(*) AS c FROM staff_applications WHERE status = 'pending'`);
   const busyStaff = count(
-    `SELECT COUNT(DISTINCT assigned_staff_id) AS c FROM cleaning_jobs WHERE status = 'in_progress' AND assigned_staff_id IS NOT NULL`
+    `SELECT COUNT(DISTINCT jsa.staff_id) AS c FROM job_staff_assignments jsa
+     JOIN cleaning_jobs j ON j.id = jsa.job_id WHERE j.status = 'in_progress'`
   );
   const offlineStaff = totalStaff - onlineStaff;
   const availableStaff = Math.max(0, onlineStaff - busyStaff);
@@ -212,14 +190,8 @@ router.get('/dashboard', (req, res) => {
 
   const unreadChats = count(
     `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND channel = 'support' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'support' AND r.sender='admin' AND r.created_at >= cm.created_at
-     )`
-  );
-  const unreadBoatQuotes = count(
-    `SELECT COUNT(DISTINCT user_id) AS c FROM chat_messages cm
-     WHERE sender = 'user' AND channel = 'boat_quote' AND NOT EXISTS (
-       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.channel = 'boat_quote' AND r.sender='admin' AND r.created_at >= cm.created_at
+     WHERE sender = 'user' AND NOT EXISTS (
+       SELECT 1 FROM chat_messages r WHERE r.user_id = cm.user_id AND r.sender='admin' AND r.created_at >= cm.created_at
      )`
   );
 
@@ -234,7 +206,6 @@ router.get('/dashboard', (req, res) => {
       todayRevenue,
       avgScore,
       unreadChats,
-      unreadBoatQuotes,
     },
     workerSummary: { total: totalStaff, online: availableStaff, busy: busyStaff, offline: offlineStaff },
     jobStatusBreakdown: { completed: completedJobs, inProgress: inProgressJobs, assigned: assignedJobs, pending: pendingJobs, total: totalJobs },
@@ -260,11 +231,12 @@ router.get('/bookings', (req, res) => {
 
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.net_price, j.vat_amount, j.payment_method, j.payment_status,
-              j.created_at, j.service_params, j.urgency, j.notes, j.has_equipment, j.has_chemicals,
-              p.name AS property_name, p.city AS property_city, p.address AS property_address, p.category AS property_category,
-              u.name AS customer_name, u.account_type AS customer_type, u.phone AS customer_phone,
-              s.name AS staff_name
+      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
+              j.required_staff_count,
+              p.name AS property_name, p.city AS property_city,
+              u.name AS customer_name, u.account_type AS customer_type,
+              s.name AS staff_name,
+              (SELECT COUNT(*) FROM job_staff_assignments jsa WHERE jsa.job_id = j.id) AS assigned_staff_count
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
        JOIN users u ON u.id = p.owner_id
@@ -278,109 +250,20 @@ router.get('/bookings', (req, res) => {
   res.json({ bookings: rows, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) });
 });
 
-// Admin, sistem uzerinden BIR MUSTERI ADINA yeni bir siparis olusturabilir
-// (orn. telefonla arayan bir musteri icin). musteri.js'teki AYNI cekirdek
-// fonksiyonu (createCleaningJob) cagriliyor - bu, otomatik personel
-// dispatch'inin (dispatchJob) musteri siparislerindeki ile BIREBIR AYNI
-// sekilde calismasini garanti eder; admin'in olusturdugu bir siparis de
-// tipki musterinin kendi olusturdugu gibi uygun personele otomatik iletilir.
-router.post('/jobs', async (req, res) => {
-  const {
-    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-    hasEquipment, hasChemicals, serviceParams, promoCode,
-  } = req.body;
-  try {
-    const createdJob = await createCleaningJob({
-      propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-      hasEquipment, hasChemicals, serviceParams, promoCode,
-      skipAccessCheck: true, createdByAdminId: req.user.id,
-    });
-    res.status(201).json(createdJob);
-
-    // Musteri, admin ADINA/ONUN YERINE olusturulan bu siparisten anlik
-    // olarak haberdar olsun - kendisi olusturmadigi icin (telefonla arayip
-    // admin'e siparis verdirdigi senaryo), uygulamayi actiginda "Siparislerim"
-    // ekraninda gormeden once push ile bilgilendirilmesi onemli.
-    const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(propertyId);
-    if (property) {
-      sendPushToUser(property.owner_id, {
-        title: 'Siparişin Oluşturuldu ✅',
-        body: `${property.name || 'Mülkün'} için bir sipariş oluşturuldu - detayları uygulamadan görebilirsin.`,
-        jobId: createdJob.id,
-        type: 'order_created_by_admin',
-      }).catch((err) => console.error('Admin siparis olusturma push hatasi:', err));
-    }
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Sipariş oluşturulamadı.' });
-  }
-});
-
-// Admin, mevcut bir siparisi duzenler - yeniden planlama, personel
-// atama/degistirme, fiyat/not duzeltmesi. Sadece GONDERILEN alanlar
-// guncellenir (COALESCE deseni). Eger assignedStaffId DEGISIYORSA (yeni bir
-// personele atama/aktarma), o personele - tipki otomatik dispatch'teki gibi -
-// bir "yeni is teklifi" push bildirimi gonderilir, boylece admin'in elle
-// atamasi ile sistemin otomatik atamasi PERSONEL ACISINDAN AYNI deneyimi
-// verir (personel haberdar olmadan uzerine is yuklenmis olmaz).
-router.put('/jobs/:id', (req, res) => {
-  const { id } = req.params;
-  const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
-  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-
-  const { scheduledAt, assignedStaffId, price, notes, urgency } = req.body || {};
-  const newCheckoutAt = scheduledAt ? new Date(scheduledAt).toISOString() : null;
-  const isReassigning = assignedStaffId !== undefined && assignedStaffId !== job.assigned_staff_id;
-
-  // Admin fiyati (KDV DAHIL, musteri fiyati) elle degistirirse, net_price/
-  // vat_amount'i da bu YENI fiyattan GERIYE DOGRU tutarli sekilde yeniden
-  // hesapliyoruz - aksi halde price ile net_price+vat_amount birbirini
-  // tutmaz kalirdi (orn. fiste yanlis KDV gorunurdu).
-  let newNetPrice = null, newVatAmount = null;
-  if (price !== undefined && price !== null && price !== '') {
-    const vatRate = getVatRate();
-    newNetPrice = Math.round((Number(price) / (1 + vatRate)) * 100) / 100;
-    newVatAmount = Math.round((Number(price) - newNetPrice) * 100) / 100;
-  }
-
-  db.prepare(
-    `UPDATE cleaning_jobs SET
-       checkout_at = COALESCE(?, checkout_at),
-       assigned_staff_id = COALESCE(?, assigned_staff_id),
-       price = COALESCE(?, price),
-       net_price = COALESCE(?, net_price),
-       vat_amount = COALESCE(?, vat_amount),
-       notes = COALESCE(?, notes),
-       urgency = COALESCE(?, urgency),
-       status = CASE WHEN ? IS NOT NULL THEN 'assigned' ELSE status END
-     WHERE id = ?`
-  ).run(
-    newCheckoutAt, assignedStaffId || null, price !== undefined ? Number(price) : null,
-    newNetPrice, newVatAmount,
-    notes || null, urgency || null, assignedStaffId || null, id
-  );
-
-  const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
-  res.json(updatedJob);
-
-  if (isReassigning && assignedStaffId) {
-    const property = db.prepare('SELECT city FROM properties WHERE id = ?').get(updatedJob.property_id);
-    sendPushToUser(assignedStaffId, {
-      title: 'MICISTO — Yeni iş teklifi',
-      body: `${property?.city || ''} · ${updatedJob.price} € (admin tarafından atandı)`,
-      jobId: id,
-      type: 'job_offer',
-    }).catch((err) => console.error('Admin atama push hatası:', err));
-  }
-});
-
 // --- Personel (tam liste) --------------------------------------------------
 
 router.get('/workers', (req, res) => {
+  // NOT: job_staff_assignments artık "bu personel bu işte var mı" sorusunun
+  // gerçek kaynağı - çok personelli işlerde assigned_staff_id sadece
+  // birincili tutuyor, ikinci/üçüncü personel eskiden burada hiç
+  // sayılmıyordu.
   const rows = db
     .prepare(
       `SELECT u.id, u.name, u.phone, u.username, u.is_online, u.current_city, u.current_lat, u.current_lng,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'done') AS completed_jobs,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs,
+              (SELECT COUNT(*) FROM job_staff_assignments jsa JOIN cleaning_jobs j ON j.id = jsa.job_id
+                 WHERE jsa.staff_id = u.id AND j.status = 'done') AS completed_jobs,
+              (SELECT COUNT(*) FROM job_staff_assignments jsa JOIN cleaning_jobs j ON j.id = jsa.job_id
+                 WHERE jsa.staff_id = u.id AND j.status = 'in_progress') AS active_jobs,
               (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS total_ratings,
               (SELECT SUM(staff_score) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND staff_score IS NOT NULL) AS sum_score
        FROM users u
@@ -405,61 +288,14 @@ router.get('/workers/live-locations', (req, res) => {
   const rows = db
     .prepare(
       `SELECT u.id, u.name, u.current_city, u.current_lat, u.current_lng,
-              (SELECT COUNT(*) FROM cleaning_jobs WHERE assigned_staff_id = u.id AND status = 'in_progress') AS active_jobs
+              (SELECT COUNT(*) FROM job_staff_assignments jsa JOIN cleaning_jobs j ON j.id = jsa.job_id
+                 WHERE jsa.staff_id = u.id AND j.status = 'in_progress') AS active_jobs
        FROM users u
        WHERE u.account_type = 'staff' AND u.is_online = 1
          AND u.current_lat IS NOT NULL AND u.current_lng IS NOT NULL`
     )
     .all();
   res.json({ workers: rows.map((r) => ({ ...r, isBusy: r.active_jobs > 0 })) });
-});
-
-// Bir personel hesabini siler - SADECE SUPER ADMIN. Aktif/bekleyen bir
-// siparise atanmis bir personel yanlislikla silinip is yariinda kalmasin
-// diye, once bu kontrol yapiliyor (musteri/siparis silmede kullanilan
-// AYNI guvenlik prensibi).
-router.delete('/workers/:id', requireSuperAdmin, (req, res) => {
-  const { id } = req.params;
-  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'staff'`).get(id);
-  if (!target) return res.status(404).json({ error: 'Personel bulunamadı.' });
-  const activeJobs = db
-    .prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs WHERE assigned_staff_id = ? AND status IN ('pending','assigned','in_progress')`)
-    .get(id).c;
-  if (activeJobs > 0) {
-    return res.status(409).json({ error: 'Bu personelin aktif/bekleyen siparişleri var, önce onları tamamlat ya da başka bir personele aktar.' });
-  }
-  // ONEMLI: chat_messages/push_subscriptions gibi ikincil kayitlar musteri
-  // silmedeki AYNI gerekceyle temizleniyor. GECMIS (tamamlanmis/iptal)
-  // siparislerin assigned_staff_id / current_candidate_id alanlarini ise
-  // SILMIYORUZ, SADECE NULL'a cekiyoruz - o siparis kayitlari mali/analitik
-  // gecmis icin onemli, personel hesabi silinse bile o gecmisin kaybolmamasi
-  // gerekiyor (sadece "kim yaptigi" bilgisi bosa dusuyor).
-  const deleteRelated = db.transaction(() => {
-    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM saved_cards WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM property_delegates WHERE delegate_user_id = ?`).run(id);
-    db.prepare(`UPDATE cleaning_jobs SET assigned_staff_id = NULL WHERE assigned_staff_id = ?`).run(id);
-    db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE current_candidate_id = ?`).run(id);
-    db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
-  });
-  deleteRelated();
-  res.json({ message: 'Personel hesabı silindi.' });
-});
-
-// Super admin, bir PERSONELIN sifresini sifirlar (gormek degil - bkz.
-// admins/:id/reset-password'daki ayni gerekce: hash'lenmis sifreler geri
-// cozulemez, bu YUZDEN "goster" degil "yenisini belirle" akisi var).
-router.put('/workers/:id/reset-password', requireSuperAdmin, (req, res) => {
-  const { newPassword } = req.body || {};
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
-  }
-  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
-  if (!target) return res.status(404).json({ error: 'Personel bulunamadı.' });
-  const passwordHash = bcrypt.hashSync(newPassword, 10);
-  db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(passwordHash, req.params.id);
-  res.json({ message: 'Şifre sıfırlandı.' });
 });
 
 // --- Müşteriler (tam liste) -------------------------------------------------
@@ -478,19 +314,6 @@ router.get('/customers', (req, res) => {
     .all();
 
   res.json({ customers: rows });
-});
-
-// Bir müşterinin tüm mülkleri - Müşteriler sayfasında satıra tıklayınca
-// açılan detay modalı için. Tekneye özgü alanlar (berth_number, length_ft
-// vb.) dahil TÜM sütunlar dönüyor - kategoriye göre hangisinin gösterileceğine
-// admin panelinin kendisi (categoryLabel/propertyMetaLine benzeri mantıkla)
-// karar veriyor, tıpkı müşteri uygulamasındaki gibi.
-router.get('/customers/:id/properties', (req, res) => {
-  const { id } = req.params;
-  const rows = db
-    .prepare('SELECT * FROM properties WHERE owner_id = ? ORDER BY created_at DESC')
-    .all(id);
-  res.json({ properties: rows });
 });
 
 // --- Ciro grafiği -----------------------------------------------------------
@@ -513,7 +336,7 @@ router.get('/revenue', (req, res) => {
   const series = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i);
+    d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
     series.push({ date: key, total: byDay[key] || 0 });
   }
@@ -537,43 +360,32 @@ router.get('/revenue', (req, res) => {
 
 // Tüm konuşmaları (kullanıcı bazında), son mesaj önizlemesi ve okunmamış
 // bilgisiyle listeler.
-// Gecerli kanallar: 'support' (genel destek) ve 'boat_quote' (>=50ft tekne
-// fiyat teklifi talepleri). Admin panelinde bu ikisi TAMAMEN AYRI gelen
-// kutulari olarak gosterilir - "Tekne Fiyat Talepleri" sekmesi "Destek"
-// sekmesinden bagimsiz calisir.
-function normalizeChannel(raw) {
-  return raw === 'boat_quote' ? 'boat_quote' : 'support';
-}
-
 router.get('/chats', (req, res) => {
-  const channel = normalizeChannel(req.query.channel);
   const rows = db
     .prepare(
       `SELECT u.id AS user_id, u.name AS customer_name, u.account_type,
-              (SELECT message FROM chat_messages WHERE user_id = u.id AND channel = ? ORDER BY created_at DESC LIMIT 1) AS last_message,
-              (SELECT created_at FROM chat_messages WHERE user_id = u.id AND channel = ? ORDER BY created_at DESC LIMIT 1) AS last_message_at,
-              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = u.id AND cm.channel = ? AND cm.sender = 'user'
-                 AND NOT EXISTS (SELECT 1 FROM chat_messages r WHERE r.user_id = u.id AND r.channel = ? AND r.sender='admin' AND r.created_at >= cm.created_at)
+              (SELECT message FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message,
+              (SELECT created_at FROM chat_messages WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) AS last_message_at,
+              (SELECT COUNT(*) FROM chat_messages cm WHERE cm.user_id = u.id AND cm.sender = 'user'
+                 AND NOT EXISTS (SELECT 1 FROM chat_messages r WHERE r.user_id = u.id AND r.sender='admin' AND r.created_at >= cm.created_at)
               ) AS unread_count
        FROM users u
-       WHERE EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.user_id = u.id AND cm.channel = ?)
+       WHERE EXISTS (SELECT 1 FROM chat_messages cm WHERE cm.user_id = u.id)
        ORDER BY last_message_at DESC`
     )
-    .all(channel, channel, channel, channel, channel);
+    .all();
   res.json(rows);
 });
 
 router.get('/chats/:userId/messages', (req, res) => {
-  const channel = normalizeChannel(req.query.channel);
   const rows = db
-    .prepare('SELECT * FROM chat_messages WHERE user_id = ? AND channel = ? ORDER BY created_at ASC')
-    .all(req.params.userId, channel);
+    .prepare('SELECT * FROM chat_messages WHERE user_id = ? ORDER BY created_at ASC')
+    .all(req.params.userId);
   res.json(rows);
 });
 
 router.post('/chats/:userId/messages', (req, res) => {
   const { message } = req.body;
-  const channel = normalizeChannel(req.body.channel);
   if (!message || !message.trim()) {
     return res.status(400).json({ error: 'Mesaj boş olamaz.' });
   }
@@ -582,19 +394,9 @@ router.post('/chats/:userId/messages', (req, res) => {
 
   const id = uuid();
   db.prepare(
-    `INSERT INTO chat_messages (id, user_id, sender, message, channel) VALUES (?, ?, 'admin', ?, ?)`
-  ).run(id, req.params.userId, message.trim(), channel);
+    `INSERT INTO chat_messages (id, user_id, sender, message) VALUES (?, ?, 'admin', ?)`
+  ).run(id, req.params.userId, message.trim());
   res.status(201).json(db.prepare('SELECT * FROM chat_messages WHERE id = ?').get(id));
-
-  // Musteriye, admin'in yanitini push ile haber veriyoruz - kanala gore
-  // baslik farkli (destek vs tekne fiyat teklifi), boylece musteri hangi
-  // konuda yanit geldigini bildirimden bile anlar.
-  sendPushToUser(req.params.userId, {
-    title: channel === 'boat_quote' ? 'Tekne fiyat teklifine yanıt geldi' : 'MICISTO Destek\'ten yeni mesaj',
-    body: message.trim().slice(0, 120),
-    type: 'chat_message',
-    channel,
-  }).catch((err) => console.error('Chat push bildirimi hata:', err));
 });
 
 // --- Hizmetler & Fiyatlandırma ----------------------------------------------
@@ -698,147 +500,27 @@ router.post('/services/checklist/:itemId/move', (req, res) => {
 
 // --- Finans -----------------------------------------------------------------
 
-// ONEMLI: financeCalc.js'teki ayni prensip burada da gecerli - SQLite'in
-// date() fonksiyonu UTC calisir, bu yuzden JS tarafi da UTC kullanmali
-// (aksi halde personel tarafiyla admin tarafi farkli "bugun" gorebilir).
 function getFinancePeriodRange(period, offset) {
   const now = new Date();
   if (period === 'month') {
-    const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
-    const start = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), 1));
-    const end = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0));
+    const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const start = new Date(target.getFullYear(), target.getMonth(), 1);
+    const end = new Date(target.getFullYear(), target.getMonth() + 1, 0);
     return { start, end };
   }
-  const day = now.getUTCDay();
+  const day = now.getDay();
   const diffToMonday = (day === 0 ? -6 : 1 - day);
-  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diffToMonday + offset * 7));
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diffToMonday + offset * 7);
+  monday.setHours(0, 0, 0, 0);
   const sunday = new Date(monday);
-  sunday.setUTCDate(monday.getUTCDate() + 6);
+  sunday.setDate(monday.getDate() + 6);
   return { start: monday, end: sunday };
 }
 function toDateKey(d) {
-  const y = d.getUTCFullYear(), m = String(d.getUTCMonth() + 1).padStart(2, '0'), day = String(d.getUTCDate()).padStart(2, '0');
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
 }
-
-// Bir isin MICISTO'nun GERCEK komisyonunu (KDV HARIC net taban uzerinden)
-// dondurur. Eski (KDV ozelliginden once olusturulmus) islerde net_price
-// NULL'dur - o zaman price zaten KDV eklenmeden hesaplanmisti.
-function jobCommission(j) {
-  const netBase = j.net_price != null ? j.net_price : j.price;
-  return Math.round((netBase - calcNetEarning(netBase)) * 100) / 100;
-}
-
-// Bir nakit isin komisyonu "TAHSIL EDILDI" sayilir mi? - personelin o isin
-// tamamlandigi tarihi kapsayan 15 gunluk donemi ZATEN "odendi" olarak
-// isaretlenmisse (staff_payment_marks), personel komisyonu bize o donemde
-// geri odemis demektir. Kart/fatura islerinde para zaten ELIMIZDE (musteri
-// odemeyi dogrudan bize yapti) - bu yuzden HER ZAMAN "tahsil edildi" sayilir,
-// donem kapanmasini beklemez.
-function isCommissionCollected(j) {
-  if (j.payment_method !== 'cash') return true;
-  if (!j.assigned_staff_id || !j.completed_at) return false;
-  const dateKey = (j.completed_at || '').slice(0, 10);
-  const mark = db
-    .prepare(`SELECT 1 FROM staff_payment_marks WHERE staff_id = ? AND ? BETWEEN period_start AND period_end LIMIT 1`)
-    .get(j.assigned_staff_id, dateKey);
-  return !!mark;
-}
-
-// Finans "Genel Bakış" sekmesi: tahsil edilmis / bekleyen komisyon kartlari
-// + zaman serisi grafigi. ONEMLI: komisyon HER YERDE net (KDV haric) taban
-// uzerinden hesaplaniyor - musterinin odedigi KDV DAHIL tutar (price)
-// DOGRUDAN kullanilirsa komisyon oldugundan fazla gorunur (bu, kullanicinin
-// canli testte yakaladigi hataydi).
-router.get('/finance/overview', (req, res) => {
-  const granularity = ['day', 'week', 'month'].includes(req.query.granularity) ? req.query.granularity : 'day';
-  const bucketCount = granularity === 'day' ? 30 : granularity === 'week' ? 12 : 12;
-
-  const jobs = db
-    .prepare(
-      `SELECT price, net_price, vat_amount, payment_method, assigned_staff_id, completed_at
-       FROM cleaning_jobs WHERE status = 'done' AND completed_at IS NOT NULL`
-    )
-    .all();
-
-  let collectedCommission = 0, pendingCommission = 0, totalVat = 0;
-  jobs.forEach((j) => {
-    const commission = jobCommission(j);
-    if (isCommissionCollected(j)) collectedCommission += commission;
-    else pendingCommission += commission;
-    totalVat += (j.vat_amount != null ? j.vat_amount : 0);
-  });
-
-  // Zaman serisi: gunluk/haftalik/aylik toplam komisyon (tahsilat durumundan
-  // BAGIMSIZ - "bu donemde ne kadar komisyon HAK EDILDI" trendini gosterir).
-  const buckets = new Map();
-  const bucketKey = (dateStr) => {
-    const d = new Date(dateStr.replace(' ', 'T') + (dateStr.includes('T') ? '' : 'Z'));
-    if (granularity === 'day') return toDateKey(d);
-    if (granularity === 'month') return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    // hafta: o haftanin Pazartesi tarihi
-    const day = d.getUTCDay();
-    const diffToMonday = (day === 0 ? -6 : 1 - day);
-    const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + diffToMonday));
-    return toDateKey(monday);
-  };
-  jobs.forEach((j) => {
-    const key = bucketKey(j.completed_at);
-    buckets.set(key, (buckets.get(key) || 0) + jobCommission(j));
-  });
-  const sortedKeys = Array.from(buckets.keys()).sort().slice(-bucketCount);
-  const series = sortedKeys.map((label) => ({ label, commission: Math.round(buckets.get(label) * 100) / 100 }));
-
-  res.json({
-    collectedCommission: Math.round(collectedCommission * 100) / 100,
-    pendingCommission: Math.round(pendingCommission * 100) / 100,
-    totalVat: Math.round(totalVat * 100) / 100,
-    series,
-  });
-});
-
-// Bir kart/kategoriye (tahsil edilmis / bekleyen) tiklaninca acilan is
-// listesi - muhasebeyle mutabakat icin kullanilir.
-router.get('/finance/transactions', (req, res) => {
-  const category = req.query.category === 'pending' ? 'pending' : 'collected';
-  const jobs = db
-    .prepare(
-      `SELECT j.id, j.service_key, j.price, j.net_price, j.vat_amount, j.payment_method, j.assigned_staff_id,
-              j.completed_at AS eventDate, u.name AS staff_name, p.name AS property_name, c.name AS customer_name
-       FROM cleaning_jobs j
-       LEFT JOIN users u ON u.id = j.assigned_staff_id
-       JOIN properties p ON p.id = j.property_id
-       JOIN users c ON c.id = p.owner_id
-       WHERE j.status = 'done' AND j.completed_at IS NOT NULL
-       ORDER BY j.completed_at DESC`
-    )
-    .all();
-
-  const filtered = jobs.filter((j) => (isCommissionCollected(j) ? category === 'collected' : category === 'pending'));
-  const transactions = filtered.map((j) => ({ ...j, commission: jobCommission(j) }));
-  res.json({ transactions, totalCommission: Math.round(transactions.reduce((s, t) => s + t.commission, 0) * 100) / 100 });
-});
-
-// --- KDV (PDV) mutabakati -----------------------------------------------
-// Muhasebeyle mutabakat icin: devlete odenmesi gereken TOPLAM KDV tutari +
-// bu tutari olusturan is listesi (Excel'e aktarilabilir).
-router.get('/finance/vat', (req, res) => {
-  const jobs = db
-    .prepare(
-      `SELECT j.id, j.service_key, j.price, j.net_price, j.vat_amount, j.payment_method, j.completed_at AS eventDate,
-              u.name AS staff_name, p.name AS property_name, c.name AS customer_name
-       FROM cleaning_jobs j
-       LEFT JOIN users u ON u.id = j.assigned_staff_id
-       JOIN properties p ON p.id = j.property_id
-       JOIN users c ON c.id = p.owner_id
-       WHERE j.status = 'done' AND j.completed_at IS NOT NULL
-       ORDER BY j.completed_at DESC`
-    )
-    .all();
-  const transactions = jobs.map((j) => ({ ...j, vatAmount: j.vat_amount != null ? j.vat_amount : 0 }));
-  const totalVat = Math.round(transactions.reduce((s, t) => s + t.vatAmount, 0) * 100) / 100;
-  res.json({ totalVat, transactions, vatRate: getVatRate() });
-});
 
 // Seçilen dönemde tamamlanan işlerden: toplam ciro, MICISTO komisyonu,
 // ödeme yöntemi dağılımı, ve personel bazında mutabakat (kim kime ne kadar
@@ -855,25 +537,16 @@ router.get('/finance', (req, res) => {
 
   const jobs = db
     .prepare(
-      `SELECT j.price, j.net_price, j.vat_amount, j.payment_method, j.assigned_staff_id, u.name AS staff_name
+      `SELECT j.price, j.payment_method, j.assigned_staff_id, u.name AS staff_name
        FROM cleaning_jobs j
        LEFT JOIN users u ON u.id = j.assigned_staff_id
        WHERE j.status = 'done' AND date(j.completed_at) BETWEEN ? AND ?`
     )
     .all(startKey, endKey);
 
-  // ONEMLI: j.price musterinin ODEDIGI (KDV DAHIL) tutar. j.net_price KDV
-  // haric net tutar (eski siparislerde NULL - o zaman price'in kendisi net
-  // kabul edilir, cunku o donemde KDV hic ayrilmiyordu). MICISTO'nun GERCEK
-  // komisyonu (kendi kazanci) SADECE net tutar uzerinden hesaplanir - KDV,
-  // MICISTO'nun kazanci degil, devlete gecici olarak tutulan bir tutardir.
-  const netBase = (j) => (j.net_price != null ? j.net_price : j.price);
-  const vatOf = (j) => (j.vat_amount != null ? j.vat_amount : 0);
-
   const totalRevenue = jobs.reduce((sum, j) => sum + j.price, 0);
-  const totalVat = Math.round(jobs.reduce((sum, j) => sum + vatOf(j), 0) * 100) / 100;
-  const totalCommission = Math.round(jobs.reduce((sum, j) => sum + (netBase(j) - calcNetEarning(netBase(j))), 0) * 100) / 100;
-  const totalPayout = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(netBase(j)), 0) * 100) / 100;
+  const totalCommission = Math.round(jobs.reduce((sum, j) => sum + (j.price - calcNetEarning(j.price)), 0) * 100) / 100;
+  const totalPayout = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.price), 0) * 100) / 100;
 
   const paymentBreakdown = { cash: { count: 0, total: 0 }, card: { count: 0, total: 0 }, invoice: { count: 0, total: 0 } };
   jobs.forEach((j) => {
@@ -882,30 +555,40 @@ router.get('/finance', (req, res) => {
     paymentBreakdown[method].total += j.price;
   });
 
+  // Çok personelli işlerde (bkz. catalog.js calcRequiredStaffCount) her
+  // personel işin sadece kendi payını (price / required_staff_count
+  // üzerinden hesaplanan net kazancı) alır/borçlanır - job_staff_assignments
+  // bu yüzden job listesi yerine (job, personel) ikilisi bazında geziliyor.
+  const assignments = db
+    .prepare(
+      `SELECT jsa.staff_id, u.name AS staff_name, j.price, j.payment_method, j.required_staff_count
+       FROM job_staff_assignments jsa
+       JOIN cleaning_jobs j ON j.id = jsa.job_id
+       JOIN users u ON u.id = jsa.staff_id
+       WHERE j.status = 'done' AND date(j.completed_at) BETWEEN ? AND ?`
+    )
+    .all(startKey, endKey);
+
   const byStaff = {};
-  jobs.forEach((j) => {
-    if (!j.assigned_staff_id) return;
-    if (!byStaff[j.assigned_staff_id]) {
-      byStaff[j.assigned_staff_id] = {
-        staffId: j.assigned_staff_id, staffName: j.staff_name,
+  assignments.forEach((a) => {
+    if (!byStaff[a.staff_id]) {
+      byStaff[a.staff_id] = {
+        staffId: a.staff_id, staffName: a.staff_name,
         cashJobs: 0, cashTotal: 0, otherJobs: 0, otherTotal: 0,
         owedToStaff: 0, owedToBusiness: 0,
       };
     }
-    const s = byStaff[j.assigned_staff_id];
-    // ONEMLI: "net" burada personelin net kazancini ifade eder (KDV haric
-    // taban uzerinden). Nakit islerde personel MUSTERIDEN TOPLAMI (KDV
-    // dahil j.price) topluyor, bu yuzden bize geri odemesi gereken tutar
-    // (owedToBusiness) hem komisyonumuzu HEM DE devlete odenecek KDV'yi
-    // icerir: j.price - net = (netBase*komisyon) + KDV.
-    const net = calcNetEarning(netBase(j));
-    if (j.payment_method === 'cash') {
+    const s = byStaff[a.staff_id];
+    const staffCount = Math.max(1, a.required_staff_count || 1);
+    const myShare = a.price / staffCount;
+    const net = calcNetEarningPerStaff(a.price, staffCount);
+    if (a.payment_method === 'cash') {
       s.cashJobs += 1;
-      s.cashTotal += j.price;
-      s.owedToBusiness += (j.price - net); // personel bizim komisyonumuzu + KDV'yi bize ödemeli
+      s.cashTotal += myShare;
+      s.owedToBusiness += (myShare - net); // personel bizim komisyonumuzu bize ödemeli
     } else {
       s.otherJobs += 1;
-      s.otherTotal += j.price;
+      s.otherTotal += myShare;
       s.owedToStaff += net; // biz personele net kazancini odemeliyiz
     }
   });
@@ -918,193 +601,22 @@ router.get('/finance', (req, res) => {
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
-    totalRevenue, totalCommission, totalPayout, totalVat, commissionRate: getCommissionRate(), vatRate: getVatRate(),
+    totalRevenue, totalCommission, totalPayout, commissionRate: getCommissionRate(),
     paymentBreakdown, staffSettlements, jobCount: jobs.length,
   });
 });
 
-// --- Personel bazlı mutabakat (ödeme dönemleri) ------------------------------
-// ONEMLI: Burada getStaffPeriods/getStaffLifetimeTotal - personelin KENDI
-// finans ekraninda (jobs.js /finance-summary) kullandigi AYNI fonksiyonlar.
-// Admin ve personel taraflari boylece garantili olarak ayni sayilari gorur
-// (iki ayri hesaplama mantigi degil, tek ortak kaynak).
-router.get('/finance/staff', (req, res) => {
-  const staffRows = db.prepare(`SELECT id, name, current_city FROM users WHERE account_type = 'staff' ORDER BY name ASC`).all();
-  const staff = staffRows.map((s) => {
-    const periods = getStaffPeriods(s.id);
-    const unpaidPeriodCount = periods.filter((p) => !p.isPaid && (p.owedToStaff > 0 || p.owedToBusiness > 0)).length;
-    return {
-      id: s.id, name: s.name, current_city: s.current_city,
-      totalEarned: getStaffLifetimeTotal(s.id),
-      unpaidPeriodCount,
-    };
-  });
-  res.json({ staff });
-});
-
-router.get('/finance/staff/:id/periods', (req, res) => {
-  const staffRow = db.prepare(`SELECT id, name FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
-  if (!staffRow) return res.status(404).json({ error: 'Personel bulunamadı.' });
-  const periods = getStaffPeriods(req.params.id);
-  res.json({ staff: staffRow, periods });
-});
-
-// Bir donemin KUMULATIF degil, IS IS kirilimi - mutabakat sirasinda "hangi
-// is ne kadar getirdi" sorusuna cevap vermek icin (bkz. financeCalc.js
-// getStaffPeriodJobs - personelin KENDI uygulamasindaki AYNI endpoint
-// mantigi ile birebir tutarli, bkz. jobs.js /finance/period-jobs).
-router.get('/finance/staff/:id/period-jobs', (req, res) => {
-  const { periodStart, periodEnd } = req.query;
-  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'periodStart ve periodEnd zorunlu.' });
-  const staffRow = db.prepare(`SELECT id, name FROM users WHERE id = ? AND account_type = 'staff'`).get(req.params.id);
-  if (!staffRow) return res.status(404).json({ error: 'Personel bulunamadı.' });
-  const jobs = getStaffPeriodJobs(req.params.id, periodStart, periodEnd);
-  res.json({ staff: staffRow, periodStart, periodEnd, jobs });
-});
-
-// Personel kendi "Ödememi Aldım" derken de, admin burada "Ödendi
-// İşaretle" derken de AYNI staff_payment_marks kaydına, AYNI upsert
-// desenine yazılıyor (bkz. jobs.js /finance/mark-received) - iki taraf da
-// aynı mutabakat gerçeğini görür.
-router.post('/finance/staff/:id/periods/mark-paid', (req, res) => {
-  const { periodStart, periodEnd, amount } = req.body || {};
-  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'Dönem bilgisi eksik.' });
-  db.prepare(
-    `INSERT INTO staff_payment_marks (id, staff_id, period_start, period_end, amount)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(staff_id, period_start) DO UPDATE SET amount = excluded.amount, paid_at = datetime('now')`
-  ).run(uuid(), req.params.id, periodStart, periodEnd, Number(amount) || 0);
-  res.json({ message: 'Ödendi olarak işaretlendi.' });
-
-  // Personel kendi mutabakatini "Odememi Aldim" ile ZATEN kendisi
-  // isaretliyorsa (jobs.js /finance/mark-received) bu push'a gerek yok -
-  // kendine bildirim gondermek anlamsiz. Sadece ADMIN tarafindan
-  // isaretlendiginde (yani personel henuz haberi yokken) push gonderiyoruz.
-  if (req.user.accountType === 'admin') {
-    sendPushToUser(req.params.id, {
-      title: 'Ödemen gönderildi 💸',
-      body: `${amount ? Number(amount).toFixed(2) + ' € ' : ''}tutarındaki ödemen işleme alındı.`,
-      type: 'payment_sent',
-    }).catch((err) => console.error('Ödeme bildirimi hata:', err));
-  }
-});
-
-router.post('/finance/staff/:id/periods/unmark-paid', (req, res) => {
-  const { periodStart } = req.body || {};
-  db.prepare('DELETE FROM staff_payment_marks WHERE staff_id = ? AND period_start = ?').run(req.params.id, periodStart);
-  res.json({ message: 'Ödeme işareti geri alındı.' });
-});
-
-// --- Push Kampanyalari (pazarlama/promosyon anlik gonderimleri) --------------
-// Admin, secilen bir kitleye (tumu / bireysel / sirket, opsiyonel sehir
-// filtresiyle) anlik bir push bildirimi olusturup gonderir. Gonderilen her
-// kampanya push_campaigns tablosuna kayit olarak dusuyor - hem gecmis
-// gorunsun hem "bugun zaten gonderdim mi" diye admin kontrol edebilsin.
-router.get('/marketing/push-campaigns', (req, res) => {
-  const campaigns = db
-    .prepare(`SELECT * FROM push_campaigns ORDER BY created_at DESC LIMIT 50`)
-    .all();
-  res.json({ campaigns });
-});
-
-router.post('/marketing/push-campaigns', async (req, res) => {
-  const { title, body, targetType, targetCity } = req.body || {};
-  if (!title || !title.trim() || !body || !body.trim()) {
-    return res.status(400).json({ error: 'Başlık ve mesaj metni zorunlu.' });
-  }
-  const finalTargetType = ['all', 'individual', 'company'].includes(targetType) ? targetType : 'all';
-  const finalCity = targetCity && targetCity.trim() ? targetCity.trim() : null;
-
-  // Hedef kitleyi olustur: her zaman sadece MUSTERI hesaplari (bireysel/
-  // sirket) - personel/admin'e pazarlama push'u gitmiyor, bu kasitli.
-  let query = `SELECT id FROM users WHERE account_type IN ('individual','company')`;
-  const params = [];
-  if (finalTargetType !== 'all') {
-    query += ` AND account_type = ?`;
-    params.push(finalTargetType);
-  }
-  if (finalCity) {
-    // Musterinin sehri dogrudan users tablosunda degil, mulklerinden
-    // cikariliyor - en az bir mulku o sehirde olan musteriler hedeflenir.
-    query += ` AND id IN (SELECT owner_id FROM properties WHERE city = ?)`;
-    params.push(finalCity);
-  }
-  const targets = db.prepare(query).all(...params);
-
-  await sendPushToUsers(targets.map((t) => t.id), {
-    title: title.trim(),
-    body: body.trim(),
-    type: 'campaign',
-  });
-
-  const id = uuid();
-  db.prepare(
-    `INSERT INTO push_campaigns (id, title, body, target_type, target_city, sent_count, created_by_admin_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, title.trim(), body.trim(), finalTargetType, finalCity, targets.length, req.user.id);
-
-  res.status(201).json({ message: `Kampanya ${targets.length} kullanıcıya gönderildi.`, sentCount: targets.length });
-});
-
 // --- Ayarlar (Settings) ------------------------------------------------------
-
-// --- Demo verisi temizleme --------------------------------------------------
-// TUM musteri ve TUM siparis verisini geri alinamaz sekilde siler - demo/
-// test asamasindan gercek kullanima gecerken kullanilir. Personel, admin ve
-// personel basvurulari (staff_applications) HIC DOKUNULMUYOR - bilerek
-// boyle, cunku bunlar demo verisi degil gercek operasyonel kurulum.
-//
-// Guvenlik: sadece super admin cagirabilir VE istegin govdesinde tam olarak
-// "SIL" onay metni gelmesi gerekiyor - yanlislikla (orn. bir test script'i
-// ya da yanlis tiklama ile) tetiklenmesini zorlastirmak icin. Frontend'de
-// AYRICA kendi onay dialogu var (iki katmanli koruma).
-router.post('/system/wipe-customer-data', requireSuperAdmin, (req, res) => {
-  const { confirm } = req.body || {};
-  if (confirm !== 'SIL') {
-    return res.status(400).json({ error: 'Onay metni yanlış. Bu geri alınamaz bir işlemdir.' });
-  }
-
-  const customerPhones = db
-    .prepare(`SELECT phone FROM users WHERE account_type IN ('individual','company')`)
-    .all()
-    .map((r) => r.phone);
-  const customerCount = customerPhones.length;
-  const propertyCount = db.prepare(`SELECT COUNT(*) AS c FROM properties`).get().c;
-  const jobCount = db.prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs`).get().c;
-
-  const wipe = db.transaction(() => {
-    db.exec(`DELETE FROM chat_messages WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
-    db.exec(`DELETE FROM push_subscriptions WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
-    db.exec(`DELETE FROM saved_cards WHERE user_id IN (SELECT id FROM users WHERE account_type IN ('individual','company'))`);
-    db.exec(`DELETE FROM property_delegates`);
-    db.exec(`DELETE FROM promo_code_redemptions`);
-    db.exec(`DELETE FROM cleaning_jobs`);
-    db.exec(`DELETE FROM properties`);
-    db.exec(`DELETE FROM users WHERE account_type IN ('individual','company')`);
-    const deleteOtp = db.prepare(`DELETE FROM otp_requests WHERE phone = ?`);
-    for (const phone of customerPhones) deleteOtp.run(phone);
-  });
-  wipe();
-
-  res.json({
-    message: 'Tüm müşteri ve sipariş verisi temizlendi.',
-    deletedCustomers: customerCount,
-    deletedProperties: propertyCount,
-    deletedOrders: jobCount,
-  });
-});
 
 router.get('/settings', (req, res) => {
   res.json({
     commissionRate: getCommissionRate(),
     payoutCycleDays: getPayoutCycleDays(),
-    dormantThresholdDays: getDormantThresholdDays(),
-    vatRate: getVatRate(),
   });
 });
 
 router.put('/settings', (req, res) => {
-  const { commissionRate, payoutCycleDays, dormantThresholdDays, vatRate } = req.body || {};
+  const { commissionRate, payoutCycleDays } = req.body || {};
   const upsert = db.prepare(
     `INSERT INTO pricing_settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`
@@ -1116,13 +628,6 @@ router.put('/settings', (req, res) => {
     }
     upsert.run('system.commissionRate', num);
   }
-  if (vatRate !== undefined && vatRate !== '') {
-    const num = Number(vatRate);
-    if (Number.isNaN(num) || num < 0 || num > 1) {
-      return res.status(400).json({ error: 'KDV oranı 0 ile 1 arasında bir ondalık sayı olmalı (örn. %21 için 0.21).' });
-    }
-    upsert.run('system.vatRate', num);
-  }
   if (payoutCycleDays !== undefined && payoutCycleDays !== '') {
     const num = Number(payoutCycleDays);
     if (Number.isNaN(num) || num < 1) {
@@ -1130,20 +635,13 @@ router.put('/settings', (req, res) => {
     }
     upsert.run('system.payoutCycleDays', num);
   }
-  if (dormantThresholdDays !== undefined && dormantThresholdDays !== '') {
-    const num = Number(dormantThresholdDays);
-    if (Number.isNaN(num) || num < 1) {
-      return res.status(400).json({ error: 'Kullanmayan müşteri eşiği en az 1 gün olmalı.' });
-    }
-    upsert.run('marketing.dormantThresholdDays', num);
-  }
   res.json({ message: 'Ayarlar güncellendi.' });
 });
 
 // --- Admin hesap yönetimi ----------------------------------------------------
 
 router.get('/admins', (req, res) => {
-  const admins = db.prepare(`SELECT id, name, username, created_at, is_super_admin FROM users WHERE account_type = 'admin' ORDER BY created_at ASC`).all();
+  const admins = db.prepare(`SELECT id, name, username, created_at FROM users WHERE account_type = 'admin' ORDER BY created_at ASC`).all();
   res.json({ admins });
 });
 
@@ -1170,7 +668,7 @@ router.post('/admins', (req, res) => {
   res.status(201).json({ message: 'Admin hesabı oluşturuldu.', admin: { id, name: name.trim(), username: username.trim() } });
 });
 
-router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
+router.delete('/admins/:id', (req, res) => {
   if (req.params.id === req.user.id) {
     return res.status(400).json({ error: 'Kendi hesabını silemezsin.' });
   }
@@ -1178,82 +676,8 @@ router.delete('/admins/:id', requireSuperAdmin, (req, res) => {
   if (totalAdmins <= 1) {
     return res.status(400).json({ error: 'Son admin hesabı silinemez.' });
   }
-  // Musteri/personel silmedeki AYNI FOREIGN KEY guvenlik onlemi - admin
-  // hesabinin (dusuk ihtimal de olsa) chat/push kaydi varsa silme islemi
-  // patlamasin diye.
-  const deleteRelated = db.transaction(() => {
-    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(req.params.id);
-    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(req.params.id);
-    db.prepare(`UPDATE push_campaigns SET created_by_admin_id = NULL WHERE created_by_admin_id = ?`).run(req.params.id);
-    db.prepare(`UPDATE cleaning_jobs SET created_by_admin_id = NULL WHERE created_by_admin_id = ?`).run(req.params.id);
-    db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
-  });
-  deleteRelated();
+  db.prepare(`DELETE FROM users WHERE id = ? AND account_type = 'admin'`).run(req.params.id);
   res.json({ message: 'Admin hesabı silindi.' });
-});
-
-// Süper admin, BAŞKA bir adminin şifresini SIFIRLAR (yeni bir şifre
-// belirler). ÖNEMLİ: mevcut şifreyi GÖRMEK/GERİ ÇÖZMEK mümkün değil ve
-// güvenlik açısından zaten doğru olan budur - şifreler bcrypt ile
-// hash'lenmiş durumda, hash'ten orijinal şifreye geri dönülemez. Bu yüzden
-// "şifreyi göster" değil, "yeni şifre belirle" akışı sunuluyor.
-router.put('/admins/:id/reset-password', requireSuperAdmin, (req, res) => {
-  const { newPassword } = req.body || {};
-  if (!newPassword || newPassword.length < 6) {
-    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalı.' });
-  }
-  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type = 'admin'`).get(req.params.id);
-  if (!target) return res.status(404).json({ error: 'Admin hesabı bulunamadı.' });
-  const passwordHash = bcrypt.hashSync(newPassword, 10);
-  db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).run(passwordHash, req.params.id);
-  res.json({ message: 'Şifre sıfırlandı.' });
-});
-
-// Bir müşteriyi (birey ya da yönetim şirketi) siler - yalnızca süper admin.
-// Güvenlik: aktif/geçmiş mülkü olan bir müşteri YANLIŞLIKLA silinip veri
-// bütünlüğü bozulmasın diye, önce mülkü olup olmadığı kontrol edilir. Gerçek
-// bir müşteriyi silmek istiyorsa, önce mülklerini silmesi gerekir - bu,
-// "yanlış/test kaydı" silme senaryosu için zaten yeterli bir akış (yeni
-// kayıt olmuş, henüz hiçbir mülk eklememiş birini silmek serbest).
-router.delete('/customers/:id', requireSuperAdmin, (req, res) => {
-  const { id } = req.params;
-  const target = db.prepare(`SELECT id FROM users WHERE id = ? AND account_type IN ('individual','company')`).get(id);
-  if (!target) return res.status(404).json({ error: 'Müşteri bulunamadı.' });
-  const propertyCount = db.prepare(`SELECT COUNT(*) AS c FROM properties WHERE owner_id = ?`).get(id).c;
-  if (propertyCount > 0) {
-    return res.status(409).json({ error: 'Bu müşterinin kayıtlı mülkleri var, önce onları silmelisin.' });
-  }
-  // ONEMLI: users tablosuna FOREIGN KEY ile referans veren BASKA tablolar da
-  // var (chat_messages, push_subscriptions, saved_cards, property_delegates) -
-  // bunlar "kritik iş verisi" degil (mulk/siparis gibi), sadece yardimci/
-  // ikincil kayitlar. Musteri silinmeden ONCE bunlarin temizlenmesi gerekiyor,
-  // yoksa SQLite FOREIGN KEY constraint hatasi verip 500 sunucu hatasina
-  // yol aciyordu (gercek bir demo hesabinda chat mesaji oldugu icin tam bu
-  // hata yasandi - test edilip dogrulandi).
-  const deleteRelated = db.transaction(() => {
-    db.prepare(`DELETE FROM chat_messages WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM push_subscriptions WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM saved_cards WHERE user_id = ?`).run(id);
-    db.prepare(`DELETE FROM property_delegates WHERE delegate_user_id = ?`).run(id);
-    db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
-  });
-  deleteRelated();
-  res.json({ message: 'Müşteri silindi.' });
-});
-
-// Bir siparişi/işi siler - yalnızca süper admin. Tamamlanmış/ödenmiş bir
-// işin yanlışlıkla silinip mali kayıtların bozulmaması için, ödemesi
-// alınmış (payment_status='released' ya da 'held') işlerin silinmesi
-// engellenir - bunlar yalnızca durum değiştirilerek (iptal vb.) yönetilebilir.
-router.delete('/bookings/:id', requireSuperAdmin, (req, res) => {
-  const { id } = req.params;
-  const job = db.prepare(`SELECT id, payment_status FROM cleaning_jobs WHERE id = ?`).get(id);
-  if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-  if (['held', 'released'].includes(job.payment_status)) {
-    return res.status(409).json({ error: 'Ödemesi alınmış/tutulan bir sipariş silinemez.' });
-  }
-  db.prepare(`DELETE FROM cleaning_jobs WHERE id = ?`).run(id);
-  res.json({ message: 'Sipariş silindi.' });
 });
 
 // Giriş yapmış admin kendi şifresini değiştirir.
@@ -1272,66 +696,6 @@ router.put('/account/password', (req, res) => {
   const newHash = bcrypt.hashSync(newPassword, 10);
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(newHash, req.user.id);
   res.json({ message: 'Şifre güncellendi.' });
-});
-
-// --- Performans Paneli (personel + müşteri) ---------------------------------
-// NOT: service_score (temizliğe verilen puan) ve staff_score (personele
-// verilen puan) ayrı sütunlar. Şirket geneli "Genel Kalite Puanımız" kartı,
-// personel ortalamalarının ortalaması DEĞİL - her işin kendi puanı üzerinden
-// hesaplanıyor (çok değerlendirmesi olan personel, az olana göre daha doğru
-// ağırlıkta sayılsın diye).
-router.get('/performance/staff', (req, res) => {
-  const staffRows = db.prepare(`SELECT id, name FROM users WHERE account_type = 'staff' ORDER BY name ASC`).all();
-  const jobRows = db.prepare(`
-    SELECT assigned_staff_id, service_score, staff_score
-    FROM cleaning_jobs
-    WHERE assigned_staff_id IS NOT NULL AND (service_score IS NOT NULL OR staff_score IS NOT NULL)
-  `).all();
-
-  const byStaff = {};
-  const allCombinedScores = [];
-  jobRows.forEach((j) => {
-    if (!byStaff[j.assigned_staff_id]) {
-      byStaff[j.assigned_staff_id] = { serviceSum: 0, serviceCount: 0, staffSum: 0, staffCount: 0 };
-    }
-    const b = byStaff[j.assigned_staff_id];
-    if (j.service_score !== null) { b.serviceSum += j.service_score; b.serviceCount += 1; }
-    if (j.staff_score !== null) { b.staffSum += j.staff_score; b.staffCount += 1; }
-    if (j.service_score !== null && j.staff_score !== null) allCombinedScores.push((j.service_score + j.staff_score) / 2);
-    else if (j.staff_score !== null) allCombinedScores.push(j.staff_score);
-    else if (j.service_score !== null) allCombinedScores.push(j.service_score);
-  });
-
-  const staff = staffRows.map((s) => {
-    const b = byStaff[s.id] || { serviceSum: 0, serviceCount: 0, staffSum: 0, staffCount: 0 };
-    const serviceAvg = b.serviceCount ? Math.round((b.serviceSum / b.serviceCount) * 10) / 10 : null;
-    const staffAvg = b.staffCount ? Math.round((b.staffSum / b.staffCount) * 10) / 10 : null;
-    const overallAvg = (serviceAvg !== null && staffAvg !== null)
-      ? Math.round(((serviceAvg + staffAvg) / 2) * 10) / 10
-      : (staffAvg !== null ? staffAvg : serviceAvg);
-    const ratingCount = Math.max(b.serviceCount, b.staffCount);
-    return { id: s.id, name: s.name, serviceAvg, staffAvg, overallAvg, ratingCount };
-  }).sort((a, b) => (b.overallAvg ?? -1) - (a.overallAvg ?? -1));
-
-  const companyAvg = allCombinedScores.length
-    ? Math.round((allCombinedScores.reduce((a, b) => a + b, 0) / allCombinedScores.length) * 10) / 10
-    : null;
-
-  res.json({ companyAvg, staff });
-});
-
-router.get('/performance/customers', (req, res) => {
-  const rows = db.prepare(`
-    SELECT u.id, u.name, u.company_name, u.account_type,
-      (SELECT COUNT(*) FROM cleaning_jobs j JOIN properties p ON p.id = j.property_id WHERE p.owner_id = u.id) AS orderCount,
-      (SELECT COUNT(*) FROM promo_code_redemptions r
-         JOIN promo_codes pc ON pc.id = r.promo_code_id
-         WHERE r.customer_id = u.id AND pc.source = 'referral') AS referralUsedCount
-    FROM users u
-    WHERE u.account_type IN ('individual','company')
-    ORDER BY orderCount DESC
-  `).all();
-  res.json({ customers: rows });
 });
 
 module.exports = router;
