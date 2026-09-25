@@ -7,6 +7,18 @@ const { syncPropertyCalendar } = require('../services/icalSync');
 const router = express.Router();
 router.use(requireAuth);
 
+// Şu an sadece bu 4 şehirde hizmet veriyoruz - müşteriler sadece bu
+// şehirlerdeki mülkler için sipariş verebilsin diye mülk ekleme/düzenleme
+// burada kısıtlanıyor. Büyük/küçük harf ve baştaki/sondaki boşluk farkları
+// tolere ediliyor (ör. "tivat ", "TIVAT" -> "Tivat").
+const ACTIVE_CITIES = ['Tivat', 'Budva', 'Kotor', 'Podgorica'];
+function normalizeActiveCity(city) {
+  if (!city) return null;
+  const trimmed = String(city).trim();
+  const match = ACTIVE_CITIES.find((c) => c.toLowerCase() === trimmed.toLowerCase());
+  return match || null;
+}
+
 // Kullanıcının erişebildiği mülkler: kendi sahip olduğu + delege olarak
 // kabul edildiği mülkler (yönetim şirketi senaryosu, şablon 7.1).
 router.get('/', (req, res) => {
@@ -29,33 +41,36 @@ router.post('/', (req, res) => {
   const {
     name, address, city, icalUrl, sizeSqm, latitude, longitude, category, buildingName,
     floorCount, sqmPerFloor, elevatorCapacity,
-    // Tekne (yelkenli) mulkune ozgu alanlar - digerlerinde hepsi null gelir.
-    boatClass, boatType, cabinCount, lengthFt, hasCanvas, berthNumber,
   } = req.body;
   if (!name) return res.status(400).json({ error: 'name zorunlu.' });
 
-  const finalCategory = ['apartment', 'house', 'office', 'common_area', 'boat'].includes(category) ? category : 'apartment';
+  // Şu an sadece Tivat/Budva/Kotor/Podgorica'da hizmet veriyoruz - bu
+  // şehirlerin dışında bir mülk eklenmeye çalışılırsa reddediliyor (sessizce
+  // kabul edip sonra dağıtımın hiçbir personele ulaşmaması yerine, en
+  // başta net bir hata dönmek daha doğru).
+  const normalizedCity = normalizeActiveCity(city);
+  if (!normalizedCity) {
+    return res.status(400).json({
+      error: `Şu an sadece şu şehirlerde hizmet veriyoruz: ${ACTIVE_CITIES.join(', ')}.`,
+      allowedCities: ACTIVE_CITIES,
+    });
+  }
+
+  const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(category) ? category : 'apartment';
   const id = uuid();
   db.prepare(
     `INSERT INTO properties
        (id, owner_id, name, category, building_name, address, city, latitude, longitude,
-        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url,
-        boat_class, boat_type, cabin_count, length_ft, has_canvas, berth_number)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        size_sqm, floor_count, sqm_per_floor, elevator_capacity, ical_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
-    id, req.user.id, name, finalCategory, buildingName || null, address || null, city || null,
+    id, req.user.id, name, finalCategory, buildingName || null, address || null, normalizedCity,
     latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
     sizeSqm ? Number(sizeSqm) : null,
     floorCount ? Number(floorCount) : null,
     sqmPerFloor ? Number(sqmPerFloor) : null,
     elevatorCapacity ? Number(elevatorCapacity) : null,
-    icalUrl || null,
-    finalCategory === 'boat' ? (boatClass || 'sailboat') : null,
-    finalCategory === 'boat' ? (boatType || null) : null,
-    finalCategory === 'boat' && cabinCount ? Number(cabinCount) : null,
-    finalCategory === 'boat' && lengthFt ? Number(lengthFt) : null,
-    finalCategory === 'boat' ? (hasCanvas ? 1 : 0) : null,
-    finalCategory === 'boat' ? (berthNumber || null) : null
+    icalUrl || null
   );
 
   res.status(201).json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
@@ -65,6 +80,11 @@ router.post('/', (req, res) => {
 // farklı lokasyonlarda sahip olduğu birden fazla mülkü tek istekte, hızlıca
 // eklemesi için. Her satır kendi tip+m²+konumunu taşıyor, ortak alanları
 // (adres/şehir) her satırda ayrı ayrı da verebilir - liste esnek.
+// NOT: Bulk eklemede geçersiz şehirli tek bir satır yüzünden TÜM isteği
+// reddetmek yerine (yönetim şirketi 20 satır girip birinde yazım hatası
+// yapınca hepsini kaybetmesin diye), sadece o satır atlanıyor ve
+// `skipped` listesinde nedeniyle birlikte geri dönülüyor - cevap şekli bu
+// yüzden artık düz dizi değil, { properties, skipped } nesnesi.
 router.post('/bulk', (req, res) => {
   const { properties } = req.body;
   if (!Array.isArray(properties) || properties.length === 0) {
@@ -79,14 +99,26 @@ router.post('/bulk', (req, res) => {
   );
 
   const created = [];
+  const skipped = [];
   const insertMany = db.transaction((rows) => {
-    for (const row of rows) {
-      if (!row || !row.name) continue;
+    rows.forEach((row, index) => {
+      if (!row || !row.name) {
+        skipped.push({ index, name: row ? row.name : null, reason: 'İsim zorunlu.' });
+        return;
+      }
+      const normalizedCity = normalizeActiveCity(row.city);
+      if (!normalizedCity) {
+        skipped.push({
+          index, name: row.name,
+          reason: `Geçersiz/desteklenmeyen şehir ("${row.city || ''}"). Şu an sadece: ${ACTIVE_CITIES.join(', ')}.`,
+        });
+        return;
+      }
       const finalCategory = ['apartment', 'house', 'office', 'common_area'].includes(row.category) ? row.category : 'apartment';
       const id = uuid();
       insert.run(
         id, req.user.id, row.name, finalCategory, row.buildingName || null,
-        row.address || null, row.city || null,
+        row.address || null, normalizedCity,
         row.latitude ? Number(row.latitude) : null, row.longitude ? Number(row.longitude) : null,
         row.sizeSqm ? Number(row.sizeSqm) : null,
         row.floorCount ? Number(row.floorCount) : null,
@@ -95,7 +127,7 @@ router.post('/bulk', (req, res) => {
         row.icalUrl || null
       );
       created.push(id);
-    }
+    });
   });
   insertMany(properties);
 
@@ -103,7 +135,7 @@ router.post('/bulk', (req, res) => {
   const rows = created.length
     ? db.prepare(`SELECT * FROM properties WHERE id IN (${placeholders})`).all(...created)
     : [];
-  res.status(201).json(rows);
+  res.status(201).json({ properties: rows, skipped });
 });
 
 function canAccessProperty(userId, propertyId) {
@@ -135,10 +167,21 @@ router.put('/:id', (req, res) => {
   const {
     name, address, city, sizeSqm, latitude, longitude, buildingName,
     floorCount, sqmPerFloor, elevatorCapacity, bedroomCount, bathroomCount,
-    // Tekne mulkune ozgu alanlar - diger kategorilerde undefined gelir,
-    // COALESCE sayesinde mevcut deger korunur.
-    boatType, cabinCount, lengthFt, hasCanvas, berthNumber,
   } = req.body;
+
+  // Şehir alanı gönderildiyse (değiştirilmek isteniyorsa) 4 aktif şehirden
+  // biri olmalı - göndermezse (COALESCE ile) mevcut değeri korunuyor,
+  // eski/legacy kayıtlar bu yüzden burada bozulmuyor.
+  let normalizedCity = null;
+  if (city) {
+    normalizedCity = normalizeActiveCity(city);
+    if (!normalizedCity) {
+      return res.status(400).json({
+        error: `Şu an sadece şu şehirlerde hizmet veriyoruz: ${ACTIVE_CITIES.join(', ')}.`,
+        allowedCities: ACTIVE_CITIES,
+      });
+    }
+  }
 
   db.prepare(
     `UPDATE properties SET
@@ -146,20 +189,14 @@ router.put('/:id', (req, res) => {
        size_sqm = COALESCE(?, size_sqm), latitude = COALESCE(?, latitude), longitude = COALESCE(?, longitude),
        building_name = COALESCE(?, building_name), floor_count = COALESCE(?, floor_count),
        sqm_per_floor = COALESCE(?, sqm_per_floor), elevator_capacity = COALESCE(?, elevator_capacity),
-       bedroom_count = COALESCE(?, bedroom_count), bathroom_count = COALESCE(?, bathroom_count),
-       boat_type = COALESCE(?, boat_type), cabin_count = COALESCE(?, cabin_count),
-       length_ft = COALESCE(?, length_ft), has_canvas = COALESCE(?, has_canvas),
-       berth_number = COALESCE(?, berth_number)
+       bedroom_count = COALESCE(?, bedroom_count), bathroom_count = COALESCE(?, bathroom_count)
      WHERE id = ?`
   ).run(
-    name || null, address || null, city || null,
+    name || null, address || null, normalizedCity,
     sizeSqm ? Number(sizeSqm) : null, latitude ? Number(latitude) : null, longitude ? Number(longitude) : null,
     buildingName || null, floorCount ? Number(floorCount) : null,
     sqmPerFloor ? Number(sqmPerFloor) : null, elevatorCapacity ? Number(elevatorCapacity) : null,
     bedroomCount ? Number(bedroomCount) : null, bathroomCount ? Number(bathroomCount) : null,
-    boatType || null, cabinCount ? Number(cabinCount) : null,
-    lengthFt ? Number(lengthFt) : null, hasCanvas === undefined ? null : (hasCanvas ? 1 : 0),
-    berthNumber || null,
     id
   );
   res.json(db.prepare('SELECT * FROM properties WHERE id = ?').get(id));
