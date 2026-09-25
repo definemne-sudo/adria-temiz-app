@@ -56,9 +56,14 @@ const COMMON_AREA_SUB_DEFS = [
   },
 ];
 
+// active: false -> müşteri uygulamasında ekstra hizmet listesinde
+// GÖSTERİLMEZ ve yeni siparişlerde SEÇİLEMEZ (calcAddonsTotal reddeder).
+// Geçmişte bu ekstralarla verilmiş siparişler (addons kolonunda saklı JSON)
+// etkilenmez - sadece yeni seçim engelleniyor. Geri açmak için `active`
+// satırını silmek/true yapmak yeterli, tanım burada duruyor.
 const ADDON_DEFS = [
-  { key: 'carpet', name: 'Halı yıkama', unitLabel: 'adet' },
-  { key: 'upholstery', name: 'Koltuk yıkama', unitLabel: 'adet' },
+  { key: 'carpet', name: 'Halı yıkama', unitLabel: 'adet', active: false },
+  { key: 'upholstery', name: 'Koltuk yıkama', unitLabel: 'adet', active: false },
 ];
 
 // MICISTO'nun her tamamlanan işten aldığı komisyon oranı - personel
@@ -137,8 +142,11 @@ function getAllServices() {
 function getAllCommonAreaSubOptions() {
   return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key));
 }
+// Müşteri uygulamasının çağırdığı /services ucu buradan besleniyor - pasif
+// (active: false) ekstralar bu listeye hiç girmiyor, yani seçenek olarak
+// görünmüyor.
 function getAllAddons() {
-  return ADDON_DEFS.map((a) => getAddon(a.key));
+  return ADDON_DEFS.filter((a) => a.active !== false).map((a) => getAddon(a.key));
 }
 function getSuppliesFees() {
   return {
@@ -201,6 +209,11 @@ function calcAddonsTotal(addons) {
   if (!Array.isArray(addons) || addons.length === 0) return 0;
   return addons.reduce((sum, a) => {
     const addon = getAddon(a.key);
+    // Pasif (active: false) bir ekstra - UI'da gösterilmiyor ama biri
+    // doğrudan API'ye göndermeye çalışırsa yine de reddedilir.
+    if (addon.active === false) {
+      throw new Error(`${addon.name} şu anda hizmet dışı.`);
+    }
     const qty = Math.max(1, Number(a.quantity) || 1);
     return sum + addon.rate * qty;
   }, 0);
