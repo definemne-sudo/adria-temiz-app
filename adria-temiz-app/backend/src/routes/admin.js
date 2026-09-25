@@ -222,8 +222,18 @@ router.get('/bookings', (req, res) => {
   const pageSize = 25;
   const offset = (page - 1) * pageSize;
 
-  const where = status ? `WHERE j.status = ?` : '';
-  const params = status ? [status] : [];
+  // Sipariş numarasına göre hızlı arama - admin panelinde "Sipariş No" kutusuna
+  // yazılan değer buraya geliyor. Sadece rakam kabul ediyoruz (order_no
+  // INTEGER sütun, rastgele metin gönderilirse anlamsız bir sorgu olur).
+  const orderNo = req.query.orderNo && /^\d+$/.test(String(req.query.orderNo).trim())
+    ? parseInt(req.query.orderNo, 10)
+    : null;
+
+  const conditions = [];
+  const params = [];
+  if (status) { conditions.push('j.status = ?'); params.push(status); }
+  if (orderNo !== null) { conditions.push('j.order_no = ?'); params.push(orderNo); }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const total = db
     .prepare(`SELECT COUNT(*) AS c FROM cleaning_jobs j ${where}`)
@@ -231,7 +241,7 @@ router.get('/bookings', (req, res) => {
 
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
+      `SELECT j.id, j.order_no, j.service_key, j.status, j.checkout_at, j.completed_at, j.price, j.payment_method, j.payment_status,
               j.required_staff_count,
               p.name AS property_name, p.city AS property_city,
               u.name AS customer_name, u.account_type AS customer_type,
