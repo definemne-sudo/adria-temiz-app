@@ -200,6 +200,46 @@ const API = (location.hostname === 'localhost' || location.hostname === '127.0.0
   ? 'http://localhost:4000/api'
   : 'https://adria-temiz-app-production.up.railway.app/api';
 
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('admin-service-worker.js').catch(() => {});
+  });
+}
+
+// --- Push Bildirimleri (yeni sipariş, MICISTORad'daki ile aynı desen) ---
+// Panel kapalıyken/sekme arka plandayken bile admin'e anlık push
+// bildirimi gitmesi için: izin iste, backend'den VAPID public key al,
+// tarayıcının push aboneliğini oluştur ve backend'e kaydet. İzin
+// verilmezse ya da tarayıcı desteklemiyorsa sessizce geçilir - panel
+// açıkken zaten çalışan sesli+masaüstü uyarı (startGlobalAlertPolling)
+// devam eder, sadece panel kapalıyken bildirim gelmez.
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+async function ensurePushSubscription(){
+  try{
+    if(!state.token) return false;
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    const permission = await Notification.requestPermission();
+    if(permission !== 'granted') return false;
+
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      const { publicKey } = await fetch(API + '/push/vapid-public-key').then(r => r.json());
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+    await api('/push/subscribe', { method:'POST', body: JSON.stringify(sub.toJSON()) });
+    return true;
+  }catch(e){ return false; }
+}
+
 const BRAND_MARK = `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;">
   <circle cx="100" cy="100" r="96" fill="#1D9E73"/>
   <path d="M58,122 C55,78 92,50 145,52 C147,104 118,138 76,138 C68,138 61,132 58,122 Z" fill="#F6FBF8"/>
@@ -363,6 +403,8 @@ tr: {
   vatNetLabel: "Net Tutar",
   vatAmountLabel: "KDV",
   vatTotalLabel: "Toplam",
+  cardFeeLabel: "Kart işlem ücreti",
+  cardFeeSplitNote: "personel/MICISTO %50/%50 paylaşır",
   fieldPayoutCycleDays: "Personel Ödeme Döngüsü (gün)",
   myAccountTitle: "Hesabım",
   fieldCurrentPassword: "Mevcut Şifre",
@@ -573,6 +615,11 @@ tr: {
   typeIndividual: "Bireysel",
   typeCompany: "Şirket",
   emptyBookings: "Sipariş bulunamadı.",
+  colOrderNo: "No",
+  orderNoSearchPlaceholder: "Sipariş no ile ara...",
+  searchBtn: "Ara",
+  clearFilterBtn: "Temizle",
+  emptyOrderNoSearch: "#{{no}} numaralı sipariş bulunamadı.",
   emptyWorkers: "Personel bulunamadı.",
   emptyCustomers: "Müşteri bulunamadı.",
   liveMapTitle: "Canlı Harita",
@@ -826,6 +873,8 @@ en: {
   vatNetLabel: "Net Amount",
   vatAmountLabel: "VAT",
   vatTotalLabel: "Total",
+  cardFeeLabel: "Card processing fee",
+  cardFeeSplitNote: "split 50/50 between staff/MICISTO",
   fieldPayoutCycleDays: "Staff Payout Cycle (days)",
   myAccountTitle: "My Account",
   fieldCurrentPassword: "Current Password",
@@ -1033,6 +1082,11 @@ en: {
   typeIndividual: "Individual",
   typeCompany: "Company",
   emptyBookings: "No bookings found.",
+  colOrderNo: "No.",
+  orderNoSearchPlaceholder: "Search by order no...",
+  searchBtn: "Search",
+  clearFilterBtn: "Clear",
+  emptyOrderNoSearch: "No order found with number #{{no}}.",
   emptyWorkers: "No staff found.",
   emptyCustomers: "No customers found.",
   liveMapTitle: "Live Map",
@@ -1285,6 +1339,8 @@ me: {
   vatNetLabel: "Neto Iznos",
   vatAmountLabel: "PDV",
   vatTotalLabel: "Ukupno",
+  cardFeeLabel: "Naknada za obradu kartice",
+  cardFeeSplitNote: "podijeljeno 50/50 osoblje/MICISTO",
   fieldPayoutCycleDays: "Ciklus isplate osoblja (dana)",
   myAccountTitle: "Moj nalog",
   fieldCurrentPassword: "Trenutna lozinka",
@@ -1492,6 +1548,11 @@ me: {
   typeIndividual: "Individualni",
   typeCompany: "Kompanija",
   emptyBookings: "Narudžbe nisu pronađene.",
+  colOrderNo: "Br.",
+  orderNoSearchPlaceholder: "Pretraži po broju narudžbe...",
+  searchBtn: "Pretraži",
+  clearFilterBtn: "Očisti",
+  emptyOrderNoSearch: "Narudžba sa brojem #{{no}} nije pronađena.",
   emptyWorkers: "Osoblje nije pronađeno.",
   emptyCustomers: "Klijenti nisu pronađeni.",
   liveMapTitle: "Mapa uživo",
@@ -1606,6 +1667,7 @@ let state = {
   applications: [],
   bookings: null,
   bookingsFilter: 'all',
+  orderNoSearch: '',
   applicationsFilter: 'pending',
   appDetailId: null,
   bookingDetailId: null,
@@ -2038,7 +2100,10 @@ function vatBreakdownHtml(j){
   if(j.net_price == null || j.vat_amount == null){
     return `${j.price} €`;
   }
-  return `${T.vatNetLabel}: ${j.net_price} € &nbsp;+&nbsp; ${T.vatAmountLabel}: ${j.vat_amount} € <br/><span style="color:var(--navy);">${T.vatTotalLabel}: ${j.price} €</span>`;
+  const cardFeeLine = (j.card_fee != null && j.card_fee > 0)
+    ? `<br/><span style="color:var(--muted); font-size:11px;">${T.cardFeeLabel}: ${j.card_fee} € (${T.cardFeeSplitNote})</span>`
+    : '';
+  return `${T.vatNetLabel}: ${j.net_price} € &nbsp;+&nbsp; ${T.vatAmountLabel}: ${j.vat_amount} € <br/><span style="color:var(--navy);">${T.vatTotalLabel}: ${j.price} €</span>${cardFeeLine}`;
 }
 
 function jobPaymentBadge(method){
@@ -2053,19 +2118,27 @@ function renderBookings(){
     <div><h2>${T.bookingsTitle}</h2><p>${T.bookingsSubtitle}</p></div>
     ${state.user.isSuperAdmin ? `<button class="btn ochre btn-sm" id="open-create-order">${T.createOrderBtn}</button>` : ''}
   </div>
-  <div class="option-row-filters" style="display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;">
+  <div class="option-row-filters" style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
     ${['all','pending','assigned','in_progress','done'].map(s => `
       <button class="btn ${state.bookingsFilter===s?'ochre':'ghost'} btn-sm" data-booking-filter="${s}">${s==='all'?T.filterAll:jobStatusLabel(s==='done'?'done':s)}</button>
     `).join('')}
   </div>
-  ${!b ? `<div class="empty-state">…</div>` : b.bookings.length === 0 ? `<div class="empty-state">${T.emptyBookings}</div>` : `
+  <div style="display:flex; gap:8px; margin-bottom:16px; align-items:center; flex-wrap:wrap;">
+    <input type="text" id="order-no-search" inputmode="numeric" placeholder="${T.orderNoSearchPlaceholder}"
+           value="${state.orderNoSearch || ''}"
+           style="flex:0 1 220px; padding:9px 12px; border:1px solid var(--line); border-radius:9px; font-size:13px;" />
+    <button class="btn ochre btn-sm" id="order-no-search-btn">${T.searchBtn}</button>
+    ${state.orderNoSearch ? `<button class="btn ghost btn-sm" id="order-no-clear-btn">${T.clearFilterBtn}</button>` : ''}
+  </div>
+  ${!b ? `<div class="empty-state">…</div>` : b.bookings.length === 0 ? `<div class="empty-state">${state.orderNoSearch ? tt('emptyOrderNoSearch',{no:state.orderNoSearch}) : T.emptyBookings}</div>` : `
     <table>
       <thead><tr>
-        <th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colStaffCol}</th><th>${T.colPrice}</th><th>${T.colPayment}</th><th>${T.colStatus}</th>
+        <th>${T.colOrderNo}</th><th>${T.colService}</th><th>${T.colCustomerCol}</th><th>${T.colStaffCol}</th><th>${T.colPrice}</th><th>${T.colPayment}</th><th>${T.colStatus}</th>
       </tr></thead>
       <tbody>
         ${b.bookings.map(j => `
           <tr data-open-booking-detail="${j.id}" style="cursor:pointer;">
+            <td><strong style="color:var(--navy);">#${j.order_no != null ? j.order_no : '—'}</strong></td>
             <td><strong>${serviceLabel(j.service_key)}</strong><br/><span style="color:var(--muted); font-size:11.5px;">${j.property_name} · ${j.property_city||''}</span></td>
             <td>${j.customer_name}</td>
             <td>${j.staff_name || T.noStaffAssigned}</td>
@@ -3492,7 +3565,10 @@ async function loadApplications(){
 async function loadBookings(page){
   const p = page || (state.bookings ? state.bookings.page : 1);
   const status = state.bookingsFilter === 'all' ? '' : `&status=${state.bookingsFilter}`;
-  state.bookings = await api(`/admin/bookings?page=${p}${status}`);
+  // Siparis numarasi aramasi aktifse sorguya eklenir - backend gecersiz/bos
+  // degeri zaten yok sayar, bu yuzden ekstra kontrol gerekmiyor.
+  const orderNo = state.orderNoSearch ? `&orderNo=${encodeURIComponent(state.orderNoSearch)}` : '';
+  state.bookings = await api(`/admin/bookings?page=${p}${status}${orderNo}`);
   render();
 }
 async function loadWorkers(){
@@ -3809,6 +3885,7 @@ function attachHandlers(){
     // arka planda çalışsın diye giriş sonrası hemen başlatıyoruz.
     requestNotificationPermission();
     startGlobalAlertPolling();
+    ensurePushSubscription();
   };
 
   document.querySelectorAll('[data-page]').forEach(el => el.onclick = async () => {
@@ -4373,6 +4450,25 @@ function attachHandlers(){
     state.bookingsFilter = el.dataset.bookingFilter;
     await loadBookings(1);
   });
+
+  // Siparis numarasi ile hizli arama - hem butona basarak hem Enter ile
+  // calisir (admin genelde numarayi yazip Enter'a basar).
+  const orderNoInput = document.getElementById('order-no-search');
+  const runOrderNoSearch = async () => {
+    state.orderNoSearch = (orderNoInput ? orderNoInput.value : '').trim();
+    await loadBookings(1);
+    // render() sonrasi input yeniden olusturuldugu icin odagi geri veriyoruz
+    const refreshed = document.getElementById('order-no-search');
+    if(refreshed) { refreshed.focus(); refreshed.setSelectionRange(refreshed.value.length, refreshed.value.length); }
+  };
+  if(orderNoInput){
+    orderNoInput.onkeydown = async (e) => { if(e.key === 'Enter'){ e.preventDefault(); await runOrderNoSearch(); } };
+  }
+  const orderNoBtn = document.getElementById('order-no-search-btn');
+  if(orderNoBtn) orderNoBtn.onclick = runOrderNoSearch;
+  const orderNoClear = document.getElementById('order-no-clear-btn');
+  if(orderNoClear) orderNoClear.onclick = async () => { state.orderNoSearch = ''; await loadBookings(1); };
+
   const bookingPrev = document.getElementById('booking-prev-page');
   if(bookingPrev) bookingPrev.onclick = async () => { await loadBookings(state.bookings.page - 1); };
   const bookingNext = document.getElementById('booking-next-page');
@@ -4498,6 +4594,7 @@ function attachHandlers(){
     try{ await loadApplications(); }catch(err){ console.error('loadApplications hata:', err); }
     requestNotificationPermission();
     startGlobalAlertPolling();
+    ensurePushSubscription();
   }
 })();
 </script>
