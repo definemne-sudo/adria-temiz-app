@@ -33,40 +33,6 @@ const SERVICE_DEFS = [
     isGroup: true, // fiyat sabit değil, alt seçimlere göre hesaplanır
     accountTypes: ['company'],
   },
-  {
-    key: 'boat',
-    name: 'Tekne Temizliği',
-    description: 'Dış, iç ve kanvas/tente bakımından istediklerini seç.',
-    isGroup: true, // ortak alan gibi, fiyat alt secimlere gore hesaplanir
-    accountTypes: ['individual', 'company'],
-  },
-];
-
-// ONEMLI: 50ft ve uzeri teknelerde otomatik fiyat GOSTERILMEZ - musteri
-// "Fiyat Teklifi Al" ile admin'e yonlendirilir (bkz. musteri uygulamasi
-// renderConfigStep). Bu esik degeri hem frontend hem backend'de ayni
-// olmali; degistirilirse iki tarafta da guncellenmeli.
-const BOAT_QUOTE_REQUIRED_LENGTH_FT = 50;
-
-const BOAT_SUB_DEFS = [
-  {
-    key: 'boat_exterior',
-    name: 'Dış Temizlik',
-    description: 'Gövde, güverte, tik ahşap, paslanmaz çelik ve cam temizliği.',
-    paramType: 'boat_length', // { lengthFt }
-  },
-  {
-    key: 'boat_interior',
-    name: 'İç Temizlik',
-    description: 'Kabin, mutfak (galley), banyo (head) ve zemin temizliği.',
-    paramType: 'boat_length', // { lengthFt }
-  },
-  {
-    key: 'boat_canvas',
-    name: 'Kanvas / Tente Bakımı',
-    description: 'Bimini ve tente kanvasının nazik, deniz tipi ürünle temizliği.',
-    paramType: 'boat_length', // { lengthFt } - yalnizca has_canvas=true olan teknelerde gosterilir
-  },
 ];
 
 const COMMON_AREA_SUB_DEFS = [
@@ -111,37 +77,6 @@ function getPayoutCycleDays() {
   return getPricingValue('system.payoutCycleDays', 15);
 }
 
-// Kart ile odeme su an sistemde ACIK mi? Lansmanda KAPALI baslatiliyor
-// (sadece nakit) - odeme islemcisi entegrasyonu hazir olunca bu ayar
-// (system.cardPaymentEnabled) 1'e cevrilerek tekrar acilabilir, kod
-// tarafinda baska hicbir degisiklik gerekmez.
-function isCardPaymentEnabled() {
-  return getPricingValue('system.cardPaymentEnabled', 0) === 1;
-}
-
-// Karadağ standart KDV oranı (varsayılan %21). Admin panelinden
-// değiştirilebilir - bkz. /admin/settings.
-function getVatRate() {
-  return getPricingValue('system.vatRate', 0.21);
-}
-
-// Kart odeme islemcisinin (Stripe/Adyen vb.) aldigi ucret - yuzde + sabit
-// kisim. SADECE kart odemelerinde uygulanir, nakitte hic yoktur (islemciye
-// hicbir sey odenmez). Musteriye YANSITILMAZ - personel/MICISTO arasinda
-// %50/%50 paylasilir (bkz. calcCardFee, jobs.js createCleaningJob).
-function getCardFeeRate() {
-  return {
-    percent: getPricingValue('system.cardFeePercent', 0.029),
-    fixed: getPricingValue('system.cardFeeFixed', 0.30),
-  };
-}
-
-// Bir islemin (KDV DAHIL brut) fiyatindan kart islemci ucretini hesaplar.
-function calcCardFee(grossPrice) {
-  const { percent, fixed } = getCardFeeRate();
-  return Math.round((grossPrice * percent + fixed) * 100) / 100;
-}
-
 function getPricingValue(key, fallback = 0) {
   const row = db.prepare('SELECT value FROM pricing_settings WHERE key = ?').get(key);
   return row ? row.value : fallback;
@@ -149,34 +84,15 @@ function getPricingValue(key, fallback = 0) {
 
 // Bir hizmetin görev listesini (checklist) döner - hem admin panelinden
 // yönetiliyor hem artık müşteri uygulamasında "Checklist'i Gör" ekranında
-// gösteriliyor. "lang" gecerli degilse (tr/en/me disinda) ya da hic
-// verilmezse Turkce'ye duser - boylece eski cagrilar (lang'siz) da
-// kirilmadan calismaya devam eder.
-function getChecklist(serviceKey, lang) {
-  // NOT: 'ru' icin COALESCE kullaniyoruz - checklist maddeleri henuz
-  // Rusca'ya cevrilmemis olabilir (item_text_ru bos), bu durumda bos/null
-  // gostermek yerine Ingilizce'ye, o da yoksa Turkce'ye düşüyoruz. Diger
-  // diller (tr/en/me) icin bu tur bir fallback'e gerek yok, cunku onlarin
-  // ceviri metinleri baştan beri dolu.
-  const validLang = ['tr', 'en', 'me', 'ru'].includes(lang) ? lang : 'tr';
-  const column = validLang === 'ru'
-    ? `COALESCE(item_text_ru, item_text_en, item_text_tr)`
-    : `item_text_${validLang}`;
+// gösteriliyor.
+function getChecklist(serviceKey) {
   return db
-    .prepare(`SELECT id, ${column} AS item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC`)
-    .all(serviceKey);
-}
-
-// Admin paneli icin - checklist maddelerini UC DILDE BIRDEN dondurur
-// (duzenleme ekraninda TR/EN/ME kutularini doldurmak icin kullanilir).
-function getChecklistAllLangs(serviceKey) {
-  return db
-    .prepare('SELECT id, item_text_tr, item_text_en, item_text_me, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
+    .prepare('SELECT id, item_text, sort_order FROM service_checklists WHERE service_key = ? ORDER BY sort_order ASC, created_at ASC')
     .all(serviceKey);
 }
 
 // Yapısal tanımı + canlı fiyatlandırmayı birleştirip tek bir nesne döner.
-function getService(key, lang) {
+function getService(key) {
   const def = SERVICE_DEFS.find((s) => s.key === key);
   if (!def) throw new Error('Geçersiz hizmet türü.');
   if (def.isGroup) return def;
@@ -190,11 +106,11 @@ function getService(key, lang) {
     extraRate: getPricingValue(`${key}.extraRate`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
-    checklist: getChecklist(key, lang),
+    checklist: getChecklist(key),
   };
 }
 
-function getCommonAreaSubOption(key, lang) {
+function getCommonAreaSubOption(key) {
   const def = COMMON_AREA_SUB_DEFS.find((s) => s.key === key);
   if (!def) throw new Error('Geçersiz ortak alan alt seçeneği.');
   return {
@@ -205,49 +121,24 @@ function getCommonAreaSubOption(key, lang) {
     ratePerCapacity: getPricingValue(`${key}.ratePerCapacity`),
     min: getPricingValue(`${key}.min`),
     estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
-    checklist: getChecklist(key, lang),
+    checklist: getChecklist(key),
   };
 }
 
-// NOT: Fiyatlandirma formulu (ratePerFt vb.) henuz netlesmedi - kullaniciyla
-// birlikte ayri bir turda belirlenecek. Su an icin pricing_settings'ten
-// deger okunmaya CALISILIYOR ama hicbir varsayilan tohumlanmadi (db.js'te
-// DEFAULT_PRICING'e boat.* eklenmedi), yani su an base/ratePerFt 0 donuyor.
-// Bu bilerek boyle - musteri uygulamasi bu yuzden tekne hizmetleri icin
-// fiyat onizlemesi GOSTERMIYOR (bkz. frontend renderConfigStep), sadece
-// alt hizmet secimini/checklist'i gosteriyor. Fiyatlandirma netlesince
-// sadece pricing_settings'e boat_exterior.base vb. degerler eklenmesi
-// yeterli olacak, kod degisikligi gerekmeyecek.
-function getBoatSubOption(key, lang) {
-  const def = BOAT_SUB_DEFS.find((s) => s.key === key);
-  if (!def) throw new Error('Geçersiz tekne alt seçeneği.');
-  return {
-    ...def,
-    base: getPricingValue(`${key}.base`),
-    ratePerFt: getPricingValue(`${key}.ratePerFt`),
-    min: getPricingValue(`${key}.min`),
-    estimatedMinutes: getPricingValue(`${key}.estimatedMinutes`),
-    checklist: getChecklist(key, lang),
-  };
-}
-
-function getAddon(key, lang) {
+function getAddon(key) {
   const def = ADDON_DEFS.find((a) => a.key === key);
   if (!def) throw new Error('Geçersiz ekstra hizmet.');
-  return { ...def, rate: getPricingValue(`${key}.rate`), checklist: getChecklist(key, lang) };
+  return { ...def, rate: getPricingValue(`${key}.rate`), checklist: getChecklist(key) };
 }
 
-function getAllServices(lang) {
-  return SERVICE_DEFS.map((s) => getService(s.key, lang));
+function getAllServices() {
+  return SERVICE_DEFS.map((s) => getService(s.key));
 }
-function getAllCommonAreaSubOptions(lang) {
-  return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key, lang));
+function getAllCommonAreaSubOptions() {
+  return COMMON_AREA_SUB_DEFS.map((s) => getCommonAreaSubOption(s.key));
 }
-function getAllBoatSubOptions(lang) {
-  return BOAT_SUB_DEFS.map((s) => getBoatSubOption(s.key, lang));
-}
-function getAllAddons(lang) {
-  return ADDON_DEFS.map((a) => getAddon(a.key, lang));
+function getAllAddons() {
+  return ADDON_DEFS.map((a) => getAddon(a.key));
 }
 function getSuppliesFees() {
   return {
@@ -262,11 +153,20 @@ function calcPrice(serviceKey, { sizeSqm } = {}) {
   const price = sqm <= service.thresholdSqm
     ? service.flatPrice
     : service.flatPrice + (sqm - service.thresholdSqm) * service.extraRate;
-  // ONEMLI: fiyat en yakin 5'e degil, kurusa (2 ondalik basamaga) yuvarlanir
-  // - admin panelindeki parametrelere gore TAM/NET rakam uretmek icin.
-  // Eskiden Math.round(price/5)*5 kullaniliyordu, bu da GERCEK rezervasyon
-  // fiyatini (sadece onizlemeyi degil) bloklar halinde yanlis yuvarliyordu.
-  return Math.max(service.min, Math.round(price * 100) / 100);
+  return Math.max(service.min, Math.round(price / 5) * 5);
+}
+
+// Yüksek m²'li işlerde birden fazla personel gönderilmesi gerekiyor - her
+// 70 m²'ye 1 personel. Ortak Alan Temizliği (merdiven/koridor/asansör) bu
+// kuralın DIŞINDA - o hizmette mülk büyüklüğü değil kat sayısı/kapasite gibi
+// ayrı parametreler var ve her zaman tek personel yeterli sayılıyor.
+// sizeSqm boş/0 ise (ör. ortak alan ya da eksik veri) her zaman 1 döner.
+const SQM_PER_STAFF = 70;
+function calcRequiredStaffCount(serviceKey, sizeSqm) {
+  if (serviceKey === 'common_area') return 1;
+  const sqm = Number(sizeSqm) || 0;
+  if (sqm <= 0) return 1;
+  return Math.max(1, Math.ceil(sqm / SQM_PER_STAFF));
 }
 
 // Tek bir ortak alan alt seçeneğinin fiyatı. Sabit bir "başlangıç ücreti"
@@ -284,8 +184,7 @@ function calcCommonAreaSubPrice(key, params = {}) {
   } else if (sub.paramType === 'elevator') {
     price += (Number(params.elevatorCapacity) || 0) * sub.ratePerCapacity;
   }
-  // ONEMLI: burada da ayni duzeltme - en yakin 5 yerine kurusa yuvarlama.
-  return Math.max(sub.min, Math.round(price * 100) / 100);
+  return Math.max(sub.min, Math.round(price / 5) * 5);
 }
 
 // selections: [{ key, floorCount?, sqmPerFloor?, elevatorCapacity? }]
@@ -315,22 +214,20 @@ function calcSuppliesFee({ hasEquipment, hasChemicals }) {
   return fee;
 }
 
-// Bir işin fiyatından MICISTO komisyonu düşüldükten sonra personele
-// kalan net kazanç. cardFeeStaffShare: kart ile odenen islerde, personelin
-// karsilamasi gereken kart islemci ucretinin YARISI (bkz. calcCardFee) -
-// nakit islerde bu her zaman 0'dir, cunku hic kart ucreti dogmaz.
-function calcNetEarning(price, cardFeeStaffShare = 0) {
-  return Math.round((price * (1 - getCommissionRate()) - cardFeeStaffShare) * 100) / 100;
+// Bir işin fiyatından MICISTO komisyonu düşüldükten sonra TOPLAM (tüm
+// atanan personel için birlikte) kalan net kazanç. Tek personelli işlerde
+// bu doğrudan o personelin kazancıdır.
+function calcNetEarning(price) {
+  return Math.round(price * (1 - getCommissionRate()) * 100) / 100;
 }
 
-// MICISTO'nun GERCEK marji - calcNetEarning'in "ayna"si. ONEMLI: Komisyonu
-// "netBase - calcNetEarning(netBase)" seklinde CIKARMA YONTEMIYLE bulmaya
-// CALISMAYIN - kart kesintisi personel tarafinda dusulunce bu yontem
-// kesintiyi yanlislikla MICISTO'ya EKLENMIS gibi gosterir. Bunun yerine
-// MICISTO'nun payi HER ZAMAN bu fonksiyonla, kendi kart payi ayrica
-// dusularak ayrı hesaplanmalidir.
-function calcMicistoMargin(price, cardFeeMicistoShare = 0) {
-  return Math.round((price * getCommissionRate() - cardFeeMicistoShare) * 100) / 100;
+// Çok personelli işlerde (yüksek m², bkz. calcRequiredStaffCount), toplam
+// net kazanç atanan personel sayısına EŞİT olarak bölünür - her biri aynı
+// işi yapıyor, aynı payı alıyor. staffCount belirtilmezse/1 ise
+// calcNetEarning ile aynı sonucu verir (geriye dönük uyumlu).
+function calcNetEarningPerStaff(price, staffCount = 1) {
+  const count = Math.max(1, Number(staffCount) || 1);
+  return Math.round((calcNetEarning(price) / count) * 100) / 100;
 }
 
 // Personel performans bonusu - o dönemde (hafta/ay) çalıştığı gün sayısının
@@ -352,13 +249,6 @@ function estimateJobMinutes(serviceKey, serviceParams) {
       catch (e) { return sum; }
     }, 0);
   }
-  if (serviceKey === 'boat') {
-    const selections = (serviceParams && serviceParams.selections) || [];
-    return selections.reduce((sum, sel) => {
-      try { return sum + (getBoatSubOption(sel.key).estimatedMinutes || 0); }
-      catch (e) { return sum; }
-    }, 0);
-  }
   try { return getService(serviceKey).estimatedMinutes || 0; }
   catch (e) { return 0; }
 }
@@ -367,18 +257,14 @@ module.exports = {
   // Geriye dönük uyumluluk için düz diziler de export ediliyor (mevcut
   // kodun SERVICES/COMMON_AREA_SUB_OPTIONS/ADDONS'u doğrudan kullandığı
   // yerler için) - ama bunlar artık GETTER, her erişimde canlı hesaplanıyor.
-  // NOT: Bu getter'lar lang parametresi ALMIYOR (geriye donuk uyumluluk
-  // icin), bu yuzden hep Turkce checklist doner - lang'e duyarli yerlerde
-  // getAllServices(lang) / getAllCommonAreaSubOptions(lang) / getAllAddons(lang)
-  // fonksiyonlari DOGRUDAN cagrilmali.
   get SERVICES() { return getAllServices(); },
   get COMMON_AREA_SUB_OPTIONS() { return getAllCommonAreaSubOptions(); },
   get ADDONS() { return getAllAddons(); },
   get SUPPLIES_FEES() { return getSuppliesFees(); },
-  getCommissionRate, getPayoutCycleDays, getVatRate, getCardFeeRate, calcCardFee, isCardPaymentEnabled, getPricingValue,
-  getService, getAddon, getCommonAreaSubOption, getBoatSubOption, getChecklist, getChecklistAllLangs,
-  getAllServices, getAllCommonAreaSubOptions, getAllBoatSubOptions, getAllAddons, getSuppliesFees,
+  getCommissionRate, getPayoutCycleDays,
+  getService, getAddon, getCommonAreaSubOption, getChecklist,
+  getAllServices, getAllCommonAreaSubOptions, getAllAddons, getSuppliesFees,
   calcPrice, calcCommonAreaSubPrice, calcCommonAreaGroupTotal, calcAddonsTotal, calcSuppliesFee,
-  calcNetEarning, calcMicistoMargin, estimateJobMinutes, calcPerformanceBonus,
-  BOAT_QUOTE_REQUIRED_LENGTH_FT,
+  calcNetEarning, calcNetEarningPerStaff, calcRequiredStaffCount,
+  estimateJobMinutes, calcPerformanceBonus,
 };
