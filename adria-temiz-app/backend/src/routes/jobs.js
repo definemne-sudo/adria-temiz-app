@@ -2,11 +2,11 @@ const express = require('express');
 const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
-const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, estimateJobMinutes, calcPerformanceBonus, getCommissionRate, getVatRate, calcCardFee, isCardPaymentEnabled } = require('../services/catalog');
+const { calcPrice, calcCommonAreaSubPrice, calcAddonsTotal, calcSuppliesFee, getService, calcNetEarning, calcNetEarningPerStaff, calcRequiredStaffCount, estimateJobMinutes, calcPerformanceBonus, getCommissionRate } = require('../services/catalog');
 const { validatePromoCode, calcDiscount, redeemPromo } = require('../services/promo');
 const { dispatchJob } = require('../services/dispatch');
 const { sendPushToUser } = require('../services/push');
-const { getStaffPeriods, getStaffLifetimeTotal, getStaffPeriodJobs, round2 } = require('../services/financeCalc');
+const { getStaffPeriods, getStaffLifetimeTotal, round2 } = require('../services/financeCalc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -53,39 +53,20 @@ router.post('/validate-promo', (req, res) => {
   res.json({ valid: true, discountAmount, discountType: result.promo.discount_type, discountValue: result.promo.discount_value });
 });
 
-// Sipariş olusturmanin CEKIRDEK mantigi - hem musteri akisindan (asagidaki
-// POST /) hem de ADMIN panelinden ("sistem uzerinden yeni siparis ac")
-// AYNI fonksiyon cagrilir. Boylece admin'in olusturdugu bir siparis de,
-// musterinin olusturdugu gibi, otomatik olarak personele dispatch edilir -
-// iki ayri/farkli davranan kod yolu OLMAZ.
-//
-// skipAccessCheck: admin, KENDI mulku olmayan herhangi bir musterinin
-// mulku icin siparis acabilmeli - bu yuzden admin cagrisinda mulk sahipligi
-// kontrolu atlanir (zaten admin.js tarafinda mulkun VAR OLDUGU ayrica
-// kontrol ediliyor).
-async function createCleaningJob({
-  propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-  hasEquipment, hasChemicals, serviceParams, promoCode,
-  requestingUserId, requestingAccountType, skipAccessCheck = false, createdByAdminId = null,
-}) {
+router.post('/', async (req, res) => {
+  const {
+    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
+    hasEquipment, hasChemicals, serviceParams,
+  } = req.body;
+
   if (!['cash', 'card', 'invoice'].includes(paymentMethod)) {
-    const err = new Error("paymentMethod 'cash', 'card' veya 'invoice' olmalı.");
-    err.status = 400; throw err;
+    return res.status(400).json({ error: "paymentMethod 'cash', 'card' veya 'invoice' olmalı." });
   }
-  // Kart ile odeme lansmanda KAPALI - sadece nakit (ve yonetim sirketleri
-  // icin aylik fatura) kabul ediliyor. Odeme islemcisi entegrasyonu hazir
-  // olunca system.cardPaymentEnabled=1 yapilarak tekrar acilabilir.
-  if (paymentMethod === 'card' && !isCardPaymentEnabled()) {
-    const err = new Error('Kart ile ödeme şu anda kullanılamıyor. Lütfen nakit ödeme seçin.');
-    err.status = 400; throw err;
+  if (paymentMethod === 'invoice' && req.user.accountType !== 'company') {
+    return res.status(403).json({ error: 'Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.' });
   }
-  if (paymentMethod === 'invoice' && !skipAccessCheck && requestingAccountType !== 'company') {
-    const err = new Error('Aylık fatura seçeneği yalnızca yönetim şirketi hesapları için geçerli.');
-    err.status = 403; throw err;
-  }
-  if (!skipAccessCheck && !accessiblePropertyIds(requestingUserId).includes(propertyId)) {
-    const err = new Error('Bu mülke erişim yetkiniz yok.');
-    err.status = 403; throw err;
+  if (!accessiblePropertyIds(req.user.id).includes(propertyId)) {
+    return res.status(403).json({ error: 'Bu mülke erişim yetkiniz yok.' });
   }
 
   let checkoutAt;
@@ -93,35 +74,21 @@ async function createCleaningJob({
     getService(serviceKey);
     checkoutAt = resolveScheduledAt(urgency || 'scheduled', scheduledAt);
   } catch (err) {
-    err.status = 400; throw err;
+    return res.status(400).json({ error: err.message });
   }
 
   const property = db.prepare('SELECT * FROM properties WHERE id = ?').get(propertyId);
-  if (!property) { const err = new Error('Mülk bulunamadı.'); err.status = 404; throw err; }
   const isCommonArea = serviceKey === 'common_area';
 
-  // ONEMLI: Tekne Temizligi hizmeti henuz aktif degil (ayri/uzman ekip
-  // kurulana kadar musteri talebine acilmiyor - bkz. frontend'deki "Cok
-  // Yakinda" ekrani). Frontend zaten bu hizmete tiklamayi engelliyor, ama
-  // API DOGRUDAN cagrilirsa (ornegin eski bir istemci surumu, ya da bir
-  // hata/kotu niyetli istek), fiyatlandirma hic tanimlanmadigi icin
-  // asagidaki calcPrice() cagrisi price=NULL doner ve veritabani NOT NULL
-  // kisitina takilip 500 SUNUCU HATASI verirdi (gercek testte yakalandi).
-  // Burada erken ve net bir 400 ile engelleyip cirkin bir cokmeyi onluyoruz.
-  if (serviceKey === 'boat') {
-    const err = new Error('Tekne temizliği hizmeti şu anda aktif değil, çok yakında hizmetinizde olacak.');
-    err.status = 400; throw err;
-  }
-
   if (isCommonArea && property.category !== 'common_area') {
-    const err = new Error('Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.');
-    err.status = 400; throw err;
+    return res.status(400).json({ error: 'Ortak Alan Temizliği yalnızca "Ortak Alan" kategorili bir mülk için sipariş edilebilir.' });
   }
   if (serviceKey === 'office' && property.category !== 'office') {
-    const err = new Error('Bu hizmet yalnızca "Ofis / İşyeri" kategorili bir mülk için sipariş edilebilir.');
-    err.status = 400; throw err;
+    return res.status(400).json({ error: 'Bu hizmet yalnızca "Ofis / İşyeri" kategorili bir mülk için sipariş edilebilir.' });
   }
 
+  // Ortak alan siparişlerinde halı/koltuk gibi ekstra hizmetler yok -
+  // gönderilse bile yok sayılır.
   const addonsList = isCommonArea
     ? []
     : (Array.isArray(addons) ? addons.filter((a) => a && a.key) : []);
@@ -153,7 +120,7 @@ async function createCleaningJob({
       basePrice = calcPrice(serviceKey, { sizeSqm: property.size_sqm });
     }
   } catch (err) {
-    err.status = 400; throw err;
+    return res.status(400).json({ error: err.message });
   }
   const equipmentOk = hasEquipment !== false;
   const chemicalsOk = hasChemicals !== false;
@@ -162,43 +129,32 @@ async function createCleaningJob({
 
   let appliedPromo = null;
   let discountAmount = 0;
-  if (promoCode) {
+  if (req.body.promoCode) {
     const result = validatePromoCode({
-      code: promoCode,
-      customerId: property.owner_id,
+      code: req.body.promoCode,
+      customerId: req.user.id,
       city: property.city,
       serviceKey,
     });
-    if (result.error) { const err = new Error(result.error); err.status = 400; throw err; }
+    if (result.error) return res.status(400).json({ error: result.error });
     appliedPromo = result.promo;
     discountAmount = calcDiscount(appliedPromo, priceBeforeDiscount);
   }
 
-  // ONEMLI: "price" musterinin GERCEKTEN ODEDIGI (KDV DAHIL) tutardir.
-  // Personel/MICISTO %80/%20 payi ise KDV HARIC net tutar uzerinden
-  // hesaplanir - aksi halde MICISTO'nun devlete odeyecegi KDV, komisyonunu
-  // neredeyse sifirlar (is planinda tespit edilip duzeltilen hata, simdi
-  // koda da yansitiliyor). netPrice/vatAmount ayrica saklanir ki musteriye
-  // kesilen fiste KDV ayrica gosterilebilsin.
-  const netPrice = Math.max(0, priceBeforeDiscount - discountAmount);
-  const vatRate = getVatRate();
-  const vatAmount = Math.round(netPrice * vatRate * 100) / 100;
-  const price = Math.round((netPrice + vatAmount) * 100) / 100;
+  const price = Math.max(0, priceBeforeDiscount - discountAmount);
   const paymentStatus = paymentMethod === 'card' ? 'held' : 'unpaid';
 
-  // Kart islemci ucreti (ornek: %2,9 + 0,30 EUR) SADECE kart odemesinde
-  // dogar - nakitte islemciye hicbir sey odenmez, cardFee her zaman 0'dir.
-  // Musteriye YANSITILMAZ (fiyat/price degismez); personel/MICISTO'nun
-  // net kazanci hesaplanirken %50/%50 paylasilir (bkz. calcNetEarning
-  // cagrilari - financeCalc.js, admin.js, jobs.js).
-  const cardFee = paymentMethod === 'card' ? calcCardFee(price) : 0;
+  // Yüksek m²'li işlerde birden fazla personel gerekebilir (her 70 m²'ye 1
+  // personel, Ortak Alan Temizliği hariç) - bkz. catalog.js calcRequiredStaffCount.
+  const requiredStaffCount = calcRequiredStaffCount(serviceKey, property.size_sqm);
 
   const id = uuid();
   db.prepare(
     `INSERT INTO cleaning_jobs
        (id, property_id, service_key, addons, service_params, has_equipment, has_chemicals,
-        urgency, payment_method, checkout_at, status, source, price, net_price, vat_amount, card_fee, payment_status, promo_code_id, discount_amount, created_by_admin_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        urgency, payment_method, checkout_at, status, source, price, payment_status, promo_code_id, discount_amount,
+        required_staff_count)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'manual', ?, ?, ?, ?, ?)`
   ).run(
     id,
     property.id,
@@ -210,40 +166,19 @@ async function createCleaningJob({
     urgency || 'scheduled',
     paymentMethod,
     checkoutAt,
-    'manual',
     price,
-    netPrice,
-    vatAmount,
-    cardFee,
     paymentStatus,
     appliedPromo ? appliedPromo.id : null,
     discountAmount || null,
-    createdByAdminId
+    requiredStaffCount
   );
 
-  if (appliedPromo) redeemPromo(appliedPromo, property.owner_id, id, discountAmount);
+  if (appliedPromo) redeemPromo(appliedPromo, req.user.id, id, discountAmount);
 
   const createdJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
+  res.status(201).json(createdJob);
+
   dispatchJob(id).catch((err) => console.error('dispatchJob hata:', err));
-  return createdJob;
-}
-
-router.post('/', async (req, res) => {
-  const {
-    propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-    hasEquipment, hasChemicals, serviceParams, promoCode,
-  } = req.body;
-
-  try {
-    const createdJob = await createCleaningJob({
-      propertyId, serviceKey, urgency, scheduledAt, addons, paymentMethod,
-      hasEquipment, hasChemicals, serviceParams, promoCode,
-      requestingUserId: req.user.id, requestingAccountType: req.user.accountType,
-    });
-    res.status(201).json(createdJob);
-  } catch (err) {
-    res.status(err.status || 500).json({ error: err.message || 'Sipariş oluşturulamadı.' });
-  }
 });
 
 // Kullanıcının (bireysel ev sahibi veya yönetim şirketi) erişebildiği
@@ -255,7 +190,8 @@ router.get('/', (req, res) => {
   const placeholders = ids.map(() => '?').join(',');
   const rows = db
     .prepare(
-      `SELECT j.*, p.name AS property_name, p.city AS property_city, s.name AS staff_name
+      `SELECT j.*, p.name AS property_name, p.city AS property_city, s.name AS staff_name,
+              (SELECT COUNT(*) FROM job_staff_assignments jsa WHERE jsa.job_id = j.id) AS assigned_staff_count
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
        LEFT JOIN users s ON s.id = j.assigned_staff_id
@@ -275,14 +211,19 @@ router.get('/pending', (req, res) => {
   const rows = db
     .prepare(
       `SELECT j.*, p.name AS property_name, p.address AS property_address, p.city AS property_city,
-              p.latitude AS property_latitude, p.longitude AS property_longitude
+              p.latitude AS property_latitude, p.longitude AS property_longitude,
+              (SELECT COUNT(*) FROM job_staff_assignments jsa WHERE jsa.job_id = j.id) AS assigned_staff_count
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
        WHERE j.status = 'pending'
        ORDER BY j.checkout_at ASC`
     )
-    .all();
-  res.json(rows);
+    .all()
+    // Zaten kabul etmiş bir personele, kendi kabul ettiği (henüz kadro
+    // dolmadığı için hâlâ 'pending' görünen) işi TEKRAR "boş iş" olarak
+    // göstermiyoruz.
+    .filter((j) => !db.prepare('SELECT 1 FROM job_staff_assignments WHERE job_id = ? AND staff_id = ?').get(j.id, req.user.id));
+  res.json(rows.map((j) => ({ ...j, remainingSlots: Math.max(0, (j.required_staff_count || 1) - j.assigned_staff_count) })));
 });
 
 // Personel bir işi kendine alır ("İşi Al" - Glovo'daki sipariş kabul etme
@@ -293,6 +234,17 @@ router.get('/pending', (req, res) => {
 // edebilir - rastgele bir iş id'siyle deneme yapılamaz. Acil siparişlerde
 // birden fazla personel aynı anda kabul etmeye çalışabileceği için atomik
 // bir UPDATE ile "ilk kabul eden alır" garantisi sağlanıyor.
+// Yüksek m²'li işlerde birden fazla personel gerekebilir (required_staff_count
+// > 1, bkz. catalog.js calcRequiredStaffCount). Bu durumda iş, kadro TAM
+// DOLANA kadar status='pending' kalır - böylece hem "Bekleyen İşler"
+// listesinden hem de bildirimle sıradaki personel işi görüp kabul edebilir.
+// Kabul, job_staff_assignments'a atomik bir satır ekler (better-sqlite3
+// senkron olduğu için SELECT+INSERT arasında yarış durumu oluşmaz - tıpkı
+// eski tek personelli UPDATE...WHERE status='pending' garantisi gibi).
+// İlk kabul eden "birincil" personel sayılır (assigned_staff_id, geriye
+// dönük uyumluluk için) ve müşteriye hemen "onaylandı" bildirimi gider;
+// kadro tamamlandığında (çok personelliyse) ayrıca "ekip tamam" bildirimi
+// gönderilir ve durum 'assigned'a geçer.
 router.post('/:id/accept', (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
@@ -304,6 +256,9 @@ router.post('/:id/accept', (req, res) => {
   const { id } = req.params;
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (job.status !== 'pending') {
+    return res.status(409).json({ error: 'Bu iş için gereken personel sayısına zaten ulaşıldı.' });
+  }
 
   // NOT: Sipariş Bildirimleri (dağıtım motoru) ertelendiği için
   // notified_staff_ids şu an hiç doldurulmuyor. Boşsa (bildirim sistemi
@@ -315,19 +270,58 @@ router.post('/:id/accept', (req, res) => {
     return res.status(403).json({ error: 'Bu iş sana bildirilmedi.' });
   }
 
-  const result = db
-    .prepare(`UPDATE cleaning_jobs SET status = 'assigned', assigned_staff_id = ?, accepted_at = datetime('now') WHERE id = ? AND status = 'pending'`)
-    .run(req.user.id, id);
-  if (result.changes === 0) {
-    return res.status(409).json({ error: 'Bu iş başka bir personel tarafından zaten alınmış.' });
+  const requiredCount = Math.max(1, job.required_staff_count || 1);
+  let wasFull = false;
+  let alreadyAccepted = false;
+  let isFirstAcceptance = false;
+  let becameFull = false;
+
+  const acceptTxn = db.transaction(() => {
+    const already = db.prepare('SELECT 1 FROM job_staff_assignments WHERE job_id = ? AND staff_id = ?').get(id, req.user.id);
+    if (already) { alreadyAccepted = true; return; }
+    const acceptedCount = db.prepare('SELECT COUNT(*) AS c FROM job_staff_assignments WHERE job_id = ?').get(id).c;
+    if (acceptedCount >= requiredCount) { wasFull = true; return; }
+
+    isFirstAcceptance = acceptedCount === 0;
+    db.prepare(
+      `INSERT INTO job_staff_assignments (id, job_id, staff_id, is_primary) VALUES (?, ?, ?, ?)`
+    ).run(uuid(), id, req.user.id, isFirstAcceptance ? 1 : 0);
+
+    if (isFirstAcceptance) {
+      db.prepare(`UPDATE cleaning_jobs SET assigned_staff_id = ? WHERE id = ?`).run(req.user.id, id);
+    }
+    const newCount = acceptedCount + 1;
+    if (newCount >= requiredCount) {
+      becameFull = true;
+      db.prepare(`UPDATE cleaning_jobs SET status = 'assigned', accepted_at = datetime('now') WHERE id = ?`).run(id);
+    }
+  });
+  acceptTxn();
+
+  if (wasFull) {
+    return res.status(409).json({ error: 'Bu iş başka personeller tarafından zaten dolduruldu.' });
+  }
+  if (alreadyAccepted) {
+    return res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
   }
 
   const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   res.json(updatedJob);
 
   // Müşteriye "siparişin onaylandı, şu personel şu saatte gelecek" bildirimi
-  // - yanıtı bekletmeden arka planda gönderiliyor.
-  notifyCustomerOfAcceptance(updatedJob).catch((err) => console.error('Müşteri bildirimi hata:', err));
+  // - yanıtı bekletmeden arka planda gönderiliyor. Çok personelli işlerde
+  // kadro tamamlanınca ayrıca "ekip tamam" bildirimi gidiyor.
+  if (isFirstAcceptance) {
+    notifyCustomerOfAcceptance(updatedJob).catch((err) => console.error('Müşteri bildirimi hata:', err));
+  }
+  if (becameFull && requiredCount > 1) {
+    notifyCustomerTeamComplete(updatedJob).catch((err) => console.error('Müşteri ekip bildirimi hata:', err));
+  }
+  // Kadro hâlâ tamamlanmadıysa (çok personelli iş), kalan yer için dağıtımı
+  // devam ettir.
+  if (!becameFull) {
+    dispatchJob(id).catch((err) => console.error('dispatchJob (kalan yer) hata:', err));
+  }
 });
 
 async function notifyCustomerOfAcceptance(job) {
@@ -342,17 +336,34 @@ async function notifyCustomerOfAcceptance(job) {
     whenText = dt.toLocaleString('tr-TR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
   }
 
+  const teamNote = job.required_staff_count > 1 ? ` (ekip tamamlanıyor, ${job.required_staff_count} kişilik bir iş)` : '';
   await sendPushToUser(property.owner_id, {
     title: 'Siparişin onaylandı! 🎉',
-    body: `${staffName}, ${property.name} için ${whenText} gelecek.`,
+    body: `${staffName}, ${property.name} için ${whenText} gelecek${teamNote}.`,
     jobId: job.id,
     type: 'job_accepted',
+  });
+}
+
+// Çok personelli işlerde (bkz. calcRequiredStaffCount), gereken TÜM
+// personel kabul ettiğinde müşteriye ayrı bir "ekip tamamlandı" bildirimi.
+async function notifyCustomerTeamComplete(job) {
+  const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(job.property_id);
+  if (!property) return;
+  await sendPushToUser(property.owner_id, {
+    title: 'Ekip tamamlandı ✅',
+    body: `${property.name} için gereken ${job.required_staff_count} personelin tamamı atandı.`,
+    jobId: job.id,
+    type: 'job_team_complete',
   });
 }
 
 // Personel bir iş teklifini reddeder. Acil olmayan siparişlerde bu, sırayı
 // bir sonraki en yakın adaya devreder. Acil (herkese aynı anda bildirilen)
 // siparişlerde reddetme başkasını engellemez, sadece kayıt altına alınır.
+// Çok personelli, acil olmayan bir işte aynı anda birden fazla adaya
+// bildirim gitmiş olabilir (current_candidate_id bu durumda NULL) - ret
+// eden kişi kim olursa olsun, hâlâ boş yer varsa yeniden dağıtım tetiklenir.
 router.post('/:id/reject', async (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
@@ -363,8 +374,12 @@ router.post('/:id/reject', async (req, res) => {
   if (job.status !== 'pending') {
     return res.json({ message: 'Bu iş artık uygun değil.' });
   }
-  if (job.urgency !== 'urgent' && job.current_candidate_id === req.user.id) {
-    db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE id = ?`).run(id);
+  const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
+  const wasNotified = notifiedIds.includes(req.user.id);
+  if (job.urgency !== 'urgent' && wasNotified) {
+    if (job.current_candidate_id === req.user.id) {
+      db.prepare(`UPDATE cleaning_jobs SET current_candidate_id = NULL WHERE id = ?`).run(id);
+    }
     await dispatchJob(id);
   }
   res.json({ message: 'Reddedildi.' });
@@ -407,10 +422,12 @@ router.get('/:id/offer-detail', (req, res) => {
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
 
   const notifiedIds = JSON.parse(job.notified_staff_ids || '[]');
-  // Kendisine özel bildirilmiş bir aday olabilir, kendi aldığı iş olabilir,
-  // ya da "Bekleyen İşler" sekmesinden gezinerek açık bir işe bakıyor
-  // olabilir (bu durumda job hâlâ 'pending' ve herkese açık) - üçü de geçerli.
-  const isCandidate = notifiedIds.includes(req.user.id) || job.assigned_staff_id === req.user.id || job.status === 'pending';
+  const isTeamMember = !!db.prepare('SELECT 1 FROM job_staff_assignments WHERE job_id = ? AND staff_id = ?').get(id, req.user.id);
+  // Kendisine özel bildirilmiş bir aday olabilir, ekibin bir parçası olabilir
+  // (çok personelli işte birincil olmasa bile), ya da "Bekleyen İşler"
+  // sekmesinden gezinerek açık bir işe bakıyor olabilir (bu durumda job
+  // hâlâ 'pending' ve herkese açık) - üçü de geçerli.
+  const isCandidate = notifiedIds.includes(req.user.id) || isTeamMember || job.status === 'pending';
   if (!isCandidate) {
     return res.status(403).json({ error: 'Bu işe erişim yetkiniz yok.' });
   }
@@ -418,12 +435,19 @@ router.get('/:id/offer-detail', (req, res) => {
   res.json({
     ...job,
     estimatedMinutes: estimateJobMinutes(job.service_key, JSON.parse(job.service_params || 'null')),
-    // KDV HARIC net taban uzerinden - bkz. jobs.js/financeCalc.js'teki
-    // ayni gerekce (KDV, personelin/MICISTO'nun payini etkilememeli).
-    netEarning: calcNetEarning(job.net_price != null ? job.net_price : job.price, job.card_fee ? job.card_fee / 2 : 0),
+    // Çok personelli işlerde (required_staff_count > 1) net kazanç, tüm
+    // ekibe eşit bölünmüş HALİYLE gösteriliyor - personel teklifi
+    // değerlendirirken gerçekte eline geçecek payı görsün.
+    netEarning: calcNetEarningPerStaff(job.price, job.required_staff_count),
+    requiredStaffCount: job.required_staff_count,
     canRespond: job.status === 'pending',
   });
 });
+
+// job_staff_assignments'a göre "bu iş bana atanmış mı" filtresi - çok
+// personelli işlerde assigned_staff_id sadece birincili tutar, gerçek
+// kaynak burası.
+const MINE_FILTER = `EXISTS (SELECT 1 FROM job_staff_assignments jsa WHERE jsa.job_id = j.id AND jsa.staff_id = ?)`;
 
 // Personelin kendine aldığı, henüz tamamlamadığı işler ("İşlerim" listesi).
 router.get('/mine', (req, res) => {
@@ -436,16 +460,17 @@ router.get('/mine', (req, res) => {
               p.latitude AS property_latitude, p.longitude AS property_longitude
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status IN ('assigned','in_progress')
+       WHERE ${MINE_FILTER} AND j.status IN ('assigned','in_progress')
        ORDER BY j.checkout_at ASC`
     )
     .all(req.user.id);
-  res.json(rows);
+  res.json(rows.map((j) => ({ ...j, myNetEarning: calcNetEarningPerStaff(j.price, j.required_staff_count) })));
 });
 
 // Home paneli için: bugün yapılacak (onaylanmış/devam eden) işler +
 // bugün tamamlanan işlerden oluşan kazanç özeti (MICISTO komisyonu
-// düşülmüş hali). "Bugün" karşılaştırması sunucu saatine göre yapılır.
+// düşülmüş, çok personelli işlerde ekibe bölünmüş hali).
+// "Bugün" karşılaştırması sunucu saatine göre yapılır.
 router.get('/home-summary', (req, res) => {
   if (req.user.accountType !== 'staff') {
     return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
@@ -458,7 +483,7 @@ router.get('/home-summary', (req, res) => {
       `SELECT j.*, ${propertyFields}
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status IN ('assigned','in_progress')
+       WHERE ${MINE_FILTER} AND j.status IN ('assigned','in_progress')
          AND date(j.checkout_at) = date('now')
        ORDER BY j.checkout_at ASC`
     )
@@ -470,15 +495,14 @@ router.get('/home-summary', (req, res) => {
       `SELECT j.*, ${propertyFields}
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status = 'done'
+       WHERE ${MINE_FILTER} AND j.status = 'done'
          AND date(j.completed_at) = date('now')
        ORDER BY j.completed_at DESC`
     )
     .all(req.user.id);
 
-  // KDV HARIC net taban uzerinden - bkz. /performance endpoint'indeki ayni gerekce.
   const grossTotal = completedToday.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price, j.card_fee ? j.card_fee / 2 : 0), 0);
+  const netTotal = completedToday.reduce((sum, j) => sum + calcNetEarningPerStaff(j.price, j.required_staff_count), 0);
 
   res.json({
     todaysJobs,
@@ -534,19 +558,15 @@ router.get('/performance', (req, res) => {
       `SELECT j.*, p.name AS property_name, p.city AS property_city
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status = 'done'
+       WHERE ${MINE_FILTER} AND j.status = 'done'
          AND date(j.completed_at) BETWEEN ? AND ?
        ORDER BY j.completed_at DESC`
     )
-    .all(req.user.id, startKey, endKey);
+    .all(req.user.id, startKey, endKey)
+    .map((j) => ({ ...j, myNetEarning: calcNetEarningPerStaff(j.price, j.required_staff_count) }));
 
-  // ONEMLI: Personelin net kazanci KDV HARIC taban uzerinden hesaplanir -
-  // j.price KDV DAHIL musteri fiyatidir, dogrudan kullanilirsa personelin
-  // "bu donemki kazancim" ekranindaki rakam OLDUGUNDAN FAZLA gorunurdu.
-  // Eski (KDV ozelliginden once olusturulmus) islerde j.net_price NULL'dur,
-  // o durumda j.price zaten KDV eklenmeden hesaplanmisti, dogrudan kullanilir.
   const grossTotal = jobs.reduce((sum, j) => sum + j.price, 0);
-  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarning(j.net_price != null ? j.net_price : j.price, j.card_fee ? j.card_fee / 2 : 0), 0) * 100) / 100;
+  const netTotal = Math.round(jobs.reduce((sum, j) => sum + calcNetEarningPerStaff(j.price, j.required_staff_count), 0) * 100) / 100;
   const daysWorked = new Set(jobs.map((j) => (j.completed_at || '').slice(0, 10))).size;
   const completionRate = totalDays ? daysWorked / totalDays : 0;
   const bonus = calcPerformanceBonus(completionRate, { period, daysWorked, totalDays });
@@ -573,43 +593,20 @@ router.get('/ratings', (req, res) => {
   const startKey = toDateKey(start);
   const endKey = toDateKey(end);
 
-  // ONEMLI: service_score (temizlige verilen puan) da SELECT'e dahil -
-  // personel artik SADECE kendisine verilen puani degil, temizlige
-  // verilen puani da goruyor. WHERE kosulu da artik iki puandan HERHANGI
-  // BIRI varsa isi listeye aliyor (eskiden sadece staff_score
-  // doluysa listeleniyordu - sadece service_score girilmis bir degerlendirme
-  // tamamen kayboluyordu).
   const rows = db
     .prepare(
-      `SELECT j.id, j.service_key, j.service_params, j.completed_at,
-              j.service_score, j.service_feedback, j.staff_score, j.staff_feedback,
+      `SELECT j.id, j.service_key, j.service_params, j.completed_at, j.staff_score, j.staff_feedback,
               p.name AS property_name, p.city AS property_city
        FROM cleaning_jobs j
        JOIN properties p ON p.id = j.property_id
-       WHERE j.assigned_staff_id = ? AND j.status = 'done'
-         AND (j.staff_score IS NOT NULL OR j.service_score IS NOT NULL)
+       WHERE ${MINE_FILTER} AND j.status = 'done' AND j.staff_score IS NOT NULL
          AND date(j.completed_at) BETWEEN ? AND ?
        ORDER BY j.completed_at DESC`
     )
     .all(req.user.id, startKey, endKey);
 
   const totalRated = rows.length;
-  // Genel ortalama: her isin kendi ici ortalamasi (iki puan da varsa
-  // ortalamalari, sadece biri varsa o) uzerinden hesaplaniyor - staff-frontend
-  // ile birebir ayni mantik, iki taraf da ayni sayiyi gorur.
-  const combinedScores = rows
-    .map((r) => {
-      const hasService = r.service_score !== null && r.service_score !== undefined;
-      const hasStaff = r.staff_score !== null && r.staff_score !== undefined;
-      if (hasService && hasStaff) return (r.service_score + r.staff_score) / 2;
-      if (hasStaff) return r.staff_score;
-      if (hasService) return r.service_score;
-      return null;
-    })
-    .filter((v) => v !== null);
-  const avgScore = combinedScores.length
-    ? Math.round((combinedScores.reduce((a, b) => a + b, 0) / combinedScores.length) * 10) / 10
-    : null;
+  const avgScore = totalRated ? Math.round((rows.reduce((sum, r) => sum + r.staff_score, 0) / totalRated) * 10) / 10 : null;
 
   res.json({
     period, offset, startDate: startKey, endDate: endKey,
@@ -644,16 +641,22 @@ router.post('/:id/cancel', (req, res) => {
   const updatedJob = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   res.json(updatedJob);
 
-  // İş zaten bir personele atanmışsa (assigned), o personele "bu iş iptal
-  // edildi, gitmene gerek yok" bildirimi gönderiyoruz.
-  if (job.assigned_staff_id) {
-    sendPushToUser(job.assigned_staff_id, {
+  // İş zaten bir/birden fazla personele atanmışsa (çok personelli işlerde
+  // kadro tamamlanmadan da kısmi kabul olabilir - bu yüzden assigned_staff_id
+  // yerine job_staff_assignments'taki TÜM ekibe bakıyoruz), her birine "bu
+  // iş iptal edildi, gitmene gerek yok" bildirimi gönderiyoruz.
+  const acceptedStaffIds = db
+    .prepare('SELECT staff_id FROM job_staff_assignments WHERE job_id = ?')
+    .all(id)
+    .map((r) => r.staff_id);
+  acceptedStaffIds.forEach((staffId) => {
+    sendPushToUser(staffId, {
       title: 'Sipariş iptal edildi',
       body: 'Müşteri bu siparişi iptal etti - bu işe gitmene gerek yok.',
       jobId: id,
       type: 'job_cancelled',
     }).catch((err) => console.error('Personel iptal bildirimi hata:', err));
-  }
+  });
 });
 
 router.patch('/:id/status', (req, res) => {
@@ -663,16 +666,20 @@ router.patch('/:id/status', (req, res) => {
   if (!allowed.includes(status)) {
     return res.status(400).json({ error: 'Geçersiz durum.' });
   }
-  // Personel yalnızca kendi aldığı (assigned_staff_id kendisi olan) işi
-  // tamamlandı işaretleyebilir - başkasının işini kapatamaz. Mülk sahibi
-  // artık işi tamamlandı işaretleyemez - bu, personel paneli tamamlanana
-  // kadar geçici bir izindi (bkz. sürüm geçmişi), kaldırıldı.
+  // Personel yalnızca kendisinin de içinde olduğu (job_staff_assignments'ta
+  // yer aldığı) bir işi tamamlandı işaretleyebilir - başkasının işini
+  // kapatamaz. Çok personelli işlerde EKİPTEKİ HERHANGİ BİR personel işi
+  // tamamlandı işaretleyebilir (sadece "birincil" değil). Mülk sahibi artık
+  // işi tamamlandı işaretleyemez - bu, personel paneli tamamlanana kadar
+  // geçici bir izindi (bkz. sürüm geçmişi), kaldırıldı.
   if (status === 'done') {
     if (req.user.accountType !== 'staff') {
       return res.status(403).json({ error: 'Bu işlemi yalnızca personel yapabilir.' });
     }
-    const jobToCheck = db.prepare('SELECT assigned_staff_id FROM cleaning_jobs WHERE id = ?').get(id);
-    if (!jobToCheck || jobToCheck.assigned_staff_id !== req.user.id) {
+    const membership = db
+      .prepare('SELECT 1 FROM job_staff_assignments WHERE job_id = ? AND staff_id = ?')
+      .get(id, req.user.id);
+    if (!membership) {
       return res.status(403).json({ error: 'Bu iş sana atanmamış.' });
     }
   }
@@ -690,21 +697,6 @@ router.patch('/:id/status', (req, res) => {
     db.prepare('UPDATE cleaning_jobs SET status = ? WHERE id = ?').run(status, id);
   }
   res.json(db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id));
-
-  // Is tamamlandiginda musteriye "degerlendir" daveti - eskiden bu haber
-  // yalnizca uygulama acilinca gorunen bir ekrandi (bkz. asagidaki /:id/rate
-  // yorumu), simdi push ile de anlik haber veriliyor.
-  if (status === 'done') {
-    const property = db.prepare('SELECT owner_id, name FROM properties WHERE id = ?').get(job.property_id);
-    if (property) {
-      sendPushToUser(property.owner_id, {
-        title: 'Hizmetin tamamlandı! ✅',
-        body: `${property.name} için hizmet tamamlandı - deneyimini değerlendirmek ister misin?`,
-        jobId: id,
-        type: 'job_done',
-      }).catch((err) => console.error('Tamamlanma bildirimi hata:', err));
-    }
-  }
 });
 
 // Müşteri, personel tarafından tamamlanmış (status='done') bir siparişi
@@ -753,27 +745,7 @@ router.get('/finance-summary', (req, res) => {
   const owedToStaffPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToStaff, 0));
   const owedToBusinessPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.owedToBusiness, 0));
   const pendingNet = round2(owedToStaffPending - owedToBusinessPending);
-  // staffEarningPending: personelin bu odenmemis donem(ler)deki GERCEK
-  // kazanci (nakit dahil, odeme yontemi farketmeksizin) - "Bu donemki
-  // kazancin" karti bunu gosterir, mutabakat (owedToStaffPending) ile
-  // KARISTIRILMAMALI - ikisi kasitli olarak farkli rakamlardir.
-  const staffEarningPending = round2(unpaidPeriods.reduce((sum, p) => sum + p.staffEarning, 0));
-  res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet, staffEarningPending });
-});
-
-// Bir donemin KUMULATIF degil, IS IS kirilimi - personel kendi mutabakat
-// donemine tikladiginda hangi isten ne kadar kazandigini gorsun (admin
-// tarafindaki AYNI endpoint mantigi, bkz. admin.js /finance/staff/:id/period-jobs -
-// iki taraf da AYNI getStaffPeriodJobs fonksiyonunu kullanir, rakamlar
-// birebir tutarlidir).
-router.get('/finance/period-jobs', (req, res) => {
-  if (req.user.accountType !== 'staff') {
-    return res.status(403).json({ error: 'Bu sayfayı yalnızca personel görebilir.' });
-  }
-  const { periodStart, periodEnd } = req.query;
-  if (!periodStart || !periodEnd) return res.status(400).json({ error: 'periodStart ve periodEnd zorunlu.' });
-  const jobs = getStaffPeriodJobs(req.user.id, periodStart, periodEnd);
-  res.json({ periodStart, periodEnd, jobs });
+  res.json({ totalEarned, periods, owedToStaffPending, owedToBusinessPending, pendingNet });
 });
 
 // Personel "Ödememi Aldım" dediğinde, admin'in "Ödendi İşaretle" dediğinde
@@ -795,12 +767,19 @@ router.post('/finance/mark-received', (req, res) => {
 });
 
 // Personel "Yola Çık" dediğinde: 1) işi işaretle 2) müşteriye "personelin
-// yola çıktı, canlı konumunu takip edebilirsin" bildirimi gönder.
+// yola çıktı, canlı konumunu takip edebilirsin" bildirimi gönder. Çok
+// personelli işlerde ekipteki HERHANGİ BİR personel bunu tetikleyebilir
+// (job_staff_assignments üyeliği yeterli, sadece birincil değil) - kayıt
+// tek satır (headed_out_at) olduğu için ilk tetikleyen işareti koyar,
+// sonraki çağrılar idempotent şekilde aynı zamanı günceller.
 router.post('/:id/head-out', (req, res) => {
   const { id } = req.params;
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
   if (!job) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
-  if (job.assigned_staff_id !== req.user.id) {
+  const membership = db
+    .prepare('SELECT 1 FROM job_staff_assignments WHERE job_id = ? AND staff_id = ?')
+    .get(id, req.user.id);
+  if (!membership) {
     return res.status(403).json({ error: 'Bu iş sana atanmamış.' });
   }
   db.prepare(`UPDATE cleaning_jobs SET headed_out_at = datetime('now') WHERE id = ?`).run(id);
@@ -844,6 +823,9 @@ router.get('/:id/staff-location', (req, res) => {
 
 // Müşterinin, atanmış personelin telefon numarasını görebilmesi - adreste
 // bir sorun olursa (bulamama, yol tarifi vb.) doğrudan ulaşabilsin diye.
+// Çok personelli işlerde EKİBİN TAMAMI (team dizisi) dönüyor; name/phone
+// alanları geriye dönük uyumluluk için birincil personeli taşımaya devam
+// ediyor (eski müşteri uygulaması sürümleri bunu kullanıyor olabilir).
 router.get('/:id/staff-contact', (req, res) => {
   const { id } = req.params;
   const job = db.prepare('SELECT * FROM cleaning_jobs WHERE id = ?').get(id);
@@ -856,9 +838,16 @@ router.get('/:id/staff-contact', (req, res) => {
   }
   const staff = db.prepare('SELECT name, phone FROM users WHERE id = ?').get(job.assigned_staff_id);
   if (!staff) return res.status(404).json({ error: 'Personel bulunamadı.' });
-  res.json({ name: staff.name, phone: staff.phone });
+
+  const team = db
+    .prepare(
+      `SELECT u.name, u.phone, jsa.is_primary
+       FROM job_staff_assignments jsa JOIN users u ON u.id = jsa.staff_id
+       WHERE jsa.job_id = ? ORDER BY jsa.is_primary DESC, jsa.joined_at ASC`
+    )
+    .all(id);
+
+  res.json({ name: staff.name, phone: staff.phone, team });
 });
 
 module.exports = router;
-module.exports.createCleaningJob = createCleaningJob;
-module.exports.accessiblePropertyIds = accessiblePropertyIds;
